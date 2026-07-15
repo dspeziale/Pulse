@@ -31,7 +31,7 @@ _SCHEMA = _REPO_ROOT / "deploy" / "schema.sql"
 _SEED = _REPO_ROOT / "deploy" / "seed.sql"
 
 _CONTAINER = f"pulse-test-pg-{uuid.uuid4().hex[:8]}"
-_PORT = int(os.environ.get("PULSE_TEST_PG_PORT", "55432"))
+_PORT = int(os.environ.get("PULSE_TEST_PG_PORT", "5433"))
 _DB_URL_ENV = "PULSE_TEST_DATABASE_URL"
 
 
@@ -45,11 +45,38 @@ def _docker_available() -> bool:
         return False
 
 
-def _apply_sql(engine: Engine, path: pathlib.Path) -> None:
+def _apply_sql_via_psql(container: str, path: pathlib.Path) -> None:
+    """Applica un file SQL eseguendo psql DENTRO il container.
+
+    Evita l'interpretazione dei '%' (usati in RAISE EXCEPTION) come placeholder
+    da parte del driver psycopg lato client.
+    """
+    with open(path, "rb") as fh:
+        subprocess.run(
+            [
+                "docker", "exec", "-i", container,
+                "psql", "-U", "pulse", "-d", "pulse", "-v", "ON_ERROR_STOP=1", "-q",
+            ],
+            stdin=fh,
+            check=True,
+            capture_output=True,
+        )
+
+
+def _apply_sql_via_engine(engine: Engine, path: pathlib.Path) -> None:
+    """Fallback per DB esterno: esegue lo script grezzo via driver DBAPI.
+
+    Usa una connessione DBAPI in autocommit e cursor.execute() sul testo intero
+    (psycopg accetta piu' statement in un'unica execute senza parametri).
+    """
     sql = path.read_text(encoding="utf-8")
-    with engine.begin() as conn:
-        conn.execute(text("SET client_min_messages TO WARNING"))
-        conn.exec_driver_sql(sql)
+    raw = engine.raw_connection()
+    try:
+        raw.autocommit = True  # type: ignore[attr-defined]
+        with raw.cursor() as cur:
+            cur.execute(sql)  # type: ignore[arg-type]
+    finally:
+        raw.close()
 
 
 def _wait_ready(url: str, attempts: int = 60) -> Engine:
@@ -92,8 +119,12 @@ def db_engine() -> Iterator[Engine]:
 
     try:
         engine = _wait_ready(url)
-        _apply_sql(engine, _SCHEMA)
-        _apply_sql(engine, _SEED)
+        if started_container:
+            _apply_sql_via_psql(_CONTAINER, _SCHEMA)
+            _apply_sql_via_psql(_CONTAINER, _SEED)
+        else:
+            _apply_sql_via_engine(engine, _SCHEMA)
+            _apply_sql_via_engine(engine, _SEED)
         yield engine
         engine.dispose()
     finally:
