@@ -68,12 +68,39 @@ def test_proxy_unexpected_status_maps_503() -> None:
     assert exc.value.status_code == 503
 
 
-def test_proxy_client_builder_with_certs() -> None:
-    """Copre la costruzione del client httpx con cert/verify da settings."""
+def test_proxy_client_builder_with_certs(tmp_path) -> None:
+    """Copre la costruzione del client httpx con cert/verify da settings reali."""
+    import ssl
+
+    cert = tmp_path / "cert.pem"
+    key = tmp_path / "key.pem"
+    ca = tmp_path / "ca.pem"
+    # genera una coppia cert/chiave self-signed valida per httpx/ssl
+    from cryptography import x509
+    from cryptography.hazmat.primitives import hashes, serialization
+    from cryptography.hazmat.primitives.asymmetric import rsa
+    from cryptography.x509.oid import NameOID
+    import datetime as _dt
+
+    k = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "pulse-test")])
+    crt = (
+        x509.CertificateBuilder()
+        .subject_name(name).issuer_name(name).public_key(k.public_key())
+        .serial_number(x509.random_serial_number())
+        .not_valid_before(_dt.datetime.now(_dt.timezone.utc))
+        .not_valid_after(_dt.datetime.now(_dt.timezone.utc) + _dt.timedelta(days=1))
+        .sign(k, hashes.SHA256())
+    )
+    key.write_bytes(k.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.TraditionalOpenSSL, serialization.NoEncryption()))
+    cert.write_bytes(crt.public_bytes(serialization.Encoding.PEM))
+    ca.write_bytes(crt.public_bytes(serialization.Encoding.PEM))
+    assert ssl  # usato implicitamente da httpx
+
     settings = Settings(
-        probe_client_cert_path="cert.pem",
-        probe_client_key_path="key.pem",
-        tls_ca_cert_path="ca.pem",
+        probe_client_cert_path=str(cert),
+        probe_client_key_path=str(key),
+        tls_ca_cert_path=str(ca),
     )
     client = ProbeQueryClient(settings)
     httpx_client = client._client()

@@ -19,7 +19,7 @@ from pulse_server.models import (
     WorkflowAction,
     WorkflowCondition,
 )
-from pulse_server.notifications import DeliveryResult, get_notifier, set_notifier
+from pulse_server.notifications import DeliveryResult, encrypt_config, get_notifier, set_notifier
 from pulse_server.security import SecretBox
 
 BOX = SecretBox("test-key")
@@ -58,7 +58,7 @@ def _setup(session, *, trigger="status_changed", conditions=None, suppression=No
     session.add(system)
     channel = NotificationChannel(
         name=f"wc-{dt.datetime.now().timestamp()}", type="telegram", enabled=True, inbound_enabled=False,
-        config={"bot_token": "t", "webhook_secret": "s"},
+        config=encrypt_config(BOX, {"bot_token": "t", "webhook_secret": "s"}),
     )
     session.add(channel)
     session.flush()
