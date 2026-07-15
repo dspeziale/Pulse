@@ -84,3 +84,55 @@ Output consegnati
 - 9 documenti di analisi/API/database completi e coerenti, pronti per l'AGENTE 2 (DBA) che dovrà scegliere e motivare il motore del DB Server sulla base del modello logico e dei requisiti dati forniti.
 
 ================================================
+
+ITERAZIONE 2
+
+Agente: DBA
+Data: 2026-07-15
+
+Input ricevuti
+- docs/database/DOCUMENTO_DATABASE.md (modello logico, 23 entità Server §3.1–§3.23 + confine OpenSearch).
+- docs/api/DOCUMENTO_API.md (coerenza nomi/campi endpoint).
+- docs/analisi/06_rbac.md (catalogo permessi, 5 ruoli, matrice ruoli×permessi).
+- docs/analisi/07_workflow_notifiche.md (entità workflow/allarmi/comandi).
+- docs/analisi/05_requisiti.md (audit immutabile, retention, cifratura, ecc.).
+- Vincolo utente: motore DB Server = PostgreSQL 16 (da motivare); OpenSearch resta sulle Probe.
+
+Lavoro svolto
+- Progettato lo schema fisico PostgreSQL 16 completo delle 23 entità del modello logico (nessuna entità OpenSearch inclusa, RF-051).
+- Mapping tipi logici→PostgreSQL (uuid, varchar, jsonb, timestamptz, ENUM→varchar+CHECK).
+- Definiti PK/FK con azioni referenziali coerenti con l'API (RESTRICT dove l'API prevede 409: probe con sistemi, canale usato da workflow), UNIQUE, CHECK, 78 indici motivati.
+- Implementate strategie richieste: audit immutabile (trigger BEFORE UPDATE/DELETE), updated_at automatico, protezione ruoli builtin, funzione di retention fn_purge_retention(), 3 viste (permessi effettivi, conteggio sistemi/probe, allarmi attivi).
+- Scritto seed: catalogo permessi, 5 ruoli predefiniti, matrice ruoli×permessi, utente admin SuperAdmin (bcrypt cost 12 di 'ChangeMe123!'), 10 parametri di configurazione di default.
+- Prodotti compose Docker e Podman (volume persistente, init da schema.sql+seed.sql via /docker-entrypoint-initdb.d, healthcheck, porta configurabile via env).
+- Redatti ER_DIAGRAM.md (Mermaid erDiagram con attributi/PK/FK/cardinalità) e SCHEMA_FISICO.md (motivazione PostgreSQL, dettaglio tabelle, strategie, incongruenze, copertura entità, esito validazione).
+- VALIDAZIONE ESEGUITA con Docker (postgres:16): schema.sql e seed.sql applicati puliti (exit 0), idempotenza verificata (re-run 0 righe), trigger e vista verificati.
+
+File creati
+- deploy/schema.sql
+- deploy/seed.sql
+- deploy/docker-compose.yml
+- deploy/podman-compose.yml
+- docs/database/ER_DIAGRAM.md
+- docs/database/SCHEMA_FISICO.md
+
+Problemi trovati
+- I-1: 06_rbac.md dichiara "37 permessi" ma il catalogo enumerato (§2) e la matrice (§4) contengono 40 codici distinti. Scelta conservativa: seed di tutti i 40 codici enumerati (nessuna invenzione); segnalare all'Analista il conteggio errato.
+- I-3: DELETE canale (API 409 solo "se usato da workflow") vs notification_deliveries.channel_id NOT NULL storico. Scelto ON DELETE RESTRICT anche su deliveries per preservare lo storico; il 409 "workflow" resta su workflow_actions.channel_id RESTRICT.
+- Parole riservate come nomi colonna (trigger/timestamp/window/repeat): mantenuti i nomi API quotandoli nel DDL (coerenza RNF-050).
+- RF-021 (ultimo SuperAdmin) e "ultimo SuperAdmin non rimuovibile" non esprimibili in modo affidabile a livello DB → enforcement Backend (409), come da API.
+- Podman non installato in questo ambiente: podman-compose.yml prodotto ma validato solo indirettamente (struttura identica al docker-compose validato).
+
+Decisioni prese
+- Motore: PostgreSQL 16 (motivato in SCHEMA_FISICO.md §1 punto per punto sui requisiti dati).
+- ENUM come varchar+CHECK (portabilità/evolvibilità) invece di CREATE TYPE.
+- JSON come jsonb; probes.tags come jsonb array con CHECK.
+- gen_random_uuid() in core (no estensione obbligatoria); pgcrypto abilitato per usi futuri.
+- Hashing password: bcrypt cost 12 (RNF-003 non specifica l'algoritmo); colonna compatibile con argon2id.
+- Audit non incluso nella retention (conservazione a fini di conformità).
+- Retention via funzione + scheduler esterno (pg_cron non garantito nell'immagine standard).
+
+Output consegnati
+- Schema fisico PostgreSQL 16 completo, eseguibile, idempotente e validato; seed RBAC completo; ER diagram; documentazione schema fisico; compose Docker/Podman. Pronto per gli AGENTI 3 (BE + FE).
+
+================================================

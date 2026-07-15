@@ -1,0 +1,47 @@
+# =============================================================================
+# Pulse — DB Server PostgreSQL 16 (Docker Compose)
+# File: deploy/docker-compose.yml
+# Autore: AGENTE 2 — DBA
+#
+# Avvio:   docker compose -f deploy/docker-compose.yml up -d
+# Stop:    docker compose -f deploy/docker-compose.yml down
+# Reset:   docker compose -f deploy/docker-compose.yml down -v   (cancella il volume!)
+#
+# schema.sql e seed.sql vengono eseguiti automaticamente al PRIMO avvio del
+# container tramite /docker-entrypoint-initdb.d (in ordine alfabetico:
+# 01-schema.sql poi 02-seed.sql). Su volume gia' inizializzato NON vengono
+# rieseguiti (comportamento standard dell'immagine postgres).
+#
+# Variabili sovrascrivibili via file .env accanto a questo compose o via ambiente.
+# =============================================================================
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: pulse-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-pulse}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pulse}
+      POSTGRES_DB: ${POSTGRES_DB:-pulse}
+      # Opzioni di inizializzazione (encoding/locale UTF-8).
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+      TZ: UTC
+    ports:
+      # Porta host configurabile via env (default 5432). Formato host:container.
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pulse_pgdata:/var/lib/postgresql/data
+      # Init scripts (eseguiti solo su data-dir vuota). :ro = sola lettura.
+      - ./schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./seed.sql:/docker-entrypoint-initdb.d/02-seed.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-pulse} -d ${POSTGRES_DB:-pulse}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+volumes:
+  pulse_pgdata:
+    name: pulse_pgdata

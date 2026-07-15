@@ -1,0 +1,56 @@
+# =============================================================================
+# Pulse — DB Server PostgreSQL 16 (Podman Compose)
+# File: deploy/podman-compose.yml
+# Autore: AGENTE 2 — DBA
+#
+# Avvio:   podman-compose -f deploy/podman-compose.yml up -d
+# Stop:    podman-compose -f deploy/podman-compose.yml down
+# Reset:   podman-compose -f deploy/podman-compose.yml down -v
+#
+# Struttura identica al docker-compose.yml. Compatibile con esecuzione ROOTLESS
+# (RNF-042). schema.sql + seed.sql eseguiti al primo avvio via
+# /docker-entrypoint-initdb.d.
+#
+# DIFFERENZE Podman rispetto a Docker (documentate):
+#  - Il montaggio dei file init monta con etichetta SELinux :ro,Z per consentire
+#    la lettura da parte del container in ambienti con SELinux enforcing
+#    (Fedora/RHEL). Su Docker basta :ro; :Z e' innocuo ma specifico Podman.
+#  - In rootless, la porta host deve essere >= 1024 senza privilegi aggiuntivi:
+#    il default 5432 e' valido rootless. Configurabile via POSTGRES_PORT.
+#  - podman-compose interpreta le stesse variabili ${VAR:-default}. In assenza
+#    di un file .env esportare le variabili nell'ambiente della shell.
+#  - Il volume nominato e' gestito da Podman (podman volume ls) invece che Docker.
+#
+# NOTA: in questo ambiente Podman NON e' installato (solo Docker). La validazione
+# automatica dello schema e' stata eseguita con Docker; questo file e' fornito
+# come richiesto (RNF-041) e replica esattamente la configurazione validata.
+# =============================================================================
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: pulse-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-pulse}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pulse}
+      POSTGRES_DB: ${POSTGRES_DB:-pulse}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+      TZ: UTC
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pulse_pgdata:/var/lib/postgresql/data
+      # :ro,Z -> sola lettura + rietichettatura SELinux (specifico Podman/SELinux).
+      - ./schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro,Z
+      - ./seed.sql:/docker-entrypoint-initdb.d/02-seed.sql:ro,Z
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-pulse} -d ${POSTGRES_DB:-pulse}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+volumes:
+  pulse_pgdata:
+    name: pulse_pgdata
