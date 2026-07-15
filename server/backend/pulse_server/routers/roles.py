@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Query, Request, Response
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 
 from .. import errors, schemas, serializers
 from ..audit import write_audit
@@ -169,7 +169,7 @@ def set_permissions(
     if role.is_builtin:
         raise errors.conflict("I permessi di un ruolo predefinito non sono modificabili.")
     _validate_permission_codes(session, body.permission_codes)
-    session.execute(RolePermission.__table__.delete().where(RolePermission.role_id == role.id))
+    session.execute(delete(RolePermission).where(RolePermission.role_id == role.id))
     for code in body.permission_codes:
         session.add(RolePermission(role_id=role.id, permission_code=code))
     write_audit(

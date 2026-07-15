@@ -78,9 +78,9 @@ def _event_field(event: dict[str, Any], name: str) -> Any:
 def eval_condition(op: str, left: Any, right: Any) -> bool:
     """Valuta un singolo operatore di condizione."""
     if op == "eq":
-        return left == right
+        return bool(left == right)
     if op == "neq":
-        return left != right
+        return bool(left != right)
     if op in ("gt", "gte", "lt", "lte"):
         if left is None or right is None:
             return False
@@ -143,7 +143,7 @@ def _within_active_hours(active_hours: dict[str, Any] | None, now: dt.datetime) 
     end = active_hours.get("end")
     if start and end:
         cur = now.strftime("%H:%M")
-        return start <= cur <= end
+        return bool(start <= cur <= end)
     return True
 
 

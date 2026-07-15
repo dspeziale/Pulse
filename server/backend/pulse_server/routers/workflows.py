@@ -5,7 +5,7 @@ from __future__ import annotations
 import datetime as dt
 
 from fastapi import APIRouter, Depends, Query, Request, Response
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 
 from .. import errors, schemas, serializers
 from ..audit import write_audit
@@ -51,7 +51,7 @@ def _replace_conditions(
     session: SessionDep, wf: NotificationWorkflow, conditions: list[schemas.WorkflowConditionIO]
 ) -> None:
     session.execute(
-        WorkflowCondition.__table__.delete().where(WorkflowCondition.workflow_id == wf.id)
+        delete(WorkflowCondition).where(WorkflowCondition.workflow_id == wf.id)
     )
     for idx, cond in enumerate(conditions):
         session.add(
@@ -69,7 +69,7 @@ def _replace_conditions(
 def _replace_actions(
     session: SessionDep, wf: NotificationWorkflow, actions: list[schemas.WorkflowActionIO]
 ) -> None:
-    session.execute(WorkflowAction.__table__.delete().where(WorkflowAction.workflow_id == wf.id))
+    session.execute(delete(WorkflowAction).where(WorkflowAction.workflow_id == wf.id))
     for action in actions:
         session.add(
             WorkflowAction(

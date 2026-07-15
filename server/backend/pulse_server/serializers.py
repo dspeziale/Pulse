@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import uuid
+
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -25,7 +27,7 @@ from .models import (
 from .notifications import mask_config
 
 
-def systems_count(session: Session, probe_id) -> int:
+def systems_count(session: Session, probe_id: uuid.UUID) -> int:
     return int(
         session.execute(
             select(func.count(MonitoredSystem.id)).where(MonitoredSystem.probe_id == probe_id)

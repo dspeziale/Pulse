@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Annotated
 
@@ -80,7 +81,7 @@ def get_current_user(request: Request, session: SessionDep, settings: SettingsDe
 CurrentUserDep = Annotated[CurrentUser, Depends(get_current_user)]
 
 
-def require_permission(code: str):
+def require_permission(code: str) -> Callable[[CurrentUser], CurrentUser]:
     """Factory di dependency che impone il possesso del permesso `code`."""
 
     def _dep(user: CurrentUserDep) -> CurrentUser:

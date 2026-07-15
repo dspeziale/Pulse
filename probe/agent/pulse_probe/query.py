@@ -23,9 +23,9 @@ def _parse_iso(value: Any) -> dt.datetime | None:
 def eval_op(op: str, left: Any, right: Any) -> bool:
     """Valuta un operatore di filtro. Operatore sconosciuto -> False."""
     if op == "eq":
-        return left == right
+        return bool(left == right)
     if op == "neq":
-        return left != right
+        return bool(left != right)
     if op in ("gt", "gte", "lt", "lte"):
         if left is None or right is None:
             return False

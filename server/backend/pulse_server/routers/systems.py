@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Query, Request, Response
-from sqlalchemy import func, or_, select
+from sqlalchemy import delete, func, or_, select
 
 from .. import errors, schemas, serializers
 from ..audit import write_audit
@@ -28,7 +28,7 @@ def _require_probe(session: SessionDep, probe_id: str) -> Probe:
 
 def _replace_windows(session: SessionDep, system: MonitoredSystem, windows: list[schemas.MaintenanceWindowIn]) -> None:
     session.execute(
-        MaintenanceWindow.__table__.delete().where(MaintenanceWindow.system_id == system.id)
+        delete(MaintenanceWindow).where(MaintenanceWindow.system_id == system.id)
     )
     for win in windows:
         if win.end <= win.start:

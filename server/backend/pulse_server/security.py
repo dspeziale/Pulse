@@ -83,7 +83,8 @@ def create_access_token(
 
 def decode_token(token: str, *, secret: str, algorithm: str) -> dict[str, Any]:
     """Decodifica e valida un JWT. Solleva jwt.PyJWTError se invalido/scaduto."""
-    return jwt.decode(token, secret, algorithms=[algorithm])
+    decoded: dict[str, Any] = jwt.decode(token, secret, algorithms=[algorithm])
+    return decoded
 
 
 # --- Cifratura segreti a riposo (Fernet, RNF-004) ----------------------------

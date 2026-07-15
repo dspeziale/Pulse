@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 
 from fastapi import APIRouter, Depends, Query, Request, Response
-from sqlalchemy import func, or_, select
+from sqlalchemy import delete, func, or_, select
 
 from .. import errors, schemas, serializers
 from ..audit import write_audit
@@ -219,7 +219,7 @@ def set_roles(
         and _count_active_superadmins(session, exclude=user.id) == 0
     ):
         raise errors.conflict("Deve esistere almeno un SuperAdmin attivo.")
-    session.execute(UserRole.__table__.delete().where(UserRole.user_id == user.id))
+    session.execute(delete(UserRole).where(UserRole.user_id == user.id))
     for role in roles:
         session.add(UserRole(user_id=user.id, role_id=role.id))
     write_audit(
