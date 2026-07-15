@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Workflow — Pulse{% endblock %}
+{% block content %}
+<h1>Workflow di notifica</h1>
+{% if can('workflows.create') %}<p><a class="btn" href="{{ url_for('workflows.new_workflow') }}">Nuovo workflow</a></p>{% endif %}
+<table>
+  <tr><th>Nome</th><th>Trigger</th><th>Abilitato</th></tr>
+  {% for w in data['items'] %}
+  <tr>
+    <td><a href="{{ url_for('workflows.detail', workflow_id=w.id) }}">{{ w.name }}</a></td>
+    <td>{{ w.trigger }}</td><td>{{ 'sì' if w.enabled else 'no' }}</td>
+  </tr>
+  {% endfor %}
+</table>
+<p class="muted">Totale: {{ data['total'] }}</p>
+{% endblock %}

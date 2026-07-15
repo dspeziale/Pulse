@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Simulazione workflow — Pulse{% endblock %}
+{% block content %}
+<h1>Esito simulazione</h1>
+<div class="card">
+  <p><strong>Match:</strong> {{ 'sì' if result.matched else 'no' }}</p>
+  {% if result.suppressed_by %}<p><strong>Soppresso da:</strong> {{ result.suppressed_by }}</p>{% endif %}
+  <h2>Azioni pianificate</h2>
+  <pre>{{ result.planned_actions|tojson(indent=2) }}</pre>
+  <a class="btn-ghost" href="{{ url_for('workflows.detail', workflow_id=workflow_id) }}">Torna al workflow</a>
+</div>
+{% endblock %}

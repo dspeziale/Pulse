@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Permessi — Pulse{% endblock %}
+{% block content %}
+<h1>Catalogo permessi</h1>
+{% for area, items in grouped.items() %}
+<div class="card">
+  <h2>{{ area }}</h2>
+  <table>
+    <tr><th>Codice</th><th>Descrizione</th></tr>
+    {% for p in items %}<tr><td>{{ p.code }}</td><td>{{ p.description }}</td></tr>{% endfor %}
+  </table>
+</div>
+{% endfor %}
+{% endblock %}

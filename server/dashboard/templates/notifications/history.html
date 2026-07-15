@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Storico notifiche — Pulse{% endblock %}
+{% block content %}
+<h1>Storico notifiche</h1>
+<form method="get">
+  <select name="status" style="width:auto">
+    <option value="">Tutti gli esiti</option>
+    {% for s in ['sent','failed','retrying'] %}
+      <option value="{{ s }}" {% if request.args.get('status')==s %}selected{% endif %}>{{ s }}</option>
+    {% endfor %}
+  </select>
+  <button class="btn-ghost">Filtra</button>
+</form>
+<table>
+  <tr><th>Data</th><th>Canale</th><th>Destinatario</th><th>Esito</th><th>Errore</th></tr>
+  {% for h in data['items'] %}
+  <tr><td class="muted">{{ h.created_at }}</td><td>{{ h.channel_id }}</td>
+      <td>{{ h.recipient }}</td><td>{{ h.status }}</td><td class="muted">{{ h.error or '' }}</td></tr>
+  {% endfor %}
+</table>
+<p class="muted">Totale: {{ data['total'] }}</p>
+{% endblock %}

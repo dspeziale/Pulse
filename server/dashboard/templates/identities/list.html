@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Identità di canale — Pulse{% endblock %}
+{% block content %}
+<h1>Le mie identità di canale</h1>
+<table>
+  <tr><th>Canale</th><th>External ID</th><th></th></tr>
+  {% for i in data['items'] %}
+  <tr>
+    <td>{{ i.channel_type }}</td><td>{{ i.external_id }}</td>
+    <td>
+      <form method="post" action="{{ url_for('identities.delete_identity', identity_id=i.id) }}" class="inline">
+        <button class="btn-danger">Rimuovi</button>
+      </form>
+    </td>
+  </tr>
+  {% endfor %}
+</table>
+<div class="card">
+  <h2>Associa nuova identità</h2>
+  <form method="post" action="{{ url_for('identities.create_identity') }}">
+    <label>Tipo canale</label>
+    <select name="channel_type">
+      {% for t in ['telegram','whatsapp','email'] %}<option value="{{ t }}">{{ t }}</option>{% endfor %}
+    </select>
+    <label>External ID</label><input name="external_id" required>
+    <label>Codice di verifica</label><input name="verification_code" required>
+    <button type="submit">Associa</button>
+  </form>
+</div>
+{% endblock %}

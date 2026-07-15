@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Canali notifica — Pulse{% endblock %}
+{% block content %}
+<h1>Canali di notifica</h1>
+{% if can('notifications.create') %}<p><a class="btn" href="{{ url_for('notifications.new_channel') }}">Nuovo canale</a></p>{% endif %}
+<table>
+  <tr><th>Nome</th><th>Tipo</th><th>Abilitato</th><th>Inbound</th></tr>
+  {% for c in data['items'] %}
+  <tr>
+    <td><a href="{{ url_for('notifications.detail', channel_id=c.id) }}">{{ c.name }}</a></td>
+    <td>{{ c.type }}</td><td>{{ 'sì' if c.enabled else 'no' }}</td>
+    <td>{{ 'sì' if c.inbound_enabled else 'no' }}</td>
+  </tr>
+  {% endfor %}
+</table>
+<p class="muted">Totale: {{ data['total'] }}</p>
+{% endblock %}

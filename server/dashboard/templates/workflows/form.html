@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Modifica' if workflow else 'Nuovo' }} workflow — Pulse{% endblock %}
+{% block content %}
+<h1>{{ 'Modifica' if workflow else 'Nuovo' }} workflow</h1>
+<p class="muted">Canali disponibili:
+  {% for c in channels['items'] %}{{ c.name }} ({{ c.id }}){% if not loop.last %}, {% endif %}{% endfor %}</p>
+<div class="card">
+<form method="post" action="{{ url_for('workflows.update_workflow', workflow_id=workflow.id) if workflow else url_for('workflows.create_workflow') }}">
+  <label>Nome</label><input name="name" value="{{ workflow.name if workflow else '' }}" required>
+  <label>Descrizione</label><input name="description" value="{{ workflow.description if workflow else '' }}">
+  <label>Trigger</label><input name="trigger" value="{{ workflow.trigger if workflow else '' }}">
+  <label><input type="checkbox" name="enabled" style="width:auto" {% if workflow and workflow.enabled %}checked{% endif %}> Abilitato</label>
+  <label>Scope (JSON)</label><textarea name="scope" rows="3">{{ workflow.scope|tojson if workflow else '' }}</textarea>
+  <label>Conditions (JSON)</label><textarea name="conditions" rows="3">{{ workflow.conditions|tojson if workflow else '' }}</textarea>
+  <label>Suppression (JSON)</label><textarea name="suppression" rows="3">{{ workflow.suppression|tojson if workflow else '' }}</textarea>
+  <label>Actions (JSON)</label><textarea name="actions" rows="4">{{ workflow.actions|tojson if workflow else '' }}</textarea>
+  <button type="submit">Salva</button>
+</form>
+</div>
+{% endblock %}

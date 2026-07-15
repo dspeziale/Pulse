@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Workflow {{ workflow.name }} — Pulse{% endblock %}
+{% block content %}
+<h1>{{ workflow.name }}</h1>
+<div class="card">
+  <p>{{ workflow.description }}</p>
+  <p><strong>Trigger:</strong> {{ workflow.trigger }} ·
+     <strong>Abilitato:</strong> {{ 'sì' if workflow.enabled else 'no' }}</p>
+  {% if can('workflows.update') %}
+  <a class="btn-ghost" href="{{ url_for('workflows.edit_workflow', workflow_id=workflow.id) }}">Modifica</a>
+  <form method="post" action="{{ url_for('workflows.toggle_enabled', workflow_id=workflow.id) }}" class="inline">
+    <input type="hidden" name="enabled" value="{{ 'off' if workflow.enabled else 'on' }}">
+    <button class="btn-ghost">{{ 'Disabilita' if workflow.enabled else 'Abilita' }}</button>
+  </form>
+  {% endif %}
+  {% if can('workflows.delete') %}
+  <form method="post" action="{{ url_for('workflows.delete_workflow', workflow_id=workflow.id) }}" class="inline">
+    <button class="btn-danger">Elimina</button>
+  </form>
+  {% endif %}
+</div>
+{% if can('workflows.update') %}
+<div class="card">
+  <h2>Simulazione (dry-run)</h2>
+  <form method="post" action="{{ url_for('workflows.simulate', workflow_id=workflow.id) }}">
+    <label>Evento (JSON)</label><textarea name="event" rows="4"></textarea>
+    <button class="btn-ghost">Simula</button>
+  </form>
+</div>
+{% endif %}
+<div class="card"><pre>{{ workflow|tojson(indent=2) }}</pre></div>
+{% endblock %}

@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Configurazione — Pulse{% endblock %}
+{% block content %}
+<h1>Configurazione</h1>
+<div class="card">
+<form method="post" action="{{ url_for('config_bp.update_config') }}">
+  <table>
+    <tr><th>Chiave</th><th>Valore</th><th>Riavvio?</th><th>Descrizione</th></tr>
+    {% for item in data['items'] %}
+    <tr>
+      <td>{{ item.key }}</td>
+      <td>
+        {% if item.sensitive %}
+          <input name="value:{{ item.key }}" placeholder="•••• (mascherato)" {% if not can('config.update') %}readonly{% endif %}>
+        {% else %}
+          <input name="value:{{ item.key }}" value="{{ item.value }}" {% if not can('config.update') %}readonly{% endif %}>
+        {% endif %}
+      </td>
+      <td>{{ 'sì' if item.requires_restart else 'no' }}</td>
+      <td class="muted">{{ item.description }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% if can('config.update') %}<button type="submit">Salva</button>{% endif %}
+</form>
+</div>
+{% endblock %}

@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Audit — Pulse{% endblock %}
+{% block content %}
+<h1>Audit log</h1>
+<form method="get">
+  <input name="action" placeholder="Azione" value="{{ request.args.get('action','') }}" style="width:auto">
+  <select name="outcome" style="width:auto">
+    <option value="">Tutti</option>
+    {% for o in ['success','failure'] %}
+      <option value="{{ o }}" {% if request.args.get('outcome')==o %}selected{% endif %}>{{ o }}</option>
+    {% endfor %}
+  </select>
+  <button class="btn-ghost">Filtra</button>
+</form>
+<table>
+  <tr><th>Data</th><th>Attore</th><th>Azione</th><th>Entità</th><th>Esito</th></tr>
+  {% for e in data['items'] %}
+  <tr>
+    <td class="muted"><a href="{{ url_for('audit.detail', entry_id=e.id) }}">{{ e.timestamp }}</a></td>
+    <td>{{ e.actor_type }}:{{ e.actor_id }}</td><td>{{ e.action }}</td>
+    <td>{{ e.entity_type }}</td><td>{{ e.outcome }}</td>
+  </tr>
+  {% endfor %}
+</table>
+<p class="muted">Totale: {{ data['total'] }}</p>
+{% endblock %}

@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Allarmi — Pulse{% endblock %}
+{% block content %}
+<h1>Allarmi</h1>
+<form method="get">
+  <select name="status" style="width:auto">
+    <option value="">Tutti</option>
+    {% for s in ['active','acknowledged','resolved'] %}
+      <option value="{{ s }}" {% if request.args.get('status')==s %}selected{% endif %}>{{ s }}</option>
+    {% endfor %}
+  </select>
+  <button class="btn-ghost">Filtra</button>
+</form>
+<table>
+  <tr><th>Sistema</th><th>Probe</th><th>Stato</th><th>Aperto</th><th></th></tr>
+  {% for a in data['items'] %}
+  <tr>
+    <td>{{ a.system_id }}</td><td>{{ a.probe_id }}</td>
+    <td><span class="badge b-{{ a.status if a.status in ['down','error'] else 'unknown' }}">{{ a.status }}</span></td>
+    <td class="muted">{{ a.opened_at }}</td>
+    <td>
+      {% if can('commands.execute') and a.status == 'active' %}
+      <form method="post" action="{{ url_for('alarms.ack_alarm', alarm_id=a.id) }}" class="inline">
+        <button class="btn-ghost">Ack</button>
+      </form>
+      {% endif %}
+    </td>
+  </tr>
+  {% endfor %}
+</table>
+<p class="muted">Totale: {{ data['total'] }}</p>
+{% endblock %}

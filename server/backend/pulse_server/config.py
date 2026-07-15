@@ -55,6 +55,8 @@ class Settings(BaseSettings):
     probe_http_timeout_seconds: float = 10.0
     probe_client_cert_path: str | None = None
     probe_client_key_path: str | None = None
+    # Token applicativo del Server presentato alla API di query della Probe.
+    probe_query_token: str = "server-to-probe-token"
 
     # --- Logging ---
     log_level: str = "info"

@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Ruolo {{ role.name }} — Pulse{% endblock %}
+{% block content %}
+<h1>{{ role.name }}</h1>
+<div class="card">
+  <p>{{ role.description }}</p>
+  <p><strong>Predefinito:</strong> {{ 'sì' if role.is_builtin else 'no' }}</p>
+  {% if can('roles.update') and not role.is_builtin %}<a class="btn-ghost" href="{{ url_for('roles.edit_role', role_id=role.id) }}">Modifica</a>{% endif %}
+  {% if can('roles.delete') and not role.is_builtin %}
+  <form method="post" action="{{ url_for('roles.delete_role', role_id=role.id) }}" class="inline">
+    <button class="btn-danger">Elimina</button>
+  </form>
+  {% endif %}
+</div>
+<h2>Permessi</h2>
+<ul>{% for p in role.permissions %}<li>{{ p }}</li>{% endfor %}</ul>
+{% endblock %}

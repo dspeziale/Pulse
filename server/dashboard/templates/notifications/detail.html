@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Canale {{ channel.name }} — Pulse{% endblock %}
+{% block content %}
+<h1>{{ channel.name }}</h1>
+<div class="card">
+  <p><strong>Tipo:</strong> {{ channel.type }}</p>
+  <p><strong>Abilitato:</strong> {{ 'sì' if channel.enabled else 'no' }} ·
+     <strong>Inbound:</strong> {{ 'sì' if channel.inbound_enabled else 'no' }}</p>
+  {% if can('notifications.update') %}<a class="btn-ghost" href="{{ url_for('notifications.edit_channel', channel_id=channel.id) }}">Modifica</a>{% endif %}
+  {% if can('notifications.delete') %}
+  <form method="post" action="{{ url_for('notifications.delete_channel', channel_id=channel.id) }}" class="inline">
+    <button class="btn-danger">Elimina</button>
+  </form>
+  {% endif %}
+</div>
+{% if can('notifications.test') %}
+<div class="card">
+  <h2>Invio di prova</h2>
+  <form method="post" action="{{ url_for('notifications.test_channel', channel_id=channel.id) }}">
+    <input name="recipient" placeholder="Destinatario" required>
+    <input name="message" placeholder="Messaggio (opzionale)">
+    <button class="btn-ghost">Invia test</button>
+  </form>
+</div>
+{% endif %}
+{% endblock %}

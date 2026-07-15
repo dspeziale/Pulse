@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Modifica' if channel else 'Nuovo' }} canale — Pulse{% endblock %}
+{% block content %}
+<h1>{{ 'Modifica' if channel else 'Nuovo' }} canale</h1>
+<div class="card">
+<form method="post" action="{{ url_for('notifications.update_channel', channel_id=channel.id) if channel else url_for('notifications.create_channel') }}">
+  <label>Nome</label><input name="name" value="{{ channel.name if channel else '' }}" required>
+  <label>Tipo</label>
+  <select name="type" id="type">
+    {% for t in ['email','telegram','whatsapp'] %}
+      <option value="{{ t }}" {% if channel and channel.type==t %}selected{% endif %}>{{ t }}</option>
+    {% endfor %}
+  </select>
+  <label><input type="checkbox" name="enabled" style="width:auto" {% if channel and channel.enabled %}checked{% endif %}> Abilitato</label>
+  <label><input type="checkbox" name="inbound_enabled" style="width:auto" {% if channel and channel.inbound_enabled %}checked{% endif %}> Inbound abilitato</label>
+  <fieldset><legend class="muted">Config email</legend>
+    <input name="smtp_host" placeholder="smtp_host">
+    <input name="smtp_port" placeholder="smtp_port" type="number">
+    <label><input type="checkbox" name="use_tls" style="width:auto"> use_tls</label>
+    <input name="username" placeholder="username">
+    <input name="password" placeholder="password" type="password">
+    <input name="from_address" placeholder="from_address">
+    <input name="imap_host" placeholder="imap_host">
+    <input name="imap_port" placeholder="imap_port" type="number">
+  </fieldset>
+  <fieldset><legend class="muted">Config telegram</legend>
+    <input name="bot_token" placeholder="bot_token">
+    <input name="webhook_secret" placeholder="webhook_secret">
+  </fieldset>
+  <fieldset><legend class="muted">Config whatsapp</legend>
+    <input name="provider" placeholder="provider">
+    <input name="api_base" placeholder="api_base">
+    <input name="api_token" placeholder="api_token">
+    <input name="phone_number_id" placeholder="phone_number_id">
+  </fieldset>
+  <button type="submit">Salva</button>
+</form>
+</div>
+{% endblock %}

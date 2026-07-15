@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Log di sistema — Pulse{% endblock %}
+{% block content %}
+<h1>Log di sistema</h1>
+<form method="get">
+  <select name="component" style="width:auto">
+    <option value="">Tutti</option>
+    {% for c in ['server','probe'] %}
+      <option value="{{ c }}" {% if request.args.get('component')==c %}selected{% endif %}>{{ c }}</option>
+    {% endfor %}
+  </select>
+  <select name="level" style="width:auto">
+    <option value="">Tutti i livelli</option>
+    {% for l in ['debug','info','warning','error','critical'] %}
+      <option value="{{ l }}" {% if request.args.get('level')==l %}selected{% endif %}>{{ l }}</option>
+    {% endfor %}
+  </select>
+  <input name="q" placeholder="Testo" value="{{ request.args.get('q','') }}" style="width:auto">
+  <button class="btn-ghost">Filtra</button>
+</form>
+<table>
+  <tr><th>Data</th><th>Componente</th><th>Livello</th><th>Logger</th><th>Messaggio</th></tr>
+  {% for e in data['items'] %}
+  <tr><td class="muted">{{ e.timestamp }}</td><td>{{ e.component }}</td>
+      <td>{{ e.level }}</td><td>{{ e.logger }}</td><td>{{ e.message }}</td></tr>
+  {% endfor %}
+</table>
+<p class="muted">Totale: {{ data['total'] }}</p>
+{% endblock %}

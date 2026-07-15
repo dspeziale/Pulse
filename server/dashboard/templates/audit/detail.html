@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Voce audit — Pulse{% endblock %}
+{% block content %}
+<h1>Voce audit</h1>
+<div class="card">
+  <p><strong>Data:</strong> {{ entry.timestamp }}</p>
+  <p><strong>Attore:</strong> {{ entry.actor_type }} {{ entry.actor_id }}</p>
+  <p><strong>Azione:</strong> {{ entry.action }}</p>
+  <p><strong>Entità:</strong> {{ entry.entity_type }} {{ entry.entity_id }}</p>
+  <p><strong>Esito:</strong> {{ entry.outcome }} · <strong>IP:</strong> {{ entry.ip or '—' }}</p>
+  <pre>{{ entry.details|tojson(indent=2) }}</pre>
+</div>
+{% endblock %}
