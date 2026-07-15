@@ -240,3 +240,48 @@ Output consegnati
 - Due frontend Flask completi (Server P-01..P-19, Probe PP-01..PP-05) allineati al DOCUMENTO_API, con Dockerfile/.env.example/requirements/README; suite pytest a copertura 100% con backend mockato. Pronto per QA.
 
 ================================================
+
+ITERAZIONE 5
+
+Agente: QA
+Data: 2026-07-15
+
+Input ricevuti
+- docs/api/DOCUMENTO_API.md (contratto API vincolante: endpoint, response, errori, permessi, pagine FE).
+- docs/analisi/* (RF/RNF, RBAC 40 permessi + matrice 5 ruoli, workflow/notifiche, casi d'uso).
+- deploy/schema.sql + seed.sql (DB reale) e deploy/docker-compose.*.yml.
+- Codice: server/backend (FastAPI), probe/agent (FastAPI), server/dashboard + probe/dashboard (Flask), frontend_common.
+- READMEs con procedure di test/coverage per-pacchetto.
+
+Lavoro svolto
+- Eseguite TUTTE le categorie richieste: API, Integration, Regression, Functional, Security, RBAC, Performance, Notification, Workflow, Audit, Log, Probe, Server, Frontend, Backend, Database, Deploy.
+- Suite pytest reali con coverage: backend 181 test / 98%; probe-agent 65 test / 98%; frontend_common 27 / 100%; dashboard Server 50 / 100% (codice app); dashboard Probe 27 / 100% (codice app). Totale 350 test, 0 falliti.
+- Integrazione LIVE: Postgres 16 Docker + schema+seed, backend uvicorn reale; harness httpx con 127 asserzioni su tutte le aree del DOCUMENTO_API (status code + forma response + casi 401/403/404/409/422). 125 pass, 2 fail (= 2 bug).
+- RBAC: creati utenti Operator/Viewer/Auditor via API e verificati accessi negati/consentiti; deny-by-default (401 senza token); integrita' (self-delete/disable admin=409, ruoli builtin protetti).
+- Security: JWT manomesso/forgiato/scaduto=401; masking segreti canali OK; SQL injection su parametri gestita (no 500); rilevata assenza header di sicurezza (hardening).
+- Audit/DB: verificata immutabilita' audit_log (UPDATE/DELETE bloccati da trigger), protezione ruoli builtin, UNIQUE, CHECK poll_interval>0, FK RESTRICT probe->sistemi; seed (40 permessi/5 ruoli/matrice/admin/10 config).
+- Probe: avvio live agent con storage in-memory (fallback), health/ready/status/systems/query verdi, auth token in tempo costante.
+- Performance smoke: login 256ms (bcrypt), list endpoint 11-18ms, 100 health seq ~137ms.
+- Deploy: docker compose config VALIDO su server/probe/base; Dockerfile con healthcheck e porta da env; Podman revisione statica (non installato).
+
+File creati
+- QA_REPORT.md (radice): sommario, esiti per categoria, coverage con gap, tabella BUG, test falliti, routing BUG_BACKEND/BUG_FRONTEND.
+- (file di lavoro temporanei nello scratchpad di sessione: harness integrazione, log; non versionati.)
+
+Problemi trovati
+- BUG-01 (BACKEND, Maggiore): POST/PUT /users accetta email non valida (schemas.py usa str invece di EmailStr) -> 201 invece di 422.
+- BUG-02 (DOC, Minore): PUT /roles/{id} modifica la description di un ruolo predefinito (200) mentre l'API doc indica 409; ambiguita' con lo schema (trigger consente la sola description). Da chiarire.
+- BUG-03/BUG-04 (BACKEND, Media): coverage backend 98% e probe-agent 98% < obiettivo 100%.
+- DOC-01 (DOC, Minore): 06_rbac.md dichiara "37 permessi" ma sono 40 (gia' noto DBA/BE).
+- SEC-01 (BACKEND, Minore): header di sicurezza HTTP assenti + banner Server (non richiesto dal contratto; hardening).
+- Nessun bug Bloccante. Nessun bug lato FRONTEND.
+
+Decisioni prese
+- Verdetto QA: FAIL, motivato da 1 bug Maggiore (validazione email) e dal mancato obiettivo di coverage 100% BE/probe; nessun blocco funzionale.
+- Comportamenti ambigui tra API doc e schema (description ruolo builtin) classificati come DOC/Minore, non come bug di codice, per non inventare requisiti.
+- Assenza header di sicurezza classificata Minore (non prevista dal contratto): segnalata come hardening, non come violazione.
+
+Output consegnati
+- QA_REPORT.md completo con tabella bug (6 finding: 1 Maggiore, 2 Media, 3 Minore; 0 Bloccanti) e routing fix (BUG_BACKEND: BUG-01, BUG-03, BUG-04, SEC-01 [+BUG-02/DOC-01 doc]; BUG_FRONTEND: nessuno). Coverage reali: BE 98%, Probe 98%, FE 100%.
+
+================================================
