@@ -137,6 +137,54 @@ Output consegnati
 
 ================================================
 
+ITERAZIONE 3
+
+Agente: BE
+Data: 2026-07-15
+
+Input ricevuti
+- docs/api/DOCUMENTO_API.md (sezione BACKEND: endpoint/request/response/errori/auth/permessi — specifica vincolante).
+- deploy/schema.sql + deploy/seed.sql e docs/database/SCHEMA_FISICO.md (schema PostgreSQL 16 reale e validato; 40 permessi nel seed = autoritativo).
+- docs/analisi/06_rbac.md, 07_workflow_notifiche.md, 05_requisiti.md, 02_specifica_tecnica.md, 03_architettura.md.
+- Schema canonico heartbeat (01_specifica_funzionale.md §4: oggetto singolo o array, status a dominio aperto, campi aggiunti dalla Probe).
+
+Lavoro svolto
+- Server backend (FastAPI): completata l'implementazione preesistente (auth/utenti/ruoli/permessi/probe/sistemi/dashboard) aggiungendo tutti i router mancanti: notifiche/canali, storico invii, workflow, allarmi (ack), comunicazione Server<->Probe (register/config/heartbeat/events/rollup), comandi in ingresso (webhook Telegram/WhatsApp/Email) + identita' di canale, audit, log di sistema, configurazione, healthcheck; assemblaggio main.py con OpenAPI curato (tag/summary) e handler errori standard.
+- Autenticazione JWT (access+refresh, lockout), RBAC deny-by-default via dependency require_permission sul catalogo 40 permessi del seed; audit_log su azioni sensibili; log di sistema.
+- Motore notifiche multi-canale (Email SMTP, Telegram Bot API, WhatsApp Business API) con cifratura segreti a riposo (Fernet), mascheramento in output, degradazione a "failed" senza credenziali. Motore workflow (trigger/scope/condizioni AND-OR/soppressione cooldown-dedup-manutenzione-orari/escalation/auto-risoluzione allarmi). Dispatcher comandi (/help,/status,/silence,/unsilence,/ack,/probes) con risoluzione identita'->utente e RBAC.
+- Probe agent (FastAPI): poller heartbeat (parsing schema canonico singolo/array, normalizzazione status, documenti connettivita'), storage OpenSearch locale (indici+mapping) con fallback in-memory equivalente, motore di query strutturata Pulse (filtri/aggregazioni avg/min/max/count/uptime), endpoint di query interrogati dal Server (/query/heartbeats, /query, /systems, /status, /health), client verso il Server (enrollment/config/liveness/eventi/rollup), rilevazione eventi (status_changed/unreachable/recovered/response_time_exceeded).
+- Sicurezza Server<->Probe a livello applicativo: token opaco per-Probe (hash SHA-256), enrollment monouso a scadenza, rotazione credenziali; token del Server verso la API di query della Probe; predisposizione mTLS via path certificati/config (documentata l'attivazione).
+- Container: Dockerfile Server backend e Probe agent (python slim, gunicorn/uvicorn, porta via env, healthcheck). Compose deploy/docker-compose.server.yml (postgres+backend+dashboard FE) e deploy/docker-compose.probe.yml (opensearch+probe-agent+dashboard FE), equivalenti podman-compose.*, .env.server.example/.env.probe.example. Build context dashboard = radice repo (contratto FE) rispettato.
+- Test: pytest+coverage con Postgres 16 effimero via Docker (schema+seed reali, isolamento per-test con savepoint) per il Server; storage in-memory + httpx.MockTransport per la Probe. mypy --strict pulito su entrambi i pacchetti.
+
+File creati
+- server/backend/pulse_server/main.py, commands.py; routers/{notifications,workflows,inbound,probe_comm,observability,health}.py; _helpers.flush_or_conflict.
+- server/backend/{requirements.txt,requirements-dev.txt,pyproject.toml,Dockerfile,.env.example,README.md}; server/backend/tests/* (conftest + 13 file di test).
+- probe/agent/pulse_probe/{__init__,config,schemas,canonical,query,store,server_client,state,poller,errors,deps,main}.py.
+- probe/agent/{requirements.txt,requirements-dev.txt,pyproject.toml,Dockerfile,.env.example,README.md}; probe/agent/tests/* (conftest + 6 file di test).
+- deploy/{docker-compose.server.yml,docker-compose.probe.yml,podman-compose.server.yml,podman-compose.probe.yml,.env.server.example,.env.probe.example}.
+
+Problemi trovati
+- Bug latente nel codice BE preesistente: parametri endpoint con annotazione Annotated+Depends (CurrentUserDep) E default Depends(require_permission(...)) — vietato da FastAPI; l'app non si assemblava. Corretto su tutti i router (annotazione CurrentUser + Depends).
+- I create-endpoint eseguivano session.flush() prima del commit guardato: le violazioni UNIQUE emergevano come 500 anziche' 409. Introdotto helper flush_or_conflict.
+- Porte Windows in range riservato Hyper-V per i container Postgres di test (55432 non bindabile): usata 5433 (test) / 5434 (verifica), override via env.
+- Mount volume schema.sql/seed.sql fallito in Git Bash per traduzione path: in verifica lo schema/seed sono stati applicati via `docker exec psql` (come nel conftest).
+
+Decisioni prese
+- Catalogo permessi = 40 codici del seed (autoritativo), non 37 citati altrove (gia' segnalato dal DBA, I-1): documentato in SCOSTAMENTI del README backend per Analista/QA.
+- Query OpenSearch strutturata (non DSL raw) e drill-down via proxy Server->Probe (API-01/API-02).
+- Storage Probe con backend OpenSearch reale + fallback in-memory a semantica identica (resilienza/testabilita', documentato).
+- Cifratura segreti canali a riposo con Fernet; test canale riporta sempre 200 con delivered true/false.
+- rotate-credentials rigenera il token per-Probe e riporta la Probe a pending (emissione certificato X.509 demandata al livello PKI/mTLS).
+
+Output consegnati
+- Server backend: tutti i 72 endpoint del DOCUMENTO_API implementati (tutte le aree §1.1-§1.17; 73 operazioni esposte in OpenAPI su 52 path template), coverage 98% su 181 test, mypy strict pulito.
+- Probe agent: API di query + poller + comunicazione col Server, coverage 98% su 65 test, mypy strict pulito.
+- Verifica reale eseguita: server-backend avviato (uvicorn) contro Postgres 16 Docker con schema+seed; GET /api/v1/health = {"status":"ok"}, /health/ready database ok, login admin/'ChangeMe123!' = HTTP 200 (token, ruolo SuperAdmin, 40 permessi), GET /permissions autenticato = 200 (40), GET /users senza token = 401, OpenAPI = 73 operazioni / 52 path. docker compose config valido su entrambi gli stack.
+- Bug noti residui: nessun test fallito; righe non coperte (2% per pacchetto) = rami difensivi/I-O (lettura CA in /probe/register, loop poller runtime, combinazioni di filtri ridondanti, casi "ultimo SuperAdmin" con piu' admin simultanei). Podman non installato: compose podman prodotti ma non eseguiti (struttura identica ai docker validati).
+
+================================================
+
 ITERAZIONE 4
 
 Agente: FE

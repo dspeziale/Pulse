@@ -17,10 +17,10 @@ Sistema distribuito per il monitoraggio della connettività e dello stato applic
 ## Stato pipeline
 | Fase | Agente | Stato |
 |------|--------|-------|
-| 1 | ANALISTA | in corso |
-| 2 | DBA | in attesa |
-| 3 | BE | in attesa |
-| 4 | FE | in attesa |
-| 5 | QA | in attesa |
+| 1 | ANALISTA | ✅ completata |
+| 2 | DBA | ✅ completata (PostgreSQL 16, schema validato) |
+| 3 | BE | ✅ completata (72/72 endpoint, coverage 98%) |
+| 4 | FE | ✅ completata (24/24 pagine, coverage 100%) |
+| 5 | QA | in corso |
 
 Vedi `DIARIO.md` per la cronologia completa e `docs/` per gli artefatti.

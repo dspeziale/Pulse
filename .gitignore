@@ -9,3 +9,4 @@ node_modules/
 htmlcov/
 *.egg-info/
 *.log
+.mypy_cache/
