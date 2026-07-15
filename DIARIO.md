@@ -136,3 +136,59 @@ Output consegnati
 - Schema fisico PostgreSQL 16 completo, eseguibile, idempotente e validato; seed RBAC completo; ER diagram; documentazione schema fisico; compose Docker/Podman. Pronto per gli AGENTI 3 (BE + FE).
 
 ================================================
+
+ITERAZIONE 4
+
+Agente: FE
+Data: 2026-07-15
+
+Input ricevuti
+- docs/api/DOCUMENTO_API.md (sezione FRONTEND: pagine P-01..P-19, PP-01..PP-05; sezione BACKEND: contratti REST consumati).
+- docs/analisi/06_rbac.md (37/40 permessi, 5 ruoli, matrice ruoli x permessi) per l'enforcement UI.
+- docs/analisi 01/02/03/07 per contesto funzionale, architettura e workflow/notifiche.
+- Codice FE preesistente (frontend_common/, server/dashboard/) da completare e correggere.
+
+Lavoro svolto
+- Completata la dashboard SERVER (Flask): verificate e integrate tutte le viste/blueprint P-01..P-19; corretti gap (aggiunti template query/builder.html e query/charts.html mancanti; aggiunta route /healthz).
+- Rimossa la dipendenza da CDN esterno (Chart.js): introdotta micro-libreria locale static/pulse-charts.js (bar/line) referenziata via url_for('static', ...).
+- Implementata da zero la dashboard PROBE (Flask): app factory, login locale (FE-02), sdk verso probe-agent con token da env (FE-03), viste PP-01..PP-05, template, /healthz.
+- Enforcement RBAC lato UI: permission_required su ogni route + menu che mostra/nasconde le voci con can('<permesso>'); nessun catalogo cablato (usa i permessi da /auth/me).
+- Gestione errori coerente coi codici backend: 401->redirect login, 403/404/409/422/500->pagina errore, backend/agent irraggiungibile->503.
+- Contratto deploy: Dockerfile (Python slim + gunicorn, porta da env, healthcheck /healthz) e .env.example per entrambe le dashboard; requirements.txt/requirements-dev.txt con versioni.
+- Test pytest con backend simulato (FakeApiClient, nessun backend reale): 104 test totali (frontend_common 27, server 50, probe 27). Coverage combinata REALE 100% (1054 stmt, 92 branch, 0 miss) via .coveragerc in radice.
+- README per entrambe le dashboard con avvio/env/test/coverage e sezione SCOSTAMENTI.
+- VERIFICA eseguita: venv + install, pytest per-pacchetto tutti verdi, coverage 100%; smoke test WSGI (app:app) per Server e Probe: /healthz 200, /login 200, pagina protetta anonima -> 302.
+
+File creati
+- server/dashboard/static/pulse-charts.js
+- server/dashboard/templates/query/builder.html, server/dashboard/templates/query/charts.html
+- server/dashboard/Dockerfile, server/dashboard/.env.example, server/dashboard/requirements.txt, server/dashboard/requirements-dev.txt, server/dashboard/README.md
+- server/dashboard/tests/conftest.py, test_app_and_auth.py, test_views_crud.py, test_views_more.py
+- probe/dashboard/app.py, probe/dashboard/sdk.py, probe/dashboard/probe_auth.py
+- probe/dashboard/views/__init__.py, auth.py, dashboard.py, query.py, status.py
+- probe/dashboard/templates/base.html, error.html, auth/login.html, dashboard/index.html, dashboard/system.html, query/builder.html, status/index.html
+- probe/dashboard/static/pulse-charts.js
+- probe/dashboard/Dockerfile, probe/dashboard/.env.example, probe/dashboard/requirements.txt, probe/dashboard/requirements-dev.txt, probe/dashboard/README.md
+- probe/dashboard/tests/conftest.py, test_probe_dashboard.py, test_probe_auth.py
+- frontend_common/tests/test_rbac.py, test_config.py, test_http_client.py, test_auth.py
+- .coveragerc
+File modificati
+- server/dashboard/app.py (route /healthz), server/dashboard/templates/dashboard/index.html e probes/detail.html (rimozione CDN), .gitignore.
+
+Problemi trovati
+- Viste query P-04/P-05 referenziavano template inesistenti (query/builder.html, query/charts.html): creati.
+- Template Server usavano Chart.js via CDN esterno (vietato dai requisiti): sostituito con libreria locale.
+- Nessuna route di healthcheck presente: aggiunta /healthz su entrambe le dashboard.
+- Le due dashboard hanno moduli entrypoint omonimi (app/sdk/views): i test vanno eseguiti in invocazioni pytest separate; coverage unificata via coverage combine.
+- QUESTIONE APERTA API-04/FE-02 (auth dashboard Probe) e FE-03 (token agent) non definite nel dettaglio: adottate credenziali locali via env + token Bearer via env; da confermare a BE/Committente.
+
+Decisioni prese
+- Grafici: micro-libreria JS locale self-contained (no CDN), sottoinsieme API Chart.js. Motivazione: requisito "niente CDN esterni".
+- Sessione: JWT del backend salvato in sessione Flask server-side firmata; refresh token conservato per logout.
+- Docker build context = radice repository (non ./server|probe/dashboard) perche' le dashboard dipendono dal pacchetto condiviso frontend_common/; porta via env e healthcheck /healthz rispettati (snippet compose forniti nei README per il BE).
+- RBAC UI senza catalogo cablato: fonte permessi = risposta backend (/auth/login, /auth/me).
+
+Output consegnati
+- Due frontend Flask completi (Server P-01..P-19, Probe PP-01..PP-05) allineati al DOCUMENTO_API, con Dockerfile/.env.example/requirements/README; suite pytest a copertura 100% con backend mockato. Pronto per QA.
+
+================================================

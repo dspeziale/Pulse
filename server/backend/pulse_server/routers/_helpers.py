@@ -35,3 +35,16 @@ def commit_or_conflict(session: Session, *, message: str, details: dict[str, Any
     except IntegrityError as exc:
         session.rollback()
         raise errors.conflict(message, details or {"db": str(exc.orig)})
+
+
+def flush_or_conflict(session: Session, *, message: str, details: dict[str, Any] | None = None) -> None:
+    """Esegue il flush convertendo le violazioni di integrita' (es. UNIQUE) in 409.
+
+    Necessario nei create che devono ottenere l'id generato (per righe figlie)
+    prima del commit finale: la violazione emergerebbe al flush, non al commit.
+    """
+    try:
+        session.flush()
+    except IntegrityError as exc:
+        session.rollback()
+        raise errors.conflict(message, details or {"db": str(exc.orig)})

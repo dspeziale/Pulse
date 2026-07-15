@@ -1,7 +1,0 @@
-Metadata-Version: 2.4
-Name: pulse-fe-common
-Version: 1.0.0
-Summary: Codice comune per i frontend Flask di Pulse (Server e Probe)
-Requires-Python: >=3.13
-Requires-Dist: Flask>=3.0
-Requires-Dist: httpx>=0.27
