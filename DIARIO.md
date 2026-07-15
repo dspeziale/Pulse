@@ -360,3 +360,94 @@ Output consegnati
 - Documentazione di analisi/API/DB allineata alla realtà implementata: conteggio permessi coerente a 40 ovunque; contratto ruoli predefiniti (409) esplicito e coerente tra API doc e RBAC.
 
 ================================================
+
+ITERAZIONE 8
+
+Agente: QA
+Data: 2026-07-16
+
+Input ricevuti
+- Messaggio orchestratore: BE e ANALISTA hanno applicato i fix del QA_REPORT.md (Iterazione 1). Richiesto RE-COLLAUDO (regression + verifica mirata bug chiusi) e aggiornamento verdetto.
+- Fix dichiarati da verificare: BUG-01 (email EmailStr->422/201), BUG-02 (ruoli builtin 409 anche su description), SEC-01 (header sicurezza + banner Server), BUG-03/BUG-04 (coverage 100% BE server e probe), DOC-01 (docs allineati a 40 permessi).
+- QA_REPORT.md Iterazione 1; codice server/backend, probe/agent, frontend; deploy/*.
+
+Lavoro svolto
+- Ri-eseguite le suite pytest con coverage: server/backend = 208 test / 100% (2725 stmt, 0 miss, 526 branch, 0 parziali), 0 falliti; probe/agent = 65 test / 100% (565 stmt, 0 miss), 0 falliti.
+- Regressione FE (fix non toccano il FE): frontend_common 27/100%, dashboard Server 50/100% app, dashboard Probe 27/100% app, 0 falliti.
+- Verifica mirata LIVE (Postgres 16 Docker + schema+seed, backend uvicorn reale, harness httpx, 39 asserzioni): BUG-01 email malformata->422, valida->201, PUT valida->200/malformata->422; BUG-02 PUT/DELETE/set-permissions su ruolo builtin->409 (description non persistita) e ruoli custom ancora editabili; SEC-01 header X-Content-Type-Options/X-Frame-Options/CSP/Referrer-Policy presenti e Server neutralizzato (nuovo modulo pulse_server/middleware.py coperto 100%).
+- Regressione rapida: login=200 (40 permessi), password errata=401, deny-by-default=401, matrice Viewer (systems.read 200 / users.read/audit.read/roles.read 403), 12 endpoint core=200, JWT manomesso=401, masking segreti OK, audit_log immutabile (UPDATE/DELETE bloccati da trigger), docker compose config server+probe VALIDO.
+- Verifica DOC-01: 06_rbac.md e DOCUMENTO_DATABASE.md ora indicano 40 permessi; unico "37" residuo e' la voce di tracciamento incongruenza I-1 in SCHEMA_FISICO.md che spiega che "37" era errato (coerente).
+
+File creati
+- QA_REPORT.md aggiornato con sezione "7. Re-collaudo — Iterazione 2" (stato per bug CHIUSO/APERTO, verdetto, coverage finali, nuova osservazione OSS-01) e banner di verdetto attuale in testa.
+- (script/log di re-collaudo nello scratchpad di sessione, non versionati.)
+
+Problemi trovati
+- Nessun bug Bloccante/Maggiore residuo. Tutti i finding Iterazione 1 CHIUSI (BUG-01, BUG-02, BUG-03, BUG-04, SEC-01, DOC-01).
+- OSS-01 (Minore, non bloccante): il fix BUG-01 usa EmailStr (email-validator) che rifiuta il TLD .local (reserved name RFC 6762); confligge con la convenzione interna del progetto (admin@pulse.local nel seed/esempi). Email reali (@example.com, @gmail.com) accettate; admin di seed non impattato (inserito via SQL). La creazione via API di utenti con dominio @pulse.local viene rifiutata con 422.
+
+Decisioni prese
+- Verdetto aggiornato: PASS. Motivazione: 0 bug bloccanti/maggiori, 0 test falliti, coverage 100% su BE server e probe come da obiettivo.
+- OSS-01 classificato Minore/non bloccante (comportamento di libreria corretto ma in tensione con la convenzione .local del progetto): segnalato per allineamento futuro (dominio non riservato oppure config email-validator), non incide sul PASS.
+
+Output consegnati
+- QA_REPORT.md con esito re-collaudo e verdetto PASS. Coverage finali: BE server 100% (208 test), probe 100% (65 test), FE 100% (104 test). Nessun bug bloccante/maggiore/aperto; unica voce residua OSS-01 (Minore, opzionale).
+
+================================================
+
+
+ITERAZIONE 9
+
+Agente: DBA
+Data: 2026-07-16
+
+Input ricevuti
+- Messaggio orchestratore: QA ha rilevato OSS-01 (Minore) - il seed usa email admin `admin@pulse.local`, ma `.local` e un TLD riservato (RFC 6762) rifiutato dalla validazione EmailStr del backend, creando incoerenza tra seed e creazione utenti via API.
+- Fix richiesto (solo artefatti DBA): cambiare l email admin nel seed a un dominio non riservato; allineare i documenti DBA; ri-validare seed.sql su Postgres 16.
+
+Lavoro svolto
+- Modificato deploy/seed.sql: email utente admin da `admin@pulse.local` a `admin@pulse.example.com`. Invariati username (admin), password e hash bcrypt.
+- Verificati riferimenti residui a `admin@pulse.local`: presenti solo in file NON di competenza DBA (QA_REPORT.md del QA, server/backend/README.md del BE) e in iterazioni storiche di DIARIO.md (non riscritte). I documenti DBA (SCHEMA_FISICO.md, ER_DIAGRAM.md) non citavano il valore: nessun allineamento necessario oltre al seed.
+- Ri-validazione con Docker (postgres:16): schema.sql exit 0, seed.sql exit 0; verificato in DB che admin -> admin@pulse.example.com.
+
+File creati
+- Nessun nuovo file. Modificato: deploy/seed.sql.
+
+Problemi trovati
+- Nessuno. La modifica e circoscritta al valore email; il resto del seed e invariato e idempotente.
+
+Decisioni prese
+- Dominio scelto: pulse.example.com (example.com riservato per documentazione da RFC 2606, non un TLD ad uso speciale come .local; accettato da EmailStr/email-validator).
+
+Output consegnati
+- deploy/seed.sql corretto e ri-validato su Postgres 16 (applica pulito). OSS-01 chiuso lato artefatti DBA.
+
+================================================
+ITERAZIONE 10
+
+Agente: ORCHESTRATORE
+Data: 2026-07-16
+
+Input ricevuti
+- Verdetto QA finale (ITERAZIONE 8): PASS.
+- Conferme di chiusura di tutti i bug dal BE (ITERAZIONE 6), ANALISTA (ITERAZIONE 7) e DBA (ITERAZIONE 9, OSS-01).
+
+Lavoro svolto
+- Coordinata l'intera pipeline: ANALISTA -> DBA -> (BE + FE in parallelo) -> QA -> ciclo di fix (BE/ANALISTA/DBA) -> re-collaudo QA.
+- Verificata e riordinata la cronologia del DIARIO dopo le scritture parallele degli agenti.
+- Versionati tutti gli artefatti su git ad ogni fase.
+- Verificata l'assenza di riferimenti funzionali residui al dominio riservato .local (solo una fixture di test ORM non soggetta a EmailStr, non un bug).
+
+File creati
+- Nessun nuovo artefatto (fase di chiusura); aggiornati README.md (stato pipeline) e DIARIO.md.
+
+Problemi trovati
+- Nessuno di livello bloccante/maggiore. Podman non installato nell'ambiente: i compose Podman sono prodotti ma verificati solo staticamente (i Docker sono stati validati realmente).
+
+Decisioni prese
+- Certificazione del progetto come COMPLETO sulla base del verdetto QA PASS e della chiusura di tutti i bug tracciati.
+
+Output consegnati
+- Progetto Pulse completo, documentato, versionato e certificato: analisi (9 doc), DB PostgreSQL validato, backend FastAPI (coverage 100%), frontend Flask (coverage 100%), deploy Docker/Podman, QA_REPORT.md con verdetto PASS, DIARIO.md completo (iterazioni 0-10).
+
+================================================

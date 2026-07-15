@@ -19,8 +19,10 @@ Sistema distribuito per il monitoraggio della connettività e dello stato applic
 |------|--------|-------|
 | 1 | ANALISTA | ✅ completata |
 | 2 | DBA | ✅ completata (PostgreSQL 16, schema validato) |
-| 3 | BE | ✅ completata (72/72 endpoint, coverage 98%) |
+| 3 | BE | ✅ completata (72/72 endpoint, coverage 100%) |
 | 4 | FE | ✅ completata (24/24 pagine, coverage 100%) |
-| 5 | QA | in corso |
+| 5 | QA | ✅ **PASS** (0 bug bloccanti/maggiori, 0 test falliti) |
+
+**Progetto CERTIFICATO** — vedi `QA_REPORT.md`. Verdetto QA: PASS. Coverage: Backend server 100%, Probe agent 100%, Frontend 100%.
 
 Vedi `DIARIO.md` per la cronologia completa e `docs/` per gli artefatti.

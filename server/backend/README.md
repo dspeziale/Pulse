@@ -156,7 +156,7 @@ Da segnalare all'Analista/QA (nessuna invenzione: scelte coerenti col DB reale):
 7. **Validazione email (BUG-01, risolto)**: `UserCreate.email` e `UserUpdate.email`
    usano ora `pydantic.EmailStr` (dipendenza `email-validator`) → email malformate
    restituiscono `422`. Nota: EmailStr rifiuta i domini special-use (es. `.local`,
-   RFC 6761); usare domini validi. Il seed conserva `admin@pulse.local` (valore DB
+   RFC 6761); usare domini validi. Il seed usa `admin@pulse.example.com` (valore DB
    storico, non ri-validato in output).
 8. **Ruoli predefiniti — PUT (BUG-02, risolto)**: `PUT /roles/{id}` su un ruolo
    `is_builtin` restituisce ora `409` per **qualsiasi** modifica (inclusa la sola

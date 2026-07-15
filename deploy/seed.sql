@@ -174,7 +174,7 @@ ON CONFLICT DO NOTHING;
 INSERT INTO users (id, username, email, full_name, password_hash, status) VALUES
     ('00000000-0000-0000-0000-0000000000a1',
      'admin',
-     'admin@pulse.local',
+     'admin@pulse.example.com',
      'Pulse Administrator',
      '$2b$12$/dbOlipZecqErctsrVMG1ukAzlM69NU2/WZFPNyTkC8IfvFWmNWeO',
      'active')

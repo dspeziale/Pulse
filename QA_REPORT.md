@@ -1,12 +1,16 @@
 # Pulse — QA Report (AGENTE 5 — QA)
 
-Data: 2026-07-15
+Data: 2026-07-15 (Iterazione 1) · 2026-07-16 (Re-collaudo Iterazione 2)
 Ambiente: Windows 11, Python 3.13.14, Docker 29.5.3 (Podman non installato).
 Fonti di verità: `docs/api/DOCUMENTO_API.md`, `docs/analisi/*`, `deploy/schema.sql`+`seed.sql`.
 
+> **AGGIORNAMENTO (Re-collaudo Iterazione 2, 2026-07-16): VERDETTO ATTUALE = PASS.**
+> Tutti i finding dell'Iterazione 1 sono stati verificati come **CHIUSI**. Il verdetto FAIL
+> qui sotto è quello **storico** dell'Iterazione 1; l'esito valido è nella **§7 Re-collaudo**.
+
 ---
 
-## 1. Sommario esecutivo
+## 1. Sommario esecutivo (Iterazione 1 — storico)
 
 **VERDETTO: FAIL** (nessun bug **Bloccante**; il fallimento è dovuto a **1 bug Maggiore** di
 validazione contratto e al mancato raggiungimento dell'obiettivo esplicito di **coverage 100%**
@@ -170,3 +174,61 @@ Nessun test **pytest** fallito (350/350 verdi). I 2 fallimenti provengono dall'h
 - **BUG_BACKEND** (area BACKEND / DB / DEPLOY lato server): **BUG-01, BUG-03, BUG-04, SEC-01**
   (+ **BUG-02** e **DOC-01** come chiarimento contratto/doc — non richiedono modifica FE).
 - **BUG_FRONTEND** (area FRONTEND): **nessuno** (coverage FE 100%, tutte le pagine P-01..P-19 / PP-01..PP-05 verdi).
+
+---
+
+## 7. Re-collaudo — Iterazione 2 (2026-07-16)
+
+Contesto: BE e ANALISTA hanno applicato i fix dell'Iterazione 1. Eseguito re-collaudo mirato
+(verifica dei bug chiusi) + regressione rapida. **Nessuna modifica al codice da parte del QA.**
+
+### 7.1 Verdetto aggiornato
+
+**VERDETTO: PASS.** Nessun bug Bloccante o Maggiore residuo. Nessun test fallito.
+Coverage obiettivo 100% raggiunto su Backend server e Probe-agent.
+
+### 7.2 Stato di ciascun bug
+
+| ID | Gravità (It.1) | Stato | Evidenza re-collaudo |
+|---|---|---|---|
+| BUG-01 | Maggiore | **CHIUSO** | `POST /users` email malformata (`clearly-not-an-email`, `noatsign.com`) → **422**; email valida standard → **201**; `PUT /users/{id}` email valida → **200**, malformata → **422**. Fix con `EmailStr` verificato. (Vedi OSS-01 per nota minore sul TLD `.local`.) |
+| BUG-02 | Minore | **CHIUSO** | `PUT /roles/{SuperAdmin}` con `description` → **409** (descrizione **non** persistita, confermato con GET); `PUT` con `name` → **409**; `DELETE` → **409**; `PUT .../permissions` → **409**. Ruoli **custom** restano creabili (201) e modificabili (200). |
+| BUG-03 | Media | **CHIUSO** | `pytest --cov=pulse_server`: **100%** (2725 stmt, 0 miss, 526 branch, 0 parziali), **208 test, 0 falliti**. |
+| BUG-04 | Media | **CHIUSO** | `pytest --cov=pulse_probe`: **100%** (565 stmt, 0 miss, 124 branch, 0 parziali), **65 test, 0 falliti**. |
+| SEC-01 | Minore | **CHIUSO** | Response con `X-Content-Type-Options: nosniff`, `X-Frame-Options`, `Content-Security-Policy`, `Referrer-Policy`; header `Server: uvicorn` **neutralizzato**. Header presenti su response sia pubbliche sia autenticate. Nuovo modulo `pulse_server/middleware.py` (coperto al 100%). |
+| DOC-01 | Minore | **CHIUSO** | `06_rbac.md` §2 → "Totale: **40 permessi**"; `DOCUMENTO_DATABASE.md` → "40 permessi". Unico "37" residuo è la voce di tracciamento incongruenza in `SCHEMA_FISICO.md` (I-1) che spiega esplicitamente che "37 è un conteggio errato" — coerente, non è un'asserzione incoerente. |
+
+### 7.3 Nuova osservazione (Iterazione 2)
+
+| ID | Area | Titolo | Descrizione | Gravità |
+|---|---|---|---|---|
+| OSS-01 | BACKEND/DOC | `EmailStr` rifiuta il TLD `.local` (reserved name) | Effetto collaterale del fix BUG-01: `EmailStr` (email-validator) rifiuta con 422 i domini `.local` (RFC 6762, special-use). Questo confligge con la **convenzione interna del progetto**, che usa `admin@pulse.local` nel seed e negli esempi doc. Le email reali (es. `@example.com`, `@gmail.com`) sono accettate; l'admin di seed è inserito via SQL (bypassa Pydantic) quindi non è impattato, ma la **creazione via API** di utenti con dominio `@pulse.local` viene rifiutata. | **Minore** (non bloccante) |
+
+Fix suggerito OSS-01: valutare se allineare la convenzione doc/seed a un dominio non riservato
+(es. `@pulse.example`) oppure configurare email-validator per accettare domini special-use se il
+requisito prevede l'uso di `.local` interno. Non impatta il verdetto PASS.
+
+### 7.4 Regressione rapida (nessuna regressione rilevata)
+
+- Auth: login admin=200 (40 permessi), password errata=401.
+- RBAC deny-by-default: endpoint senza token=401; Viewer → `systems.read`=200, `users.read`/`audit.read`/`roles.read`=403.
+- Endpoint core (permissions/roles/users/probes/systems/notification-channels/notification-workflows/alarms/audit/logs/config/dashboard.aggregate): tutti **200**. `permissions`=40.
+- Sicurezza: JWT manomesso=401; segreti canale mascherati (password non in chiaro).
+- Audit immutabile: UPDATE/DELETE su `audit_log` → errore trigger (invariato).
+- Deploy: `docker compose config` VALIDO su stack server e probe.
+- Frontend (regressione): `frontend_common` 27 test/100%, dashboard Server 50 test/100% app, dashboard Probe 27 test/100% app — invariati (i fix non toccano il FE).
+
+### 7.5 Coverage finali (Iterazione 2)
+
+| Componente | Test | Coverage | Falliti |
+|---|---|---|---|
+| Backend server (`pulse_server`) | 208 | **100%** | 0 |
+| Probe agent (`pulse_probe`) | 65 | **100%** | 0 |
+| frontend_common | 27 | 100% | 0 |
+| dashboard Server (codice app) | 50 | 100% | 0 |
+| dashboard Probe (codice app) | 27 | 100% | 0 |
+
+### 7.6 Routing residuo
+
+- **BUG_BACKEND aperti**: nessuno bloccante/maggiore. Resta solo **OSS-01** (Minore, opzionale).
+- **BUG_FRONTEND aperti**: nessuno.
