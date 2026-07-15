@@ -64,6 +64,12 @@ class Settings(BaseSettings):
     # --- Rate limiting inbound (webhook) ---
     inbound_rate_limit_per_minute: int = 60
 
+    # --- Hardening HTTP (SEC-01) ---
+    # Abilita l'header HSTS: attivare SOLO quando il servizio e' esposto in HTTPS
+    # (dietro TLS/reverse proxy), altrimenti puo' bloccare l'accesso in HTTP.
+    hsts_enabled: bool = False
+    hsts_max_age_seconds: int = 63072000  # 2 anni
+
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:

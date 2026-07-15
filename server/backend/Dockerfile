@@ -32,5 +32,7 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
 port=os.environ.get('PULSE_API_PORT','8443'); \
 sys.exit(0) if urllib.request.urlopen(f'http://127.0.0.1:{port}/api/v1/health', timeout=3).status==200 else sys.exit(1)"
 
-# gunicorn con worker uvicorn; porta via env (default 8443).
-CMD ["sh", "-c", "gunicorn pulse_server.main:app -k uvicorn.workers.UvicornWorker -b 0.0.0.0:${PULSE_API_PORT:-8443} --workers ${PULSE_WORKERS:-2} --access-logfile - --error-logfile -"]
+# uvicorn con piu' worker; porta via env (default 8443).
+# --no-server-header (SEC-01): sopprime il banner "Server: uvicorn"; l'header
+# "Server: Pulse" e' impostato dal middleware applicativo.
+CMD ["sh", "-c", "uvicorn pulse_server.main:app --host 0.0.0.0 --port ${PULSE_API_PORT:-8443} --workers ${PULSE_WORKERS:-2} --no-server-header"]

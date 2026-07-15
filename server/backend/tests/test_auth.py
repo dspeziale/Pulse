@@ -37,7 +37,7 @@ def test_login_lockout_after_threshold(client) -> None:
         headers=headers,
         json={
             "username": "lockme",
-            "email": "lockme@pulse.local",
+            "email": "lockme@example.com",
             "full_name": "Lock Me",
             "password": "Password123!",
             "role_ids": [],
@@ -134,7 +134,7 @@ def test_forbidden_without_permission(client) -> None:
         headers=headers,
         json={
             "username": "viewer1",
-            "email": "viewer1@pulse.local",
+            "email": "viewer1@example.com",
             "full_name": "Viewer",
             "password": "Password123!",
             "role_ids": [viewer_role],

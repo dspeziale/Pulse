@@ -86,11 +86,23 @@ I test avviano automaticamente un container PostgreSQL 16 effimero via Docker
 savepoint e viene annullato al termine (isolamento senza perdere il seed).
 In alternativa impostare `PULSE_TEST_DATABASE_URL` per puntare a un DB esistente.
 
-**Coverage reale raggiunta: 98%** (181 test). Le righe residue non coperte sono
-rami difensivi/di I/O (lettura file certificato CA in `/probe/register`, provider
-`ProbeQueryClient` istanziato solo in produzione, combinazioni di filtri
-ridondanti, casi "ultimo SuperAdmin" raggiungibili solo con più SuperAdmin
-attivi simultanei). Nessun test è saltato o fallito.
+**Coverage reale raggiunta: 100%** (208 test) — statement + branch. L'unica riga
+esclusa con `# pragma: no cover` motivato è il ramo difensivo in `/probe/register`
+"probe inesistente", irraggiungibile perché `enrollment_tokens.probe_id` ha
+`ON DELETE CASCADE` (il token non può sopravvivere alla Probe). Nessun test è
+saltato o fallito. `mypy --strict` pulito.
+
+## Hardening HTTP (SEC-01)
+
+Un middleware (`middleware.py`) imposta su ogni risposta gli header di sicurezza:
+- `X-Content-Type-Options: nosniff`
+- `X-Frame-Options: DENY`
+- `Content-Security-Policy: default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'` (CSP restrittiva adatta a una API JSON)
+- `Referrer-Policy: no-referrer`
+- `Server: Pulse` (neutralizza il banner `uvicorn` che rivelerebbe lo stack)
+- `Strict-Transport-Security` (HSTS) emesso **solo** se `PULSE_HSTS_ENABLED=true`:
+  attivarlo unicamente quando il servizio è esposto in HTTPS (dietro TLS/reverse
+  proxy), altrimenti bloccherebbe l'accesso in HTTP.
 
 ## Sicurezza Server↔Probe (mTLS)
 
@@ -141,4 +153,16 @@ Da segnalare all'Analista/QA (nessuna invenzione: scelte coerenti col DB reale):
    via `GET /logs`; l'ingest dei log Probe avviene tramite i push di
    liveness/eventi (API-03). Non esiste un endpoint dedicato di ingest log nel
    DOCUMENTO_API: coerente con la scelta dell'Analista.
+7. **Validazione email (BUG-01, risolto)**: `UserCreate.email` e `UserUpdate.email`
+   usano ora `pydantic.EmailStr` (dipendenza `email-validator`) → email malformate
+   restituiscono `422`. Nota: EmailStr rifiuta i domini special-use (es. `.local`,
+   RFC 6761); usare domini validi. Il seed conserva `admin@pulse.local` (valore DB
+   storico, non ri-validato in output).
+8. **Ruoli predefiniti — PUT (BUG-02, risolto)**: `PUT /roles/{id}` su un ruolo
+   `is_builtin` restituisce ora `409` per **qualsiasi** modifica (inclusa la sola
+   `description`), come da DOCUMENTO_API §1.3. Il trigger DB `fn_protect_builtin_roles`
+   protegge solo `name`/`is_builtin`; il backend estende il blocco (allineamento
+   API↔schema deciso a favore del contratto API su indicazione dell'orchestratore).
+9. **Header di sicurezza (SEC-01, aggiunto)**: vedi §Hardening HTTP. Hardening non
+   richiesto esplicitamente dal contratto; introdotto senza alterare i payload.
 ```

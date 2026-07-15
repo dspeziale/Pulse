@@ -44,7 +44,7 @@ def register(
     if enrollment is None or enrollment.used_at is not None or enrollment.expires_at <= now:
         raise errors.unauthorized("Token di enrollment non valido, scaduto o gia' usato.")
     probe = session.get(Probe, enrollment.probe_id)
-    if probe is None:
+    if probe is None:  # pragma: no cover - irraggiungibile: FK enrollment_tokens.probe_id ON DELETE CASCADE
         raise errors.not_found("Probe inesistente.")
     if not probe.enabled:
         raise errors.forbidden("Probe disabilitata.")

@@ -88,3 +88,36 @@ def test_inmemory_store_roundtrip() -> None:
 def test_build_store_defaults_to_inmemory() -> None:
     store = build_store(Settings(opensearch_url=None))
     assert isinstance(store, InMemoryStore)
+
+
+def test_parse_iso_non_string() -> None:
+    """query 16: valore non stringa -> None."""
+    assert q._parse_iso(12345) is None
+    assert q._parse_iso(None) is None
+
+
+def test_within_time_non_string_timestamp() -> None:
+    doc = {"@timestamp": 999}  # non stringa
+    assert q.within_time(doc, "2026-07-15T00:00:00Z", None) is False
+
+
+def test_within_time_to_only_and_frm_only() -> None:
+    doc = {"@timestamp": "2026-07-15T10:00:00Z"}
+    # solo `to` (frm None) -> ramo 71->75
+    assert q.within_time(doc, None, "2026-07-15T11:00:00Z") is True
+    # solo `frm`
+    assert q.within_time(doc, "2026-07-15T09:00:00Z", None) is True
+
+
+def test_aggregation_avg_without_field_ignored() -> None:
+    """query 92->83: aggregazione avg senza field non produce output e prosegue."""
+    _, _, aggs = q.apply_query(DOCS, aggregations=[{"type": "avg"}, {"type": "count"}])
+    assert aggs == {"count": 3}
+
+
+def test_is_number() -> None:
+    """query 114-115/except: _is_number su valore valido e non valido."""
+    assert q._is_number(10) is True
+    assert q._is_number("3.14") is True
+    assert q._is_number("abc") is False
+    assert q._is_number(None) is False

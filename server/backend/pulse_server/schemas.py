@@ -10,7 +10,7 @@ import datetime as dt
 import uuid
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 
 class _Model(BaseModel):
@@ -92,7 +92,7 @@ class UserList(_Model):
 
 class UserCreate(_Model):
     username: str = Field(min_length=1, max_length=100)
-    email: str = Field(min_length=3, max_length=255)
+    email: EmailStr = Field(max_length=255)
     full_name: str | None = None
     password: str = Field(min_length=8)
     role_ids: list[str] = Field(default_factory=list)
@@ -100,7 +100,7 @@ class UserCreate(_Model):
 
 
 class UserUpdate(_Model):
-    email: str | None = None
+    email: EmailStr | None = None
     full_name: str | None = None
     status: Literal["active", "disabled", "locked"] | None = None
 

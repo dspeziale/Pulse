@@ -102,8 +102,12 @@ def update_role(
     role = session.get(Role, parse_uuid(role_id, what="role_id"))
     if role is None:
         raise errors.not_found("Ruolo inesistente.")
-    if role.is_builtin and body.name is not None and body.name != role.name:
-        raise errors.conflict("La struttura di un ruolo predefinito non e' modificabile.")
+    # DOCUMENTO_API §1.3: PUT su ruolo predefinito -> 409. Coerente con RB-02
+    # ("struttura bloccata") e con lo schema (i builtin non sono modificabili via
+    # API, inclusa la sola description). Il trigger DB protegge name/is_builtin;
+    # il backend estende il blocco a QUALSIASI modifica dei builtin.
+    if role.is_builtin:
+        raise errors.conflict("Un ruolo predefinito non e' modificabile.")
     if body.name is not None:
         role.name = body.name
     if body.description is not None:

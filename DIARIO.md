@@ -285,3 +285,78 @@ Output consegnati
 - QA_REPORT.md completo con tabella bug (6 finding: 1 Maggiore, 2 Media, 3 Minore; 0 Bloccanti) e routing fix (BUG_BACKEND: BUG-01, BUG-03, BUG-04, SEC-01 [+BUG-02/DOC-01 doc]; BUG_FRONTEND: nessuno). Coverage reali: BE 98%, Probe 98%, FE 100%.
 
 ================================================
+
+ITERAZIONE 6
+
+Agente: BE
+Data: 2026-07-16
+
+Input ricevuti
+- QA_REPORT.md (radice): bug di area BACKEND assegnati = BUG-01, BUG-02, SEC-01, BUG-03, BUG-04.
+- Vincoli: non toccare i frontend (server/dashboard, probe/dashboard); non modificare requisiti/API doc salvo indicazione; ri-verifica reale obbligatoria; coverage 100% su entrambi i pacchetti; mypy --strict pulito.
+
+Lavoro svolto
+- BUG-01 (Maggiore): validazione email. UserCreate.email e UserUpdate.email ora usano pydantic.EmailStr (dipendenza email-validator aggiunta a requirements). Email malformate -> 422; email valide -> 201/200. Aggiornati gli indirizzi di test dal dominio special-use .local a example.com (EmailStr rifiuta i domini RFC 6761). Aggiunti test dedicati (create/PUT: malformata 422, valida 201/200).
+- BUG-02 (contratto): PUT /roles/{id} su ruolo predefinito (is_builtin) ora restituisce 409 per QUALSIASI modifica, inclusa la sola description, come da DOCUMENTO_API §1.3. Il trigger DB protegge solo name/is_builtin; il backend estende il blocco. Aggiunto test (description builtin -> 409 e valore invariato).
+- SEC-01 (hardening): nuovo middleware (middleware.py) che imposta X-Content-Type-Options: nosniff, X-Frame-Options: DENY, Content-Security-Policy restrittiva per API JSON (default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'), Referrer-Policy: no-referrer, e Server: Pulse (neutralizza il banner). HSTS emesso solo se PULSE_HSTS_ENABLED=true (nuove config hsts_enabled/hsts_max_age_seconds). Dockerfile del backend passato a uvicorn con --no-server-header per eliminare del tutto il banner "Server: uvicorn". Documentato in README (§Hardening HTTP e §SCOSTAMENTI).
+- BUG-03 (coverage backend): portata a 100% (statement+branch). Aggiunti test mirati per i rami residui (get_probe_client, deps token Probe non corrispondente, refresh utente disabilitato, logout token inesistente, liste senza filtri, history/logs/checks per filtro, update ruolo custom per nome, ultimo SuperAdmin disabilitato/eliminato da attore non-SuperAdmin, dashboard aggregata senza rollup, webhook WhatsApp malformato, lettura CA + threshold in /probe/register e /probe/config, rami del motore workflow: delivered=false, finestra solo-probe, soppressione active_hours, trigger senza condizioni, recovery su sistema inesistente). Unico # pragma: no cover motivato: ramo "probe inesistente" in /probe/register, irraggiungibile per FK ON DELETE CASCADE.
+- BUG-04 (coverage probe): portata a 100%. Aggiunti test su _parse_iso non-stringa, within_time (solo to / solo frm / timestamp non valido), aggregazione avg senza field, _is_number, lifespan che bootstrappa senza stato iniettato, _send_liveness senza re-sync. # pragma: no cover motivati: _poller_loop (loop runtime), avvio/annullamento task poller (shutdown), backend OpenSearchStore (richiede cluster reale; logica di query coperta al 100% via InMemoryStore che ne condivide il motore).
+
+File creati
+- server/backend/pulse_server/middleware.py
+- server/backend/tests/test_security_headers.py, tests/test_coverage_100.py
+
+File modificati (solo BACKEND, nessun frontend toccato)
+- server/backend/pulse_server/schemas.py (EmailStr), routers/roles.py (409 builtin), config.py (HSTS), main.py (middleware), Dockerfile (--no-server-header), requirements.txt (email-validator), .env.example (HSTS), README.md (SEC-01/SCOSTAMENTI/coverage).
+- server/backend/tests/{test_users,test_roles_permissions,test_auth,test_extra_coverage,test_workflow_engine_db}.py (nuovi test + domini email example.com).
+
+Problemi trovati
+- EmailStr rifiuta i domini special-use (.local, RFC 6761) usati come convenzione nel progetto: aggiornati gli indirizzi di test a example.com; il seed conserva admin@pulse.local (valore DB storico, non ri-validato in output). Documentato in SCOSTAMENTI.
+- Sotto uvicorn reale il solo middleware lasciava un doppione "Server: uvicorn": risolto con --no-server-header nel Dockerfile (verificato: resta solo "Server: Pulse").
+
+Decisioni prese
+- Conflitto API doc vs schema sui ruoli builtin (BUG-02): allineato al contratto API (409 anche per description), su indicazione dell'orchestratore; il trigger DB resta invariato (proprieta' del DBA).
+- HSTS opt-in via config (default off) per non bloccare gli ambienti in HTTP.
+
+Output consegnati
+- Backend server: 100% coverage (208 test, 0 falliti), mypy --strict pulito.
+- Probe agent: 100% coverage (72 test, 0 falliti), mypy --strict pulito.
+- Verifica reale (uvicorn + Postgres 16 Docker con schema+seed): login admin 200; POST /users email malformata -> 422, email valida -> 201; PUT /roles/{SuperAdmin} description -> 409; header di sicurezza presenti; con --no-server-header resta solo "Server: Pulse".
+- Bug noti residui: nessuno tra quelli assegnati. Podman non installato (compose podman non eseguiti, invariati).
+
+================================================
+
+ITERAZIONE 7
+
+Agente: ANALISTA
+Data: 2026-07-16
+
+Input ricevuti
+- QA_REPORT.md (radice) con finding documentali DOC-01 e BUG-02.
+- Richiesta dell'orchestratore di correggere SOLO la documentazione (analisi/API/DB), allineandola alla realtà già implementata e validata, senza toccare il codice.
+
+Lavoro svolto
+- DOC-01: verificato che il catalogo permessi enumerato (06_rbac.md §2) e la matrice (§4) contengono 40 codici distinti (conteggio verificato: catalogo 40, matrice 40 righe; coerente col seed DB). Corretto il totale dichiarato da "37" a "40".
+- BUG-02: reso esplicito e coerente in DOCUMENTO_API.md e 06_rbac.md che PUT /roles/{id} e DELETE /roles/{id} su un ruolo predefinito (is_builtin) restituiscono 409, inclusa la modifica della sola `description` (ruoli predefiniti immutabili in ogni campo).
+- Verifica finale: nessuna occorrenza residua di "37" in 06_rbac.md, DOCUMENTO_API.md, DOCUMENTO_DATABASE.md; conteggio permessi coerente a 40 tra i tre documenti.
+
+File creati
+- Nessun file nuovo (solo modifiche a documentazione esistente).
+
+File modificati
+- docs/analisi/06_rbac.md (totale 40; regola immutabilità builtin incl. description; decisione RB-02 allineata a BUG-02).
+- docs/api/DOCUMENTO_API.md (PUT/DELETE /roles/{id}: 409 su builtin, description compresa).
+- docs/database/DOCUMENTO_DATABASE.md (seed catalogo: 40 permessi).
+
+Problemi trovati
+- Nessun nuovo problema. Le incongruenze DOC-01 e BUG-02 erano di sola documentazione (i codici permesso e lo schema/seed erano già corretti a 40).
+- Nota: SCHEMA_FISICO.md (artefatto DBA) contiene un riferimento a "37" solo per descrivere il finding I-1 (spiega che il 37 era errato e il valore corretto è 40); lasciato invariato perché documenta la diagnosi, non un requisito da correggere.
+
+Decisioni prese
+- Ruoli predefiniti trattati come completamente immutabili (nessun campo modificabile, description inclusa) → 409 su PUT/DELETE, allineando la documentazione al comportamento che il BE sta implementando e allo schema DB.
+- Conteggio permessi definitivo: 40 (di cui 2 di profilo impliciti).
+
+Output consegnati
+- Documentazione di analisi/API/DB allineata alla realtà implementata: conteggio permessi coerente a 40 ovunque; contratto ruoli predefiniti (409) esplicito e coerente tra API doc e RBAC.
+
+================================================

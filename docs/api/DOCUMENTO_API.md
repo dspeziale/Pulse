@@ -134,10 +134,14 @@ Formato corpo errore:
 
 ### PUT /api/v1/roles/{id}
 - **Permesso**: `roles.update`. **Request**: `{ "name"?: string, "description"?: string }`
-- **Response 200**: `Role`. **Errori**: 409 (ruolo predefinito), 404, 422, 401, 403.
+- **Response 200**: `Role`.
+- **Nota (ruoli predefiniti / builtin)**: qualsiasi PUT su un ruolo predefinito (`is_builtin = true`) restituisce **409**, **inclusa la modifica della sola `description`**. I ruoli predefiniti sono immutabili in ogni loro campo; per personalizzazioni creare un ruolo custom.
+- **Errori**: 409 (ruolo predefinito — qualunque campo, description compresa), 404, 422, 401, 403.
 
 ### DELETE /api/v1/roles/{id}
-- **Permesso**: `roles.delete`. **Response 204**. **Errori**: 409 (predefinito o assegnato a utenti), 404, 401, 403.
+- **Permesso**: `roles.delete`. **Response 204**.
+- **Nota (ruoli predefiniti / builtin)**: DELETE su un ruolo predefinito (`is_builtin = true`) restituisce sempre **409** (non eliminabile).
+- **Errori**: 409 (predefinito, oppure assegnato a utenti), 404, 401, 403.
 
 ### PUT /api/v1/roles/{id}/permissions
 - **Descrizione**: imposta i permessi del ruolo. **Permesso**: `roles.assign_permissions`.

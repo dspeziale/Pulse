@@ -13,6 +13,7 @@ from fastapi import FastAPI
 
 from . import __version__
 from .errors import register_exception_handlers
+from .middleware import security_headers_middleware
 from .routers import (
     auth,
     dashboard,
@@ -70,6 +71,7 @@ def create_app() -> FastAPI:
         redoc_url="/api/v1/redoc",
     )
     register_exception_handlers(app)
+    app.middleware("http")(security_headers_middleware)
 
     app.include_router(auth.router)
     app.include_router(users.router)

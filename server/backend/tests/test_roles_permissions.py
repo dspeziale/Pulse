@@ -63,6 +63,17 @@ def test_builtin_role_cannot_rename(client, auth_headers) -> None:
     assert r.status_code == 409
 
 
+def test_builtin_role_description_update_409(client, auth_headers) -> None:
+    """BUG-02: PUT su ruolo predefinito -> 409 anche per la sola description."""
+    r = client.put(
+        f"/api/v1/roles/{SUPERADMIN_ROLE}", headers=auth_headers, json={"description": "HACKED-DESC"}
+    )
+    assert r.status_code == 409
+    # la description NON deve essere cambiata
+    got = client.get(f"/api/v1/roles/{SUPERADMIN_ROLE}", headers=auth_headers)
+    assert got.json()["description"] != "HACKED-DESC"
+
+
 def test_builtin_role_cannot_delete(client, auth_headers) -> None:
     r = client.delete(f"/api/v1/roles/{SUPERADMIN_ROLE}", headers=auth_headers)
     assert r.status_code == 409
@@ -85,7 +96,7 @@ def test_delete_role_in_use_conflict(client, auth_headers) -> None:
         "/api/v1/users",
         headers=auth_headers,
         json={
-            "username": "hasrole", "email": "hasrole@pulse.local", "full_name": "",
+            "username": "hasrole", "email": "hasrole@example.com", "full_name": "",
             "password": "Password123!", "role_ids": [rid], "status": "active",
         },
     )

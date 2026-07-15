@@ -145,3 +145,42 @@ def test_send_liveness_triggers_resync() -> None:
 def test_bootstrap_state_builds_inmemory() -> None:
     state = main.bootstrap_state(Settings(opensearch_url=None))
     assert isinstance(state.store, InMemoryStore)
+
+
+def test_send_liveness_no_resync() -> None:
+    """main 88->exit: nessun nuovo config_version -> nessun re-sync."""
+    settings = Settings(opensearch_url=None, probe_token="tok")
+    state = main.bootstrap_state(settings)
+    state.config_version = "v1"
+
+    calls = {"config": 0}
+
+    class _S(ServerClient):
+        def __init__(self) -> None:
+            pass
+
+        def send_liveness(self, token, body):  # type: ignore[override]
+            return {"config_version": "v1"}  # invariato
+
+        def get_config(self, token):  # type: ignore[override]
+            calls["config"] += 1
+            return {}
+
+    state.server = _S()
+    main._send_liveness(state)
+    assert calls["config"] == 0  # nessun re-sync
+
+
+def test_lifespan_bootstraps_without_injected_state(monkeypatch) -> None:
+    """main: lifespan costruisce lo stato quando non e' iniettato (app = create_app())."""
+    from fastapi.testclient import TestClient
+
+    import pulse_probe.main as m
+
+    monkeypatch.setattr(
+        m, "get_settings", lambda: Settings(opensearch_url=None, poller_enabled=False, server_query_token="tok")
+    )
+    app = m.create_app()  # nessun settings -> runtime non iniettato
+    with TestClient(app) as c:
+        assert c.get("/api/v1/health").json() == {"status": "ok"}
+        assert hasattr(app.state, "runtime")

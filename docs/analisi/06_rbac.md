@@ -121,7 +121,7 @@ Formato codice permesso: `area.azione`.
 | `config.read` | Consultare la configurazione. |
 | `config.update` | Modificare la configurazione. |
 
-Totale: **37 permessi** (di cui 2 di profilo impliciti).
+Totale: **40 permessi** (di cui 2 di profilo impliciti). Il conteggio coincide con i codici enumerati in questa sezione, con le righe della matrice (§4) e con il seed del DB Server.
 
 ---
 
@@ -190,7 +190,7 @@ Legenda: ✔ = concesso, vuoto = non concesso.
 
 1. Deve sempre esistere ≥1 utente attivo con ruolo **SuperAdmin** (RF-021).
 2. Un utente non può auto-eliminarsi né auto-disabilitarsi.
-3. I ruoli predefiniti non sono eliminabili; i loro permessi non sono modificabili (per garantire coerenza operativa). I ruoli **personalizzati** sono pienamente configurabili.
+3. I ruoli predefiniti (`is_builtin = true`) sono **completamente immutabili**: non sono eliminabili e non sono modificabili in **nessun** campo, **inclusa la `description`**. Ogni tentativo di `PUT /api/v1/roles/{id}` o `DELETE /api/v1/roles/{id}` su un ruolo predefinito restituisce **409**. I ruoli **personalizzati** sono pienamente configurabili.
 4. La revoca di un permesso da un ruolo ha effetto immediato sulle richieste successive degli utenti di quel ruolo.
 5. L'autenticazione della **Probe** (attore di sistema) è indipendente dal RBAC utente: usa credenziali per-Probe (mTLS + token) e ha accesso solo agli endpoint dedicati (`/api/v1/probe/*` in ingest e alla propria configurazione), non alle API di gestione.
 
@@ -201,5 +201,5 @@ Legenda: ✔ = concesso, vuoto = non concesso.
 | # | Tema | Decisione | Motivazione |
 |---|---|---|---|
 | RB-01 | Distinzione SuperAdmin/Admin | SuperAdmin gestisce ruoli/permessi; Admin gestisce operatività + utenti | Separazione dei privilegi: la modifica della struttura di autorizzazione è più sensibile. |
-| RB-02 | Ruoli predefiniti modificabili? | No (struttura bloccata), sì ruoli personalizzati | Evita di indebolire per errore ruoli critici; flessibilità via ruoli custom. |
+| RB-02 | Ruoli predefiniti modificabili? | No: immutabili in ogni campo (inclusa `description`) → PUT/DELETE su builtin restituiscono 409; sì ruoli personalizzati | Evita di indebolire/alterare per errore ruoli critici; flessibilità via ruoli custom. Allineato al comportamento BE/schema DB (BUG-02). |
 | RB-03 | Permessi scoping per-Probe/per-sistema (row-level) | Non incluso (permessi globali per area) | I requisiti non richiedono scoping fine; da valutare se emergesse la necessità di multi-tenant. |

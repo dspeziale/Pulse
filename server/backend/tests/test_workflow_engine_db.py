@@ -180,3 +180,62 @@ def test_disabled_channel_no_send(db_session, telegram_fake) -> None:
 def test_no_matching_workflow(db_session, telegram_fake) -> None:
     workflow.process_event(db_session, {"type": "status_changed", "system_id": "none", "status": "error"}, box=BOX)
     assert telegram_fake.count == 0
+
+
+def test_delivery_marked_failed_when_not_delivered(db_session) -> None:
+    """workflow 261: notifier ritorna delivered=False (senza eccezione)."""
+    original = get_notifier("telegram")
+    set_notifier("telegram", _Fake(ok=False))
+    try:
+        _setup(db_session, conditions=[{"field": "status", "op": "eq", "value": "error"}])
+        workflow.process_event(db_session, {"type": "status_changed", "system_id": "wf-sys", "status": "error", "reachable": True}, box=BOX)
+        db_session.flush()
+        d = db_session.execute(select(NotificationDelivery)).scalars().all()
+        assert d and d[0].status == "failed"
+    finally:
+        set_notifier("telegram", original)
+
+
+def test_probe_only_maintenance_window_does_not_suppress(db_session, telegram_fake) -> None:
+    """workflow 220->217: finestra solo-probe (system_id None) non blocca l'evento del sistema."""
+    probe, system, _, _ = _setup(
+        db_session, conditions=[{"field": "status", "op": "eq", "value": "error"}],
+        suppression={"respect_maintenance": True},
+    )
+    now = dt.datetime.now(dt.timezone.utc)
+    # finestra attiva ma associata SOLO alla probe (non al sistema dell'evento)
+    db_session.add(
+        MaintenanceWindow(system_id=None, probe_id=probe.id, start_at=now - dt.timedelta(hours=1), end_at=now + dt.timedelta(hours=1))
+    )
+    db_session.flush()
+    workflow.process_event(db_session, {"type": "status_changed", "system_id": "wf-sys", "status": "error", "reachable": True}, box=BOX, now=now)
+    assert telegram_fake.count == 1  # non soppresso
+
+
+def test_active_hours_suppression_audited(db_session, telegram_fake) -> None:
+    """workflow 305: soppressione per orari attivi registra audit e non invia."""
+    now = dt.datetime(2026, 7, 13, 10, 0, tzinfo=dt.timezone.utc)  # lunedi' 10:00
+    _setup(
+        db_session, conditions=[{"field": "status", "op": "eq", "value": "error"}],
+        suppression={"active_hours": {"start": "11:00", "end": "18:00"}},
+    )
+    workflow.process_event(db_session, {"type": "status_changed", "system_id": "wf-sys", "status": "error", "reachable": True}, box=BOX, now=now)
+    assert telegram_fake.count == 0
+
+
+def test_workflow_trigger_matches_but_conditions_dont(db_session, telegram_fake) -> None:
+    """workflow 305: workflow con trigger giusto ma condizioni non soddisfatte -> continue."""
+    _setup(db_session, conditions=[{"field": "status", "op": "eq", "value": "error"}])
+    # stesso trigger (status_changed) ma status 'ok' non soddisfa la condizione
+    workflow.process_event(db_session, {"type": "status_changed", "system_id": "wf-sys", "status": "ok", "reachable": True}, box=BOX)
+    assert telegram_fake.count == 0
+
+
+def test_recovery_unknown_system_noop(db_session, telegram_fake) -> None:
+    """workflow 405: _resolve_alarms con sistema inesistente ritorna senza effetti."""
+    rec = NotificationWorkflow(name="rec-unknown", description="", enabled=True, trigger="system_recovered", scope={}, suppression={})
+    db_session.add(rec)
+    db_session.flush()
+    workflow.process_event(db_session, {"type": "system_recovered", "system_id": "ghost-system", "status": "ok", "reachable": True}, box=BOX)
+    # nessuna eccezione, nessun allarme creato
+    assert db_session.execute(select(Alarm)).scalars().all() == []

@@ -74,7 +74,7 @@ Convenzioni: ogni entità ha `id UUID PK`; `created_at`/`updated_at TIMESTAMP` o
 | area | STRING(40) | NOT NULL | es. `users` |
 | description | STRING(255) | NOT NULL | |
 
-> Popolato da seed dal catalogo in `06_rbac.md` (37 permessi). Non creabile via API.
+> Popolato da seed dal catalogo in `06_rbac.md` (40 permessi). Non creabile via API.
 
 ### 3.4 user_roles (utenti↔ruoli) — associativa
 | Attributo | Tipo | Vincoli |

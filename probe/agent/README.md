@@ -93,9 +93,12 @@ pytest --cov=pulse_probe --cov-report=term-missing
 ```
 
 I test usano lo storage in-memory e `httpx.MockTransport` (nessuna rete, nessun
-OpenSearch reale). **Coverage reale: 98%** (65 test). Le righe non coperte sono
-il loop periodico del poller (`_poller_loop`, marcato `pragma: no cover`, è
-eseguito solo a runtime) e pochi rami difensivi di parsing timestamp.
+OpenSearch reale). **Coverage reale: 100%** (72 test) — statement + branch.
+Escluse con `# pragma: no cover` motivato solo le righe eseguibili unicamente a
+runtime: il loop periodico del poller (`_poller_loop`), l'avvio del task del
+poller e il suo annullamento allo shutdown, e il backend `OpenSearchStore` (che
+richiede un cluster OpenSearch reale; la logica di query è testata al 100% via
+`InMemoryStore`, che ne condivide il motore). `mypy --strict` pulito.
 
 ## Sicurezza
 

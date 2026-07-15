@@ -40,7 +40,7 @@ def test_disabled_user_token_forbidden(client, auth_headers) -> None:
     client.post(
         "/api/v1/users",
         headers=auth_headers,
-        json={"username": "todisable", "email": "td@pulse.local", "full_name": "", "password": "Password123!", "role_ids": ["00000000-0000-0000-0000-000000000002"], "status": "active"},
+        json={"username": "todisable", "email": "td@example.com", "full_name": "", "password": "Password123!", "role_ids": ["00000000-0000-0000-0000-000000000002"], "status": "active"},
     )
     tok = client.post("/api/v1/auth/login", json={"username": "todisable", "password": "Password123!"}).json()["access_token"]
     uid = client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {tok}"}).json()["id"]
