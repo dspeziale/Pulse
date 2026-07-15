@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Pulse — Probe{% endblock %}</title>
+  <style>
+    :root { --bg:#0f172a; --panel:#1e293b; --ink:#e2e8f0; --mut:#94a3b8;
+            --line:#334155; --ok:#22c55e; --warn:#eab308; --err:#ef4444;
+            --down:#f97316; --unk:#64748b; --acc:#34d399; }
+    * { box-sizing:border-box; }
+    body { margin:0; font-family:system-ui,Segoe UI,Arial,sans-serif;
+           background:var(--bg); color:var(--ink); }
+    a { color:var(--acc); text-decoration:none; }
+    header { background:var(--panel); border-bottom:1px solid var(--line);
+             padding:.6rem 1rem; display:flex; align-items:center; gap:1rem;
+             flex-wrap:wrap; }
+    header .brand { font-weight:700; font-size:1.1rem; color:var(--acc); }
+    nav a { margin-right:.8rem; color:var(--mut); white-space:nowrap; }
+    nav a:hover { color:var(--ink); }
+    main { padding:1rem 1.4rem; max-width:1100px; }
+    h1 { font-size:1.4rem; } h2 { font-size:1.1rem; }
+    table { width:100%; border-collapse:collapse; margin:1rem 0; background:var(--panel); }
+    th,td { text-align:left; padding:.45rem .6rem; border-bottom:1px solid var(--line); }
+    th { color:var(--mut); font-weight:600; }
+    .badge { padding:.1rem .5rem; border-radius:.6rem; font-size:.78rem;
+             color:#0b1220; font-weight:600; }
+    .b-ok{background:var(--ok);} .b-warn{background:var(--warn);}
+    .b-error{background:var(--err);color:#fff;} .b-down{background:var(--down);}
+    .b-unknown{background:var(--unk);color:#fff;}
+    input,select,textarea { background:#0b1220; color:var(--ink);
+      border:1px solid var(--line); border-radius:.4rem; padding:.4rem .5rem;
+      width:100%; margin:.2rem 0 .7rem; font-family:inherit; }
+    label { display:block; color:var(--mut); font-size:.85rem; }
+    button,.btn { background:var(--acc); color:#08131f; border:none;
+      border-radius:.4rem; padding:.45rem .8rem; font-weight:600; cursor:pointer; }
+    .btn-ghost { background:transparent; color:var(--acc); border:1px solid var(--line); }
+    .card { background:var(--panel); border:1px solid var(--line);
+      border-radius:.6rem; padding:1rem; margin:.6rem 0; }
+    .kpis { display:flex; gap:1rem; flex-wrap:wrap; }
+    .kpi { flex:1; min-width:140px; text-align:center; }
+    .kpi .n { font-size:1.8rem; font-weight:700; }
+    .flash { padding:.6rem 1rem; border-radius:.4rem; margin:.4rem 0; }
+    .flash.success{background:#14532d;} .flash.danger{background:#7f1d1d;}
+    .flash.warning{background:#713f12;} .flash.info{background:#164e63;}
+    .muted { color:var(--mut); } .inline { display:inline; }
+    .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:1rem; }
+  </style>
+  {% block head_extra %}{% endblock %}
+</head>
+<body>
+{% if is_authenticated %}
+<header>
+  <span class="brand">Pulse · Probe</span>
+  <nav>
+    <a href="{{ url_for('dashboard.index') }}">Dashboard</a>
+    <a href="{{ url_for('query.builder') }}">Query</a>
+    <a href="{{ url_for('status.show_status') }}">Stato</a>
+  </nav>
+  <span style="margin-left:auto">
+    <span class="muted">{{ current_user }}</span>
+    <form method="post" action="{{ url_for('auth.logout') }}" class="inline">
+      <button class="btn-ghost">Esci</button>
+    </form>
+  </span>
+</header>
+{% endif %}
+<main>
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for category, message in messages %}
+      <div class="flash {{ category }}">{{ message }}</div>
+    {% endfor %}
+  {% endwith %}
+  {% block content %}{% endblock %}
+</main>
+</body>
+</html>

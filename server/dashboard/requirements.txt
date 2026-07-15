@@ -1,0 +1,6 @@
+# Dashboard SERVER — dipendenze di runtime (versioni pinnate a range compatibili).
+# Il pacchetto condiviso pulse-fe-common va installato a parte (vedi Dockerfile:
+# `pip install ./frontend_common`), essendo sorgente comune ai due frontend.
+Flask>=3.0,<4
+httpx>=0.27,<1
+gunicorn>=21,<23

@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}Errore {{ code }} — Pulse Probe{% endblock %}
+{% block content %}
+<h1>Errore {{ code }}</h1>
+<div class="card">
+  <p>{{ message }}</p>
+  <p><a class="btn-ghost" href="{{ url_for('dashboard.index') }}">Torna alla dashboard</a></p>
+</div>
+{% endblock %}
