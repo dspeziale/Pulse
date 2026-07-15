@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Probe {{ probe.name }} — Pulse{% endblock %}
-{% block head_extra %}<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>{% endblock %}
+{% block head_extra %}<script src="{{ url_for('static', filename='pulse-charts.js') }}"></script>{% endblock %}
 {% block content %}
 <h1>Probe: {{ probe.name }}</h1>
 <p>

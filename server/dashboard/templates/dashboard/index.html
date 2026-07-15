@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Dashboard — Pulse Server{% endblock %}
-{% block head_extra %}<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>{% endblock %}
+{% block head_extra %}<script src="{{ url_for('static', filename='pulse-charts.js') }}"></script>{% endblock %}
 {% block content %}
 <h1>Dashboard aggregata</h1>
 <form method="get" class="inline">

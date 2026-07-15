@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}Grafici / Analisi — Pulse Server{% endblock %}
+{% block head_extra %}<script src="{{ url_for('static', filename='pulse-charts.js') }}"></script>{% endblock %}
+{% block content %}
+<h1>Grafici / Analisi (P-05)</h1>
+
+<form method="get" class="card">
+  <div class="grid2">
+    <div>
+      <label>Probe</label>
+      <select name="probe_id" required>
+        <option value="">— seleziona —</option>
+        {% for p in probes['items'] %}
+          <option value="{{ p.id }}" {% if p.id==probe_id %}selected{% endif %}>{{ p.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label>system_id</label>
+      <input name="system_id" value="{{ system_id }}" placeholder="sys-1" required>
+    </div>
+    <div><label>Da (ISO)</label><input name="from" value="{{ time_from }}"></div>
+    <div><label>A (ISO)</label><input name="to" value="{{ time_to }}"></div>
+  </div>
+  <button type="submit">Aggiorna grafici</button>
+</form>
+
+{% if aggregations %}
+<div class="card">
+  <h3>Aggregazioni</h3>
+  <pre class="muted">{{ aggregations|tojson(indent=2) }}</pre>
+</div>
+{% endif %}
+
+{% if heartbeats %}
+<div class="card"><h3>response_ms</h3><canvas id="rt" height="120"></canvas></div>
+<table>
+  <tr><th>Timestamp</th><th>Check</th><th>Stato</th><th>ms</th></tr>
+  {% for h in heartbeats['items'] %}
+  <tr>
+    <td class="muted">{{ h['@timestamp'] }}</td><td>{{ h.check_name }}</td>
+    <td><span class="badge b-{{ h.status }}">{{ h.status }}</span></td>
+    <td>{{ h.response_ms }}</td>
+  </tr>
+  {% endfor %}
+</table>
+<script>
+const hb = {{ heartbeats['items']|tojson }};
+new Chart(document.getElementById('rt'), {
+  type:'line',
+  data:{ labels: hb.map(h=>h['@timestamp']),
+    datasets:[{label:'response_ms', data:hb.map(h=>h.response_ms), borderColor:'#38bdf8'}] }
+});
+</script>
+{% else %}
+<p class="muted">Seleziona Probe e system_id per visualizzare i grafici.</p>
+{% endif %}
+{% endblock %}

@@ -39,6 +39,11 @@ def create_app(config: Optional[ServerDashboardConfig] = None) -> Flask:
             return redirect(url_for("dashboard.index"))
         return redirect(url_for("auth.login"))
 
+    @app.route("/healthz")
+    def _healthz():
+        """Liveness della dashboard (non verifica il backend). Per container."""
+        return {"status": "ok"}, 200
+
     return app
 
 

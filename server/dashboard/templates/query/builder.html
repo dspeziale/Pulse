@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Query OpenSearch — Pulse Server{% endblock %}
+{% block content %}
+<h1>Interrogazione OpenSearch (P-04)</h1>
+<p class="muted">Query strutturata Pulse (filtri/aggregazioni) inoltrata via
+  <code>POST /probes/{id}/query</code>. Non è DSL raw (decisione API-01).</p>
+
+<form method="post" action="{{ url_for('query.run_query') }}" class="card">
+  <label>Probe</label>
+  <select name="probe_id" required>
+    <option value="">— seleziona —</option>
+    {% for p in probes['items'] %}
+      <option value="{{ p.id }}" {% if p.id==probe_id %}selected{% endif %}>{{ p.name }}</option>
+    {% endfor %}
+  </select>
+
+  <div class="grid2">
+    <div><label>Da (ISO-8601)</label><input name="from" placeholder="2026-07-15T00:00:00Z"></div>
+    <div><label>A (ISO-8601)</label><input name="to" placeholder="2026-07-15T23:59:59Z"></div>
+  </div>
+
+  <label>Filtri (JSON array)</label>
+  <textarea name="filters" rows="4" placeholder='[{"field":"system_id","op":"eq","value":"sys-1"}]'></textarea>
+
+  <label>Aggregazioni (JSON array)</label>
+  <textarea name="aggregations" rows="3" placeholder='[{"type":"avg","field":"response_ms","interval":"1h"}]'></textarea>
+
+  <button type="submit">Esegui query</button>
+</form>
+
+{% if result %}
+<h2>Risultati ({{ result.total }})</h2>
+{% if result.aggregations %}
+<div class="card">
+  <h3>Aggregazioni</h3>
+  <pre class="muted">{{ result.aggregations|tojson(indent=2) }}</pre>
+</div>
+{% endif %}
+<table>
+  <tr><th>Timestamp</th><th>Sistema</th><th>Check</th><th>Stato</th><th>ms</th></tr>
+  {% for h in result['items'] %}
+  <tr>
+    <td class="muted">{{ h['@timestamp'] }}</td>
+    <td>{{ h.system_name }}</td><td>{{ h.check_name }}</td>
+    <td><span class="badge b-{{ h.status }}">{{ h.status }}</span></td>
+    <td>{{ h.response_ms }}</td>
+  </tr>
+  {% endfor %}
+</table>
+{% endif %}
+{% endblock %}
