@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Modifica' if role else 'Nuovo' }} ruolo — Pulse{% endblock %}
+{% block content %}
+<h1>{{ 'Modifica' if role else 'Nuovo' }} ruolo</h1>
+<div class="card">
+<form method="post" action="{{ url_for('roles.update_role', role_id=role.id) if role else url_for('roles.create_role') }}">
+  <label>Nome</label><input name="name" value="{{ role.name if role else '' }}" {% if role and role.is_builtin %}readonly{% endif %} required>
+  <label>Descrizione</label><input name="description" value="{{ role.description if role else '' }}">
+  {% if not role %}
+  <label>Permessi</label>
+  {% for area, items in permissions['items']|groupby('area') %}
+    <fieldset><legend class="muted">{{ area }}</legend>
+    {% for p in items %}
+      <label><input type="checkbox" name="permission_codes" value="{{ p.code }}" style="width:auto"> {{ p.code }}</label>
+    {% endfor %}
+    </fieldset>
+  {% endfor %}
+  {% endif %}
+  <button type="submit">Salva</button>
+</form>
+</div>
+{% if role and can('roles.assign_permissions') and not role.is_builtin %}
+<div class="card">
+  <h2>Permessi del ruolo</h2>
+  <form method="post" action="{{ url_for('roles.assign_permissions', role_id=role.id) }}">
+    {% for area, items in permissions['items']|groupby('area') %}
+      <fieldset><legend class="muted">{{ area }}</legend>
+      {% for p in items %}
+        <label><input type="checkbox" name="permission_codes" value="{{ p.code }}" style="width:auto"
+          {% if p.code in role.permissions %}checked{% endif %}> {{ p.code }}</label>
+      {% endfor %}
+      </fieldset>
+    {% endfor %}
+    <button class="btn-ghost">Aggiorna permessi</button>
+  </form>
+</div>
+{% endif %}
+{% endblock %}
