@@ -27,6 +27,15 @@ def test_query_run_success(client, login, fake):
     assert r.status_code == 200
 
 
+def test_query_run_empty_json_defaults(client, login, fake):
+    login(["heartbeats.query"])
+    fake.set("POST", "/probes/p1/query", {"items": [], "aggregations": {}, "total": 0})
+    fake.set("GET", "/probes", {"items": []})
+    r = client.post("/query", data={"probe_id": "p1", "filters": "",
+                                    "aggregations": ""})
+    assert r.status_code == 200
+
+
 def test_query_run_no_probe(client, login, fake):
     login(["heartbeats.query"])
     r = client.post("/query", data={"probe_id": ""})
@@ -119,6 +128,15 @@ def test_workflows_cycle(client, login, fake):
                        data={"event": "{}"}).status_code == 200
     fake.set("DELETE", "/notification-workflows/1", None)
     assert client.post("/notification-workflows/1/delete").status_code == 302
+
+
+def test_workflow_create_empty_json_defaults(client, login, fake):
+    login(["workflows.create"])
+    fake.set("POST", "/notification-workflows", {"id": "1"})
+    # Campi JSON assenti -> ramo default di _json_field.
+    r = client.post("/notification-workflows/new",
+                    data={"name": "w", "trigger": "status_changed"})
+    assert r.status_code == 302
 
 
 def test_workflows_invalid_json_branches(client, login, fake):

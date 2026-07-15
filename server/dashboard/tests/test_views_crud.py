@@ -24,7 +24,7 @@ def test_users_list(client, login, fake):
     fake.set("GET", "/users", {"items": [{"id": "1", "username": "a",
                                           "status": "active", "roles": []}],
                                "total": 1})
-    r = client.get("/users?q=a&status=active&page=1")
+    r = client.get("/users?q=a&status=active&page=1&page_size=10")
     assert r.status_code == 200
 
 
