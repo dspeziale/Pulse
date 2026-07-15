@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Token enrollment — Pulse{% endblock %}
+{% block content %}
+<h1>Token di enrollment</h1>
+<div class="card">
+  <p class="muted">Copiare subito: il token non sarà più mostrato.</p>
+  {% if result.probe %}<p><strong>Probe:</strong> {{ result.probe.name }} ({{ result.probe.id }})</p>{% endif %}
+  <label>Enrollment token</label>
+  <input value="{{ result.enrollment_token }}" readonly>
+  <p class="muted">Scadenza: {{ result.enrollment_expires_at }}</p>
+  <a class="btn-ghost" href="{{ url_for('probes.list_probes') }}">Torna all'elenco</a>
+</div>
+{% endblock %}

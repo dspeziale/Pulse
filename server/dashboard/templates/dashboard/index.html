@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — Pulse Server{% endblock %}
+{% block head_extra %}<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>{% endblock %}
+{% block content %}
+<h1>Dashboard aggregata</h1>
+<form method="get" class="inline">
+  <label class="inline">Finestra</label>
+  <select name="window" onchange="this.form.submit()" style="width:auto">
+    {% for w in ['1h','24h','7d'] %}
+      <option value="{{ w }}" {% if w==window %}selected{% endif %}>{{ w }}</option>
+    {% endfor %}
+  </select>
+</form>
+
+{% set s = aggregate.systems_summary %}
+<div class="card kpis">
+  <div class="kpi"><div class="n">{{ s.ok }}</div><div class="muted">OK</div></div>
+  <div class="kpi"><div class="n">{{ s.warn }}</div><div class="muted">Warn</div></div>
+  <div class="kpi"><div class="n">{{ s.error }}</div><div class="muted">Error</div></div>
+  <div class="kpi"><div class="n">{{ s.down }}</div><div class="muted">Down</div></div>
+  <div class="kpi"><div class="n">{{ s.unknown }}</div><div class="muted">Unknown</div></div>
+  <div class="kpi"><div class="n">{{ aggregate.active_alarms }}</div><div class="muted">Allarmi attivi</div></div>
+</div>
+
+<div class="card"><canvas id="statusChart" height="90"></canvas></div>
+
+<h2>Sonde</h2>
+<table>
+  <tr><th>Nome</th><th>Stato</th><th>Sistemi</th><th>Down</th></tr>
+  {% for p in aggregate.probes %}
+  <tr>
+    <td>{{ p.probe_id }}</td>
+    <td><span class="badge b-{{ p.status }}">{{ p.status }}</span></td>
+    <td>{{ p.systems_total }}</td><td>{{ p.systems_down }}</td>
+  </tr>
+  {% endfor %}
+</table>
+
+<h2>Allarmi attivi</h2>
+<table>
+  <tr><th>Sistema</th><th>Stato</th><th>Aperto</th></tr>
+  {% for a in alarms['items'] %}
+  <tr><td>{{ a.system_id }}</td><td>{{ a.status }}</td><td>{{ a.opened_at }}</td></tr>
+  {% endfor %}
+</table>
+
+<script>
+const d = {{ s|tojson }};
+new Chart(document.getElementById('statusChart'), {
+  type: 'bar',
+  data: { labels:['OK','Warn','Error','Down','Unknown'],
+    datasets:[{ label:'Sistemi', data:[d.ok,d.warn,d.error,d.down,d.unknown],
+      backgroundColor:['#22c55e','#eab308','#ef4444','#f97316','#64748b'] }] },
+  options:{ plugins:{legend:{display:false}} }
+});
+</script>
+{% endblock %}

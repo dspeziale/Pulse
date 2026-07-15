@@ -1,0 +1,37 @@
+"""Utility comuni ai router: paginazione, parsing UUID, gestione conflitti."""
+
+from __future__ import annotations
+
+import uuid
+from typing import Any
+
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
+
+from .. import errors
+
+
+def clamp_pagination(page: int, page_size: int) -> tuple[int, int]:
+    page = max(1, page)
+    page_size = min(max(1, page_size), 200)
+    return page, page_size
+
+
+def offset(page: int, page_size: int) -> int:
+    return (page - 1) * page_size
+
+
+def parse_uuid(value: str, *, what: str = "id") -> uuid.UUID:
+    try:
+        return uuid.UUID(str(value))
+    except (ValueError, TypeError):
+        raise errors.not_found(f"{what} non valido o inesistente.")
+
+
+def commit_or_conflict(session: Session, *, message: str, details: dict[str, Any] | None = None) -> None:
+    """Esegue il commit convertendo le violazioni di integrita' in 409."""
+    try:
+        session.commit()
+    except IntegrityError as exc:
+        session.rollback()
+        raise errors.conflict(message, details or {"db": str(exc.orig)})

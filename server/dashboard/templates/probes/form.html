@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Modifica' if probe else 'Nuova' }} Probe — Pulse{% endblock %}
+{% block content %}
+<h1>{{ 'Modifica' if probe else 'Nuova' }} Probe</h1>
+<div class="card">
+<form method="post" action="{{ url_for('probes.update_probe', probe_id=probe.id) if probe else url_for('probes.create_probe') }}">
+  <label>Nome</label><input name="name" value="{{ probe.name if probe else '' }}" required>
+  <label>Descrizione</label><input name="description" value="{{ probe.description if probe else '' }}">
+  <label>Query endpoint</label><input name="query_endpoint" value="{{ probe.query_endpoint if probe else '' }}">
+  <label>Tag (separati da virgola)</label><input name="tags" value="{{ probe.tags|join(', ') if probe else '' }}">
+  <label><input type="checkbox" name="enabled" style="width:auto" {% if not probe or probe.enabled %}checked{% endif %}> Abilitata</label>
+  <button type="submit">Salva</button>
+</form>
+</div>
+{% if probe and can('probes.rotate_key') %}
+<form method="post" action="{{ url_for('probes.rotate_probe', probe_id=probe.id) }}">
+  <button class="btn-ghost">Ruota credenziali</button>
+</form>
+{% endif %}
+{% if probe and can('probes.delete') %}
+<form method="post" action="{{ url_for('probes.delete_probe', probe_id=probe.id) }}">
+  <button class="btn-danger">Elimina</button>
+</form>
+{% endif %}
+{% endblock %}

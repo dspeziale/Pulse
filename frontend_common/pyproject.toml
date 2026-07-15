@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pulse-fe-common"
+version = "1.0.0"
+description = "Codice comune per i frontend Flask di Pulse (Server e Probe)"
+requires-python = ">=3.13"
+dependencies = [
+    "Flask>=3.0",
+    "httpx>=0.27",
+]
+
+[tool.setuptools.packages.find]
+include = ["pulse_fe_common*"]
+
+[tool.setuptools.package-data]
+pulse_fe_common = ["templates/*.html"]

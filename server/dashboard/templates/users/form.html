@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Modifica' if user else 'Nuovo' }} utente — Pulse{% endblock %}
+{% block content %}
+<h1>{{ 'Modifica' if user else 'Nuovo' }} utente</h1>
+<div class="card">
+<form method="post" action="{{ url_for('users.update_user', user_id=user.id) if user else url_for('users.create_user') }}">
+  {% if not user %}
+    <label>Username</label><input name="username" required>
+    <label>Password</label><input name="password" type="password" required>
+  {% endif %}
+  <label>Nome completo</label><input name="full_name" value="{{ user.full_name if user else '' }}">
+  <label>Email</label><input name="email" type="email" value="{{ user.email if user else '' }}">
+  <label>Stato</label>
+  <select name="status">
+    {% for st in ['active','disabled'] %}
+      <option value="{{ st }}" {% if user and user.status==st %}selected{% endif %}>{{ st }}</option>
+    {% endfor %}
+  </select>
+  {% if not user %}
+    <label>Ruoli</label>
+    {% for r in roles['items'] %}
+      <label><input type="checkbox" name="role_ids" value="{{ r.id }}" style="width:auto"> {{ r.name }}</label>
+    {% endfor %}
+  {% endif %}
+  <button type="submit">Salva</button>
+</form>
+</div>
+{% if user and can('users.assign_roles') %}
+<div class="card">
+  <h2>Ruoli</h2>
+  <form method="post" action="{{ url_for('users.assign_roles', user_id=user.id) }}">
+    {% for r in roles['items'] %}
+      <label><input type="checkbox" name="role_ids" value="{{ r.id }}" style="width:auto"
+        {% if r.name in user.roles %}checked{% endif %}> {{ r.name }}</label>
+    {% endfor %}
+    <button class="btn-ghost">Aggiorna ruoli</button>
+  </form>
+</div>
+{% endif %}
+{% if user and can('users.update') %}
+<div class="card">
+  <h2>Reset password</h2>
+  <form method="post" action="{{ url_for('users.reset_password', user_id=user.id) }}">
+    <input name="new_password" type="password" placeholder="Nuova password" required>
+    <button class="btn-ghost">Reimposta</button>
+  </form>
+</div>
+{% endif %}
+{% endblock %}

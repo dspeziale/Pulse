@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Modifica' if system else 'Nuovo' }} sistema — Pulse{% endblock %}
+{% block content %}
+<h1>{{ 'Modifica' if system else 'Nuovo' }} sistema</h1>
+<div class="card">
+<form method="post" action="{{ url_for('systems.update_system', system_id=system.id) if system else url_for('systems.create_system') }}">
+  <label>System ID</label><input name="system_id" value="{{ system.system_id if system else '' }}" required>
+  <label>Nome</label><input name="system_name" value="{{ system.system_name if system else '' }}" required>
+  <label>URL heartbeat</label><input name="heartbeat_url" value="{{ system.heartbeat_url if system else '' }}" required>
+  <label>Probe</label>
+  <select name="probe_id" required>
+    {% for p in probes['items'] %}
+      <option value="{{ p.id }}" {% if system and system.probe_id==p.id %}selected{% endif %}>{{ p.name }}</option>
+    {% endfor %}
+  </select>
+  <div class="grid2">
+    <div><label>Poll interval (s)</label><input name="poll_interval_seconds" type="number" value="{{ system.poll_interval_seconds if system else 60 }}"></div>
+    <div><label>Timeout (s)</label><input name="timeout_seconds" type="number" value="{{ system.timeout_seconds if system else 10 }}"></div>
+    <div><label>Soglia warn (ms)</label><input name="response_ms_warn" type="number" value="{{ system.thresholds.response_ms_warn if system and system.thresholds else '' }}"></div>
+    <div><label>Soglia error (ms)</label><input name="response_ms_error" type="number" value="{{ system.thresholds.response_ms_error if system and system.thresholds else '' }}"></div>
+  </div>
+  <label><input type="checkbox" name="enabled" style="width:auto" {% if not system or system.enabled %}checked{% endif %}> Abilitato</label>
+  <button type="submit">Salva</button>
+</form>
+</div>
+{% endblock %}

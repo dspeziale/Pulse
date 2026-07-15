@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Utente {{ user.username }} — Pulse{% endblock %}
+{% block content %}
+<h1>{{ user.username }}</h1>
+<div class="card">
+  <p><strong>Nome:</strong> {{ user.full_name }}</p>
+  <p><strong>Email:</strong> {{ user.email }}</p>
+  <p><strong>Stato:</strong> {{ user.status }}</p>
+  <p><strong>Ruoli:</strong> {{ user.roles|join(', ') }}</p>
+  <p class="muted">Ultimo accesso: {{ user.last_login_at or '—' }}</p>
+  {% if can('users.update') %}<a class="btn-ghost" href="{{ url_for('users.edit_user', user_id=user.id) }}">Modifica</a>{% endif %}
+  {% if can('users.delete') %}
+  <form method="post" action="{{ url_for('users.delete_user', user_id=user.id) }}" class="inline">
+    <button class="btn-danger">Elimina/disabilita</button>
+  </form>
+  {% endif %}
+</div>
+{% endblock %}

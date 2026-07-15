@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Sistema {{ system.system_name }} — Pulse{% endblock %}
+{% block content %}
+<h1>{{ system.system_name }}</h1>
+<div class="card">
+  <p><strong>ID:</strong> {{ system.system_id }} · <strong>Probe:</strong> {{ system.probe_id }}</p>
+  <p class="muted">{{ system.heartbeat_url }}</p>
+  {% if can('systems.update') %}<a class="btn-ghost" href="{{ url_for('systems.edit_system', system_id=system.id) }}">Modifica</a>{% endif %}
+  {% if can('systems.delete') %}
+  <form method="post" action="{{ url_for('systems.delete_system', system_id=system.id) }}" class="inline">
+    <button class="btn-danger">Elimina</button>
+  </form>
+  {% endif %}
+</div>
+<h2>Check scoperti</h2>
+<table>
+  <tr><th>Check</th><th>Nome</th><th>Ultimo stato</th><th>Ultimo contatto</th></tr>
+  {% for c in checks['items'] %}
+  <tr><td>{{ c.check_id }}</td><td>{{ c.check_name }}</td>
+      <td><span class="badge b-{{ c.last_status }}">{{ c.last_status }}</span></td>
+      <td class="muted">{{ c.last_seen_at }}</td></tr>
+  {% endfor %}
+</table>
+{% endblock %}

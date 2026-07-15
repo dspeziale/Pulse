@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Probe {{ probe.name }} — Pulse{% endblock %}
+{% block head_extra %}<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>{% endblock %}
+{% block content %}
+<h1>Probe: {{ probe.name }}</h1>
+<p>
+  Stato: <span class="badge b-{{ status.status }}">{{ status.status }}</span>
+  {% if can('probes.update') %}· <a href="{{ url_for('probes.edit_probe', probe_id=probe.id) }}">Gestisci</a>{% endif %}
+</p>
+<div class="card">
+  <p class="muted">Ultimo contatto: {{ status.last_seen_at or '—' }} ·
+     Ultima sync: {{ status.last_sync_at or '—' }} · Versione: {{ status.version or '—' }}</p>
+  {% if status.last_error %}<p class="badge b-error">{{ status.last_error }}</p>{% endif %}
+</div>
+
+<h2>Sistemi ({{ overview.generated_at }})</h2>
+<table>
+  <tr><th>Sistema</th><th>Stato</th><th>Avg ms</th><th>Uptime %</th></tr>
+  {% for s in overview.systems %}
+  <tr>
+    <td>{{ s.system_name }}</td>
+    <td><span class="badge b-{{ s.status }}">{{ s.status }}</span></td>
+    <td>{{ s.avg_response_ms }}</td><td>{{ s.uptime_pct }}</td>
+  </tr>
+  {% endfor %}
+</table>
+
+<h2>Heartbeat recenti</h2>
+<table>
+  <tr><th>Timestamp</th><th>Sistema</th><th>Check</th><th>Stato</th><th>ms</th></tr>
+  {% for h in heartbeats['items'] %}
+  <tr>
+    <td class="muted">{{ h['@timestamp'] }}</td>
+    <td>{{ h.system_name }}</td><td>{{ h.check_name }}</td>
+    <td><span class="badge b-{{ h.status }}">{{ h.status }}</span></td>
+    <td>{{ h.response_ms }}</td>
+  </tr>
+  {% endfor %}
+</table>
+<div class="card"><canvas id="rt" height="90"></canvas></div>
+<script>
+const hb = {{ heartbeats['items']|tojson }};
+new Chart(document.getElementById('rt'), {
+  type:'line',
+  data:{ labels: hb.map(h=>h['@timestamp']),
+    datasets:[{label:'response_ms', data:hb.map(h=>h.response_ms), borderColor:'#38bdf8'}] }
+});
+</script>
+{% endblock %}

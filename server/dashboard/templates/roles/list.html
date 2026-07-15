@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Ruoli — Pulse{% endblock %}
+{% block content %}
+<h1>Ruoli</h1>
+{% if can('roles.create') %}<p><a class="btn" href="{{ url_for('roles.new_role') }}">Nuovo ruolo</a></p>{% endif %}
+<table>
+  <tr><th>Nome</th><th>Descrizione</th><th>Predefinito</th><th>N. permessi</th></tr>
+  {% for r in data['items'] %}
+  <tr>
+    <td><a href="{{ url_for('roles.detail', role_id=r.id) }}">{{ r.name }}</a></td>
+    <td>{{ r.description }}</td><td>{{ 'sì' if r.is_builtin else 'no' }}</td>
+    <td>{{ r.permissions|length }}</td>
+  </tr>
+  {% endfor %}
+</table>
+<p class="muted">Totale: {{ data['total'] }}</p>
+{% endblock %}

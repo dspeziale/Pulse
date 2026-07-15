@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Sistemi — Pulse{% endblock %}
+{% block content %}
+<h1>Sistemi monitorati</h1>
+{% if can('systems.create') %}<p><a class="btn" href="{{ url_for('systems.new_system') }}">Nuovo sistema</a></p>{% endif %}
+<form method="get">
+  <input name="q" placeholder="Cerca" value="{{ request.args.get('q','') }}" style="width:auto">
+  <select name="probe_id" style="width:auto">
+    <option value="">Tutte le Probe</option>
+    {% for p in probes['items'] %}
+      <option value="{{ p.id }}" {% if request.args.get('probe_id')==p.id %}selected{% endif %}>{{ p.name }}</option>
+    {% endfor %}
+  </select>
+  <button class="btn-ghost">Filtra</button>
+</form>
+<table>
+  <tr><th>ID</th><th>Nome</th><th>URL heartbeat</th><th>Probe</th><th>Abilitato</th></tr>
+  {% for s in data['items'] %}
+  <tr>
+    <td><a href="{{ url_for('systems.detail', system_id=s.id) }}">{{ s.system_id }}</a></td>
+    <td>{{ s.system_name }}</td><td class="muted">{{ s.heartbeat_url }}</td>
+    <td>{{ s.probe_id }}</td><td>{{ 'sì' if s.enabled else 'no' }}</td>
+  </tr>
+  {% endfor %}
+</table>
+<p class="muted">Totale: {{ data['total'] }}</p>
+{% endblock %}
