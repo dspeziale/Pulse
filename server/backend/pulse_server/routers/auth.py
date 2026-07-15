@@ -10,6 +10,7 @@ from sqlalchemy import select
 from .. import errors, schemas
 from ..audit import write_audit
 from ..deps import (
+    CurrentUser,
     CurrentUserDep,
     SessionDep,
     SettingsDep,
@@ -151,7 +152,7 @@ def logout(
 @router.get("/me", response_model=schemas.MeResponse)
 def me(
     session: SessionDep,
-    user: CurrentUserDep = Depends(require_permission("profile.read")),
+    user: CurrentUser = Depends(require_permission("profile.read")),
 ) -> schemas.MeResponse:
     db_user = session.get(User, user.id)
     assert db_user is not None
@@ -171,7 +172,7 @@ def change_password(
     body: schemas.ChangePasswordRequest,
     session: SessionDep,
     request: Request,
-    user: CurrentUserDep = Depends(require_permission("profile.update")),
+    user: CurrentUser = Depends(require_permission("profile.update")),
 ) -> Response:
     db_user = session.get(User, user.id)
     assert db_user is not None

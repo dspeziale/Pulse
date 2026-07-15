@@ -1,0 +1,55 @@
+"""Test della configurazione da variabili d'ambiente."""
+import pulse_fe_common.config as cfgmod
+from pulse_fe_common.config import ProbeDashboardConfig, ServerDashboardConfig
+
+
+def test_server_defaults(monkeypatch):
+    for k in ("PULSE_SERVER_API_BASE", "PULSE_SERVER_SECRET_KEY",
+              "PULSE_HTTP_TIMEOUT", "PULSE_VERIFY_TLS", "PULSE_SERVER_DASH_PORT"):
+        monkeypatch.delenv(k, raising=False)
+    cfg = ServerDashboardConfig.from_env()
+    assert cfg.api_base_url == "http://localhost:8000/api/v1"
+    assert cfg.secret_key == "dev-server-secret"
+    assert cfg.request_timeout == 10.0
+    assert cfg.verify_tls is True
+    assert cfg.port == 5000
+
+
+def test_server_from_env_overrides(monkeypatch):
+    monkeypatch.setenv("PULSE_SERVER_API_BASE", "https://api.example/api/v1/")
+    monkeypatch.setenv("PULSE_HTTP_TIMEOUT", "3.5")
+    monkeypatch.setenv("PULSE_VERIFY_TLS", "false")
+    monkeypatch.setenv("PULSE_SERVER_DASH_PORT", "8080")
+    cfg = ServerDashboardConfig.from_env()
+    assert cfg.api_base_url == "https://api.example/api/v1"  # trailing slash rimosso
+    assert cfg.request_timeout == 3.5
+    assert cfg.verify_tls is False
+    assert cfg.port == 8080
+
+
+def test_probe_defaults(monkeypatch):
+    for k in ("PULSE_PROBE_API_BASE", "PULSE_PROBE_AGENT_TOKEN",
+              "PULSE_PROBE_DASH_USER", "PULSE_PROBE_DASH_PASSWORD",
+              "PULSE_PROBE_SECRET_KEY", "PULSE_PROBE_DASH_PORT"):
+        monkeypatch.delenv(k, raising=False)
+    cfg = ProbeDashboardConfig.from_env()
+    assert cfg.agent_base_url == "http://localhost:8444/api/v1"
+    assert cfg.dash_user == "probe"
+    assert cfg.port == 5001
+
+
+def test_bool_parsing_variants(monkeypatch):
+    monkeypatch.setenv("X", "YES")
+    assert cfgmod._get_bool("X", False) is True
+    monkeypatch.setenv("X", "0")
+    assert cfgmod._get_bool("X", True) is False
+    monkeypatch.delenv("X", raising=False)
+    assert cfgmod._get_bool("X", True) is True
+
+
+def test_int_float_parsing(monkeypatch):
+    monkeypatch.delenv("Y", raising=False)
+    assert cfgmod._get_int("Y", 7) == 7
+    assert cfgmod._get_float("Y", 1.5) == 1.5
+    monkeypatch.setenv("Y", "42")
+    assert cfgmod._get_int("Y", 0) == 42

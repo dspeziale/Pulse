@@ -9,7 +9,7 @@ from sqlalchemy import func, or_, select
 
 from .. import errors, schemas, serializers
 from ..audit import write_audit
-from ..deps import CurrentUserDep, SessionDep, SettingsDep, client_ip, require_permission
+from ..deps import CurrentUser, CurrentUserDep, SessionDep, SettingsDep, client_ip, require_permission
 from ..models import EnrollmentToken, MonitoredSystem, Probe
 from ..security import generate_opaque_token, hash_token
 from ._helpers import clamp_pagination, commit_or_conflict, offset, parse_uuid
@@ -33,7 +33,7 @@ def list_probes(
     page_size: int = Query(20, ge=1, le=200),
     q: str | None = None,
     status: str | None = None,
-    _: CurrentUserDep = Depends(require_permission("probes.read")),
+    _: CurrentUser = Depends(require_permission("probes.read")),
 ) -> schemas.ProbeList:
     page, page_size = clamp_pagination(page, page_size)
     stmt = select(Probe)
@@ -61,7 +61,7 @@ def create_probe(
     session: SessionDep,
     settings: SettingsDep,
     request: Request,
-    actor: CurrentUserDep = Depends(require_permission("probes.create")),
+    actor: CurrentUser = Depends(require_permission("probes.create")),
 ) -> schemas.ProbeCreateResponse:
     probe = Probe(
         name=body.name,
@@ -95,7 +95,7 @@ def create_probe(
 
 @router.get("/{probe_id}", response_model=schemas.ProbeOut)
 def get_probe(
-    probe_id: str, session: SessionDep, _: CurrentUserDep = Depends(require_permission("probes.read"))
+    probe_id: str, session: SessionDep, _: CurrentUser = Depends(require_permission("probes.read"))
 ) -> schemas.ProbeOut:
     probe = session.get(Probe, parse_uuid(probe_id, what="probe_id"))
     if probe is None:
@@ -109,7 +109,7 @@ def update_probe(
     body: schemas.ProbeUpdate,
     session: SessionDep,
     request: Request,
-    actor: CurrentUserDep = Depends(require_permission("probes.update")),
+    actor: CurrentUser = Depends(require_permission("probes.update")),
 ) -> schemas.ProbeOut:
     probe = session.get(Probe, parse_uuid(probe_id, what="probe_id"))
     if probe is None:
@@ -144,7 +144,7 @@ def delete_probe(
     probe_id: str,
     session: SessionDep,
     request: Request,
-    actor: CurrentUserDep = Depends(require_permission("probes.delete")),
+    actor: CurrentUser = Depends(require_permission("probes.delete")),
 ) -> Response:
     probe = session.get(Probe, parse_uuid(probe_id, what="probe_id"))
     if probe is None:
@@ -175,7 +175,7 @@ def rotate_credentials(
     session: SessionDep,
     settings: SettingsDep,
     request: Request,
-    actor: CurrentUserDep = Depends(require_permission("probes.rotate_key")),
+    actor: CurrentUser = Depends(require_permission("probes.rotate_key")),
 ) -> schemas.EnrollmentInfo:
     probe = session.get(Probe, parse_uuid(probe_id, what="probe_id"))
     if probe is None:
@@ -208,7 +208,7 @@ def rotate_credentials(
 
 @router.get("/{probe_id}/status", response_model=schemas.ProbeStatusOut)
 def probe_status(
-    probe_id: str, session: SessionDep, _: CurrentUserDep = Depends(require_permission("probes.read"))
+    probe_id: str, session: SessionDep, _: CurrentUser = Depends(require_permission("probes.read"))
 ) -> schemas.ProbeStatusOut:
     probe = session.get(Probe, parse_uuid(probe_id, what="probe_id"))
     if probe is None:

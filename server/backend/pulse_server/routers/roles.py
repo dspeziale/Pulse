@@ -7,7 +7,7 @@ from sqlalchemy import func, select
 
 from .. import errors, schemas, serializers
 from ..audit import write_audit
-from ..deps import CurrentUserDep, SessionDep, client_ip, require_permission
+from ..deps import CurrentUser, CurrentUserDep, SessionDep, client_ip, require_permission
 from ..models import Permission, Role, RolePermission, UserRole
 from ._helpers import clamp_pagination, commit_or_conflict, offset, parse_uuid
 
@@ -35,7 +35,7 @@ def list_roles(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=200),
     q: str | None = None,
-    _: CurrentUserDep = Depends(require_permission("roles.read")),
+    _: CurrentUser = Depends(require_permission("roles.read")),
 ) -> schemas.RoleList:
     page, page_size = clamp_pagination(page, page_size)
     stmt = select(Role)
@@ -58,7 +58,7 @@ def create_role(
     body: schemas.RoleCreate,
     session: SessionDep,
     request: Request,
-    actor: CurrentUserDep = Depends(require_permission("roles.create")),
+    actor: CurrentUser = Depends(require_permission("roles.create")),
 ) -> schemas.RoleOut:
     _validate_permission_codes(session, body.permission_codes)
     role = Role(name=body.name, description=body.description, is_builtin=False)
@@ -83,7 +83,7 @@ def create_role(
 
 @router.get("/{role_id}", response_model=schemas.RoleOut)
 def get_role(
-    role_id: str, session: SessionDep, _: CurrentUserDep = Depends(require_permission("roles.read"))
+    role_id: str, session: SessionDep, _: CurrentUser = Depends(require_permission("roles.read"))
 ) -> schemas.RoleOut:
     role = session.get(Role, parse_uuid(role_id, what="role_id"))
     if role is None:
@@ -97,7 +97,7 @@ def update_role(
     body: schemas.RoleUpdate,
     session: SessionDep,
     request: Request,
-    actor: CurrentUserDep = Depends(require_permission("roles.update")),
+    actor: CurrentUser = Depends(require_permission("roles.update")),
 ) -> schemas.RoleOut:
     role = session.get(Role, parse_uuid(role_id, what="role_id"))
     if role is None:
@@ -128,7 +128,7 @@ def delete_role(
     role_id: str,
     session: SessionDep,
     request: Request,
-    actor: CurrentUserDep = Depends(require_permission("roles.delete")),
+    actor: CurrentUser = Depends(require_permission("roles.delete")),
 ) -> Response:
     role = session.get(Role, parse_uuid(role_id, what="role_id"))
     if role is None:
@@ -161,7 +161,7 @@ def set_permissions(
     body: schemas.RolePermissionsUpdate,
     session: SessionDep,
     request: Request,
-    actor: CurrentUserDep = Depends(require_permission("roles.assign_permissions")),
+    actor: CurrentUser = Depends(require_permission("roles.assign_permissions")),
 ) -> schemas.RoleOut:
     role = session.get(Role, parse_uuid(role_id, what="role_id"))
     if role is None:
@@ -189,7 +189,7 @@ def set_permissions(
 
 @perm_router.get("", response_model=schemas.PermissionList)
 def list_permissions(
-    session: SessionDep, _: CurrentUserDep = Depends(require_permission("permissions.read"))
+    session: SessionDep, _: CurrentUser = Depends(require_permission("permissions.read"))
 ) -> schemas.PermissionList:
     rows = session.execute(select(Permission).order_by(Permission.area, Permission.code)).scalars().all()
     return schemas.PermissionList(

@@ -9,7 +9,7 @@ from sqlalchemy import func, select
 
 from .. import errors, schemas, serializers
 from ..audit import write_audit
-from ..deps import CurrentUserDep, SessionDep, client_ip, require_permission
+from ..deps import CurrentUser, CurrentUserDep, SessionDep, client_ip, require_permission
 from ..models import AuditLog, Configuration, SystemLog
 from ._helpers import clamp_pagination, offset, parse_uuid
 
@@ -40,7 +40,7 @@ def list_audit(
     to: str | None = None,
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=200),
-    _: CurrentUserDep = Depends(require_permission("audit.read")),
+    _: CurrentUser = Depends(require_permission("audit.read")),
 ) -> schemas.AuditList:
     page, page_size = clamp_pagination(page, page_size)
     stmt = select(AuditLog)
@@ -78,7 +78,7 @@ def list_audit(
 def get_audit(
     audit_id: str,
     session: SessionDep,
-    _: CurrentUserDep = Depends(require_permission("audit.read")),
+    _: CurrentUser = Depends(require_permission("audit.read")),
 ) -> schemas.AuditOut:
     entry = session.get(AuditLog, parse_uuid(audit_id, what="audit_id"))
     if entry is None:
@@ -100,7 +100,7 @@ def list_logs(
     q: str | None = None,
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=200),
-    _: CurrentUserDep = Depends(require_permission("syslog.read")),
+    _: CurrentUser = Depends(require_permission("syslog.read")),
 ) -> schemas.LogList:
     page, page_size = clamp_pagination(page, page_size)
     stmt = select(SystemLog)
@@ -138,7 +138,7 @@ def list_logs(
 @config_router.get("", response_model=schemas.ConfigList)
 def list_config(
     session: SessionDep,
-    _: CurrentUserDep = Depends(require_permission("config.read")),
+    _: CurrentUser = Depends(require_permission("config.read")),
 ) -> schemas.ConfigList:
     rows = session.execute(select(Configuration).order_by(Configuration.key)).scalars().all()
     return schemas.ConfigList(items=[serializers.config_out(c) for c in rows])
@@ -148,7 +148,7 @@ def list_config(
 def get_config_item(
     key: str,
     session: SessionDep,
-    _: CurrentUserDep = Depends(require_permission("config.read")),
+    _: CurrentUser = Depends(require_permission("config.read")),
 ) -> schemas.ConfigItemOut:
     item = session.get(Configuration, key)
     if item is None:
@@ -161,7 +161,7 @@ def update_config(
     body: schemas.ConfigUpdateRequest,
     session: SessionDep,
     request: Request,
-    actor: CurrentUserDep = Depends(require_permission("config.update")),
+    actor: CurrentUser = Depends(require_permission("config.update")),
 ) -> schemas.ConfigUpdateResponse:
     updated: list[str] = []
     requires_restart: list[str] = []

@@ -10,7 +10,7 @@ from sqlalchemy import func, select
 
 from .. import errors, schemas, serializers
 from ..context import ProbeClientDep
-from ..deps import CurrentUserDep, SessionDep, SettingsDep, require_permission
+from ..deps import CurrentUser, CurrentUserDep, SessionDep, SettingsDep, require_permission
 from ..models import Alarm, MonitoredSystem, Probe, ProbeRollup
 
 router = APIRouter(prefix="/api/v1", tags=["heartbeats-dashboard"])
@@ -47,7 +47,7 @@ def get_heartbeats(
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=500),
     sort: str | None = None,
-    _: CurrentUserDep = Depends(require_permission("heartbeats.read")),
+    _: CurrentUser = Depends(require_permission("heartbeats.read")),
 ) -> schemas.HeartbeatList:
     probe = _require_probe(session, probe_id)
     params: dict[str, Any] = {
@@ -72,7 +72,7 @@ def post_query(
     session: SessionDep,
     settings: SettingsDep,
     client: ProbeClientDep,
-    _: CurrentUserDep = Depends(require_permission("heartbeats.query")),
+    _: CurrentUser = Depends(require_permission("heartbeats.query")),
 ) -> schemas.QueryResponse:
     probe = _require_probe(session, probe_id)
     payload = body.model_dump(by_alias=True, exclude_none=True)
@@ -98,7 +98,7 @@ def dashboard_aggregate(
     session: SessionDep,
     request: Request,
     window: str = "24h",
-    _: CurrentUserDep = Depends(require_permission("dashboard.read")),
+    _: CurrentUser = Depends(require_permission("dashboard.read")),
 ) -> schemas.DashboardAggregate:
     probes = session.execute(select(Probe)).scalars().all()
     summary = {k: 0 for k in _NORMALIZED}
@@ -141,7 +141,7 @@ def dashboard_probe(
     probe_id: str,
     session: SessionDep,
     window: str = "24h",
-    _: CurrentUserDep = Depends(require_permission("dashboard.read")),
+    _: CurrentUser = Depends(require_permission("dashboard.read")),
 ) -> schemas.DashboardProbeResponse:
     probe = _require_probe(session, probe_id)
     rollup = _latest_rollup(session, probe.id)

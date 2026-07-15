@@ -7,7 +7,7 @@ from sqlalchemy import func, or_, select
 
 from .. import errors, schemas, serializers
 from ..audit import write_audit
-from ..deps import CurrentUserDep, SessionDep, client_ip, require_permission
+from ..deps import CurrentUser, CurrentUserDep, SessionDep, client_ip, require_permission
 from ..models import DiscoveredCheck, MaintenanceWindow, MonitoredSystem, Probe
 from ._helpers import clamp_pagination, commit_or_conflict, offset, parse_uuid
 
@@ -52,7 +52,7 @@ def list_systems(
     q: str | None = None,
     probe_id: str | None = None,
     enabled: bool | None = None,
-    _: CurrentUserDep = Depends(require_permission("systems.read")),
+    _: CurrentUser = Depends(require_permission("systems.read")),
 ) -> schemas.SystemList:
     page, page_size = clamp_pagination(page, page_size)
     stmt = select(MonitoredSystem)
@@ -85,7 +85,7 @@ def create_system(
     body: schemas.SystemCreate,
     session: SessionDep,
     request: Request,
-    actor: CurrentUserDep = Depends(require_permission("systems.create")),
+    actor: CurrentUser = Depends(require_permission("systems.create")),
 ) -> schemas.SystemOut:
     probe = _require_probe(session, body.probe_id)
     th = body.thresholds or schemas.Thresholds()
@@ -121,7 +121,7 @@ def create_system(
 
 @router.get("/{system_id}", response_model=schemas.SystemOut)
 def get_system(
-    system_id: str, session: SessionDep, _: CurrentUserDep = Depends(require_permission("systems.read"))
+    system_id: str, session: SessionDep, _: CurrentUser = Depends(require_permission("systems.read"))
 ) -> schemas.SystemOut:
     system = session.get(MonitoredSystem, parse_uuid(system_id, what="system_id"))
     if system is None:
@@ -135,7 +135,7 @@ def update_system(
     body: schemas.SystemUpdate,
     session: SessionDep,
     request: Request,
-    actor: CurrentUserDep = Depends(require_permission("systems.update")),
+    actor: CurrentUser = Depends(require_permission("systems.update")),
 ) -> schemas.SystemOut:
     system = session.get(MonitoredSystem, parse_uuid(system_id, what="system_id"))
     if system is None:
@@ -177,7 +177,7 @@ def delete_system(
     system_id: str,
     session: SessionDep,
     request: Request,
-    actor: CurrentUserDep = Depends(require_permission("systems.delete")),
+    actor: CurrentUser = Depends(require_permission("systems.delete")),
 ) -> Response:
     system = session.get(MonitoredSystem, parse_uuid(system_id, what="system_id"))
     if system is None:
@@ -201,7 +201,7 @@ def delete_system(
 def system_checks(
     system_id: str,
     session: SessionDep,
-    _: CurrentUserDep = Depends(require_permission("checks.read")),
+    _: CurrentUser = Depends(require_permission("checks.read")),
 ) -> schemas.SystemChecksList:
     system = session.get(MonitoredSystem, parse_uuid(system_id, what="system_id"))
     if system is None:
@@ -221,7 +221,7 @@ def list_checks(
     probe_id: str | None = None,
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=200),
-    _: CurrentUserDep = Depends(require_permission("checks.read")),
+    _: CurrentUser = Depends(require_permission("checks.read")),
 ) -> schemas.GlobalChecksList:
     page, page_size = clamp_pagination(page, page_size)
     stmt = select(DiscoveredCheck, MonitoredSystem.system_id).join(

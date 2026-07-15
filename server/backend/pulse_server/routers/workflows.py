@@ -9,7 +9,7 @@ from sqlalchemy import func, select
 
 from .. import errors, schemas, serializers
 from ..audit import write_audit
-from ..deps import CurrentUserDep, SessionDep, client_ip, require_permission
+from ..deps import CurrentUser, CurrentUserDep, SessionDep, client_ip, require_permission
 from ..models import (
     Alarm,
     NotificationChannel,
@@ -92,7 +92,7 @@ def list_workflows(
     q: str | None = None,
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=200),
-    _: CurrentUserDep = Depends(require_permission("workflows.read")),
+    _: CurrentUser = Depends(require_permission("workflows.read")),
 ) -> schemas.WorkflowList:
     page, page_size = clamp_pagination(page, page_size)
     stmt = select(NotificationWorkflow)
@@ -122,7 +122,7 @@ def create_workflow(
     body: schemas.WorkflowCreate,
     session: SessionDep,
     request: Request,
-    actor: CurrentUserDep = Depends(require_permission("workflows.create")),
+    actor: CurrentUser = Depends(require_permission("workflows.create")),
 ) -> schemas.WorkflowOut:
     _validate_trigger(body.trigger)
     _validate_channels(session, body.actions)
@@ -158,7 +158,7 @@ def create_workflow(
 def get_workflow(
     workflow_id: str,
     session: SessionDep,
-    _: CurrentUserDep = Depends(require_permission("workflows.read")),
+    _: CurrentUser = Depends(require_permission("workflows.read")),
 ) -> schemas.WorkflowOut:
     wf = session.get(NotificationWorkflow, parse_uuid(workflow_id, what="workflow_id"))
     if wf is None:
@@ -172,7 +172,7 @@ def update_workflow(
     body: schemas.WorkflowUpdate,
     session: SessionDep,
     request: Request,
-    actor: CurrentUserDep = Depends(require_permission("workflows.update")),
+    actor: CurrentUser = Depends(require_permission("workflows.update")),
 ) -> schemas.WorkflowOut:
     wf = session.get(NotificationWorkflow, parse_uuid(workflow_id, what="workflow_id"))
     if wf is None:
@@ -216,7 +216,7 @@ def delete_workflow(
     workflow_id: str,
     session: SessionDep,
     request: Request,
-    actor: CurrentUserDep = Depends(require_permission("workflows.delete")),
+    actor: CurrentUser = Depends(require_permission("workflows.delete")),
 ) -> Response:
     wf = session.get(NotificationWorkflow, parse_uuid(workflow_id, what="workflow_id"))
     if wf is None:
@@ -242,7 +242,7 @@ def set_enabled(
     body: schemas.WorkflowEnabledRequest,
     session: SessionDep,
     request: Request,
-    actor: CurrentUserDep = Depends(require_permission("workflows.update")),
+    actor: CurrentUser = Depends(require_permission("workflows.update")),
 ) -> schemas.WorkflowOut:
     wf = session.get(NotificationWorkflow, parse_uuid(workflow_id, what="workflow_id"))
     if wf is None:
@@ -269,7 +269,7 @@ def simulate_workflow(
     workflow_id: str,
     body: schemas.SimulateRequest,
     session: SessionDep,
-    _: CurrentUserDep = Depends(require_permission("workflows.update")),
+    _: CurrentUser = Depends(require_permission("workflows.update")),
 ) -> schemas.SimulateResponse:
     wf = session.get(NotificationWorkflow, parse_uuid(workflow_id, what="workflow_id"))
     if wf is None:
@@ -296,7 +296,7 @@ def list_alarms(
     to: str | None = None,
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=200),
-    _: CurrentUserDep = Depends(require_permission("workflows.read")),
+    _: CurrentUser = Depends(require_permission("workflows.read")),
 ) -> schemas.AlarmList:
     page, page_size = clamp_pagination(page, page_size)
     stmt = select(Alarm)
@@ -335,7 +335,7 @@ def ack_alarm(
     body: schemas.AckRequest,
     session: SessionDep,
     request: Request,
-    actor: CurrentUserDep = Depends(require_permission("commands.execute")),
+    actor: CurrentUser = Depends(require_permission("commands.execute")),
 ) -> schemas.AlarmOut:
     alarm = session.get(Alarm, parse_uuid(alarm_id, what="alarm_id"))
     if alarm is None:

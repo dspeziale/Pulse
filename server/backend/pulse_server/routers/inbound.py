@@ -16,7 +16,7 @@ from .. import errors, schemas, serializers
 from ..audit import write_audit
 from ..commands import execute_command
 from ..context import SecretBoxDep
-from ..deps import CurrentUserDep, SessionDep, client_ip, require_permission
+from ..deps import CurrentUser, CurrentUserDep, SessionDep, client_ip, require_permission
 from ..models import ChannelIdentity, NotificationChannel
 from ..notifications import decrypt_config
 from ..security import verify_hmac_sha256
@@ -164,7 +164,7 @@ def create_identity(
     body: schemas.ChannelIdentityCreate,
     session: SessionDep,
     request: Request,
-    actor: CurrentUserDep = Depends(require_permission("commands.execute")),
+    actor: CurrentUser = Depends(require_permission("commands.execute")),
 ) -> schemas.ChannelIdentityOut:
     existing = session.execute(
         select(ChannelIdentity).where(
@@ -204,7 +204,7 @@ def create_identity(
 @identities_router.get("", response_model=schemas.ChannelIdentityList)
 def list_identities(
     session: SessionDep,
-    actor: CurrentUserDep = Depends(require_permission("commands.execute")),
+    actor: CurrentUser = Depends(require_permission("commands.execute")),
 ) -> schemas.ChannelIdentityList:
     rows = session.execute(
         select(ChannelIdentity).where(ChannelIdentity.user_id == actor.id)
@@ -217,7 +217,7 @@ def delete_identity(
     identity_id: str,
     session: SessionDep,
     request: Request,
-    actor: CurrentUserDep = Depends(require_permission("commands.execute")),
+    actor: CurrentUser = Depends(require_permission("commands.execute")),
 ) -> Response:
     identity = session.get(ChannelIdentity, parse_uuid(identity_id, what="identity_id"))
     if identity is None or identity.user_id != actor.id:

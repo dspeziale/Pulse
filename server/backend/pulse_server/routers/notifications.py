@@ -10,7 +10,7 @@ from sqlalchemy import func, select
 from .. import errors, schemas, serializers
 from ..audit import write_audit
 from ..context import SecretBoxDep
-from ..deps import CurrentUserDep, SessionDep, client_ip, require_permission
+from ..deps import CurrentUser, CurrentUserDep, SessionDep, client_ip, require_permission
 from ..models import NotificationChannel, NotificationDelivery, WorkflowAction
 from ..notifications import decrypt_config, encrypt_config, get_notifier
 from ._helpers import clamp_pagination, commit_or_conflict, offset, parse_uuid
@@ -26,7 +26,7 @@ def list_channels(
     enabled: bool | None = None,
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=200),
-    _: CurrentUserDep = Depends(require_permission("notifications.read")),
+    _: CurrentUser = Depends(require_permission("notifications.read")),
 ) -> schemas.ChannelList:
     page, page_size = clamp_pagination(page, page_size)
     stmt = select(NotificationChannel)
@@ -54,7 +54,7 @@ def create_channel(
     session: SessionDep,
     box: SecretBoxDep,
     request: Request,
-    actor: CurrentUserDep = Depends(require_permission("notifications.create")),
+    actor: CurrentUser = Depends(require_permission("notifications.create")),
 ) -> schemas.ChannelOut:
     channel = NotificationChannel(
         name=body.name,
@@ -83,7 +83,7 @@ def create_channel(
 def get_channel(
     channel_id: str,
     session: SessionDep,
-    _: CurrentUserDep = Depends(require_permission("notifications.read")),
+    _: CurrentUser = Depends(require_permission("notifications.read")),
 ) -> schemas.ChannelOut:
     channel = session.get(NotificationChannel, parse_uuid(channel_id, what="channel_id"))
     if channel is None:
@@ -98,7 +98,7 @@ def update_channel(
     session: SessionDep,
     box: SecretBoxDep,
     request: Request,
-    actor: CurrentUserDep = Depends(require_permission("notifications.update")),
+    actor: CurrentUser = Depends(require_permission("notifications.update")),
 ) -> schemas.ChannelOut:
     channel = session.get(NotificationChannel, parse_uuid(channel_id, what="channel_id"))
     if channel is None:
@@ -134,7 +134,7 @@ def delete_channel(
     channel_id: str,
     session: SessionDep,
     request: Request,
-    actor: CurrentUserDep = Depends(require_permission("notifications.delete")),
+    actor: CurrentUser = Depends(require_permission("notifications.delete")),
 ) -> Response:
     channel = session.get(NotificationChannel, parse_uuid(channel_id, what="channel_id"))
     if channel is None:
@@ -166,7 +166,7 @@ def test_channel(
     session: SessionDep,
     box: SecretBoxDep,
     request: Request,
-    actor: CurrentUserDep = Depends(require_permission("notifications.test")),
+    actor: CurrentUser = Depends(require_permission("notifications.test")),
 ) -> schemas.ChannelTestResponse:
     channel = session.get(NotificationChannel, parse_uuid(channel_id, what="channel_id"))
     if channel is None:
@@ -218,7 +218,7 @@ def notifications_history(
     to: str | None = None,
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=200),
-    _: CurrentUserDep = Depends(require_permission("notifications.read")),
+    _: CurrentUser = Depends(require_permission("notifications.read")),
 ) -> schemas.DeliveryList:
     page, page_size = clamp_pagination(page, page_size)
     stmt = select(NotificationDelivery)

@@ -9,7 +9,7 @@ from sqlalchemy import func, or_, select
 
 from .. import errors, schemas, serializers
 from ..audit import write_audit
-from ..deps import CurrentUserDep, SessionDep, client_ip, require_permission
+from ..deps import CurrentUser, CurrentUserDep, SessionDep, client_ip, require_permission
 from ..models import Role, User, UserRole
 from ..security import hash_password
 from ._helpers import clamp_pagination, commit_or_conflict, offset, parse_uuid
@@ -53,7 +53,7 @@ def list_users(
     q: str | None = None,
     status: str | None = None,
     role: str | None = None,
-    _: CurrentUserDep = Depends(require_permission("users.read")),
+    _: CurrentUser = Depends(require_permission("users.read")),
 ) -> schemas.UserList:
     page, page_size = clamp_pagination(page, page_size)
     stmt = select(User)
@@ -89,7 +89,7 @@ def create_user(
     body: schemas.UserCreate,
     session: SessionDep,
     request: Request,
-    actor: CurrentUserDep = Depends(require_permission("users.create")),
+    actor: CurrentUser = Depends(require_permission("users.create")),
 ) -> schemas.UserOut:
     roles = _load_roles(session, body.role_ids)
     user = User(
@@ -120,7 +120,7 @@ def create_user(
 
 @router.get("/{user_id}", response_model=schemas.UserOut)
 def get_user(
-    user_id: str, session: SessionDep, _: CurrentUserDep = Depends(require_permission("users.read"))
+    user_id: str, session: SessionDep, _: CurrentUser = Depends(require_permission("users.read"))
 ) -> schemas.UserOut:
     user = session.get(User, parse_uuid(user_id, what="user_id"))
     if user is None:
@@ -134,7 +134,7 @@ def update_user(
     body: schemas.UserUpdate,
     session: SessionDep,
     request: Request,
-    actor: CurrentUserDep = Depends(require_permission("users.update")),
+    actor: CurrentUser = Depends(require_permission("users.update")),
 ) -> schemas.UserOut:
     user = session.get(User, parse_uuid(user_id, what="user_id"))
     if user is None:
@@ -174,7 +174,7 @@ def delete_user(
     user_id: str,
     session: SessionDep,
     request: Request,
-    actor: CurrentUserDep = Depends(require_permission("users.delete")),
+    actor: CurrentUser = Depends(require_permission("users.delete")),
 ) -> Response:
     user = session.get(User, parse_uuid(user_id, what="user_id"))
     if user is None:
@@ -204,7 +204,7 @@ def set_roles(
     body: schemas.UserRolesUpdate,
     session: SessionDep,
     request: Request,
-    actor: CurrentUserDep = Depends(require_permission("users.assign_roles")),
+    actor: CurrentUser = Depends(require_permission("users.assign_roles")),
 ) -> schemas.UserOut:
     user = session.get(User, parse_uuid(user_id, what="user_id"))
     if user is None:
@@ -243,7 +243,7 @@ def reset_password(
     body: schemas.ResetPasswordRequest,
     session: SessionDep,
     request: Request,
-    actor: CurrentUserDep = Depends(require_permission("users.update")),
+    actor: CurrentUser = Depends(require_permission("users.update")),
 ) -> Response:
     user = session.get(User, parse_uuid(user_id, what="user_id"))
     if user is None:
