@@ -9,10 +9,10 @@ from sqlalchemy import func, or_, select
 
 from .. import errors, schemas, serializers
 from ..audit import write_audit
-from ..deps import CurrentUser, CurrentUserDep, SessionDep, SettingsDep, client_ip, require_permission
+from ..deps import CurrentUser, SessionDep, SettingsDep, client_ip, require_permission
 from ..models import EnrollmentToken, MonitoredSystem, Probe
 from ..security import generate_opaque_token, hash_token
-from ._helpers import clamp_pagination, commit_or_conflict, offset, parse_uuid
+from ._helpers import clamp_pagination, commit_or_conflict, flush_or_conflict, offset, parse_uuid
 
 router = APIRouter(prefix="/api/v1/probes", tags=["probes"])
 
@@ -72,7 +72,7 @@ def create_probe(
         status="pending",
     )
     session.add(probe)
-    session.flush()
+    flush_or_conflict(session, message="Nome Probe gia' esistente.")
     token, expires = _new_enrollment(session, settings, probe)
     write_audit(
         session,

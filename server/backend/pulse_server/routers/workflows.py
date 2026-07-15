@@ -9,7 +9,7 @@ from sqlalchemy import func, select
 
 from .. import errors, schemas, serializers
 from ..audit import write_audit
-from ..deps import CurrentUser, CurrentUserDep, SessionDep, client_ip, require_permission
+from ..deps import CurrentUser, SessionDep, client_ip, require_permission
 from ..models import (
     Alarm,
     NotificationChannel,
@@ -18,7 +18,7 @@ from ..models import (
     WorkflowCondition,
 )
 from ..workflow import evaluate, workflow_to_dict
-from ._helpers import clamp_pagination, commit_or_conflict, offset, parse_uuid
+from ._helpers import clamp_pagination, commit_or_conflict, flush_or_conflict, offset, parse_uuid
 
 router = APIRouter(prefix="/api/v1/notification-workflows", tags=["workflows"])
 alarms_router = APIRouter(prefix="/api/v1/alarms", tags=["workflows"])
@@ -136,7 +136,7 @@ def create_workflow(
         created_by=actor.id,
     )
     session.add(wf)
-    session.flush()
+    flush_or_conflict(session, message="Nome workflow gia' esistente.")
     _replace_conditions(session, wf, body.conditions)
     _replace_actions(session, wf, body.actions)
     write_audit(

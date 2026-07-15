@@ -10,7 +10,7 @@ from sqlalchemy import func, select
 from .. import errors, schemas, serializers
 from ..audit import write_audit
 from ..context import SecretBoxDep
-from ..deps import CurrentUser, CurrentUserDep, SessionDep, client_ip, require_permission
+from ..deps import CurrentUser, SessionDep, client_ip, require_permission
 from ..models import NotificationChannel, NotificationDelivery, WorkflowAction
 from ..notifications import decrypt_config, encrypt_config, get_notifier
 from ._helpers import clamp_pagination, commit_or_conflict, offset, parse_uuid

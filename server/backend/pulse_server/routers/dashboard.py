@@ -10,7 +10,7 @@ from sqlalchemy import func, select
 
 from .. import errors, schemas, serializers
 from ..context import ProbeClientDep
-from ..deps import CurrentUser, CurrentUserDep, SessionDep, SettingsDep, require_permission
+from ..deps import CurrentUser, SessionDep, SettingsDep, require_permission
 from ..models import Alarm, MonitoredSystem, Probe, ProbeRollup
 
 router = APIRouter(prefix="/api/v1", tags=["heartbeats-dashboard"])

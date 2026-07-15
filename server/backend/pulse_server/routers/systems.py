@@ -7,9 +7,9 @@ from sqlalchemy import func, or_, select
 
 from .. import errors, schemas, serializers
 from ..audit import write_audit
-from ..deps import CurrentUser, CurrentUserDep, SessionDep, client_ip, require_permission
+from ..deps import CurrentUser, SessionDep, client_ip, require_permission
 from ..models import DiscoveredCheck, MaintenanceWindow, MonitoredSystem, Probe
-from ._helpers import clamp_pagination, commit_or_conflict, offset, parse_uuid
+from ._helpers import clamp_pagination, commit_or_conflict, flush_or_conflict, offset, parse_uuid
 
 router = APIRouter(prefix="/api/v1/systems", tags=["systems"])
 checks_router = APIRouter(prefix="/api/v1/checks", tags=["checks"])
@@ -101,7 +101,7 @@ def create_system(
         response_ms_error=th.response_ms_error,
     )
     session.add(system)
-    session.flush()
+    flush_or_conflict(session, message="system_id gia' esistente.")
     if body.maintenance_windows:
         _replace_windows(session, system, body.maintenance_windows)
     write_audit(

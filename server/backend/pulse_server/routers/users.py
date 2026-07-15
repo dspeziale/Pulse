@@ -9,10 +9,10 @@ from sqlalchemy import func, or_, select
 
 from .. import errors, schemas, serializers
 from ..audit import write_audit
-from ..deps import CurrentUser, CurrentUserDep, SessionDep, client_ip, require_permission
+from ..deps import CurrentUser, SessionDep, client_ip, require_permission
 from ..models import Role, User, UserRole
 from ..security import hash_password
-from ._helpers import clamp_pagination, commit_or_conflict, offset, parse_uuid
+from ._helpers import clamp_pagination, commit_or_conflict, flush_or_conflict, offset, parse_uuid
 
 router = APIRouter(prefix="/api/v1/users", tags=["users"])
 
@@ -100,7 +100,7 @@ def create_user(
         status=body.status,
     )
     session.add(user)
-    session.flush()
+    flush_or_conflict(session, message="Username o email gia' esistenti.")
     for role in roles:
         session.add(UserRole(user_id=user.id, role_id=role.id))
     write_audit(

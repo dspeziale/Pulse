@@ -7,9 +7,9 @@ from sqlalchemy import func, select
 
 from .. import errors, schemas, serializers
 from ..audit import write_audit
-from ..deps import CurrentUser, CurrentUserDep, SessionDep, client_ip, require_permission
+from ..deps import CurrentUser, SessionDep, client_ip, require_permission
 from ..models import Permission, Role, RolePermission, UserRole
-from ._helpers import clamp_pagination, commit_or_conflict, offset, parse_uuid
+from ._helpers import clamp_pagination, commit_or_conflict, flush_or_conflict, offset, parse_uuid
 
 router = APIRouter(prefix="/api/v1/roles", tags=["roles"])
 perm_router = APIRouter(prefix="/api/v1/permissions", tags=["permissions"])
@@ -63,7 +63,7 @@ def create_role(
     _validate_permission_codes(session, body.permission_codes)
     role = Role(name=body.name, description=body.description, is_builtin=False)
     session.add(role)
-    session.flush()
+    flush_or_conflict(session, message="Nome ruolo gia' esistente.")
     for code in body.permission_codes:
         session.add(RolePermission(role_id=role.id, permission_code=code))
     write_audit(

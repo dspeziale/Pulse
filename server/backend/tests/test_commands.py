@@ -5,9 +5,6 @@ from __future__ import annotations
 import datetime as dt
 import uuid
 
-import pytest
-from sqlalchemy import select
-
 from pulse_server.commands import execute_command
 from pulse_server.models import (
     Alarm,
@@ -118,10 +115,9 @@ def test_ack_command(db_session) -> None:
     assert ghost.outcome == "error"
     ok = execute_command(db_session, channel_type="telegram", external_id="ext-sa4", text=f"/ack {alarm.id}")
     assert ok.outcome == "executed"
-    db_session.refresh(alarm)
+    db_session.flush()
     assert alarm.status == "acknowledged"
-    already = execute_command(db_session, channel_type="telegram", external_id="ext-sa4", text=f"/ack {alarm.id}")
-    # ora e' acknowledged (non resolved) quindi ri-ack lo re-imposta -> executed; risolviamolo e riproviamo
+    # allarme risolto -> nuovo ack rifiutato
     alarm.status = "resolved"
     db_session.flush()
     resolved = execute_command(db_session, channel_type="telegram", external_id="ext-sa4", text=f"/ack {alarm.id}")

@@ -9,7 +9,7 @@ from sqlalchemy import func, select
 
 from .. import errors, schemas, serializers
 from ..audit import write_audit
-from ..deps import CurrentUser, CurrentUserDep, SessionDep, client_ip, require_permission
+from ..deps import CurrentUser, SessionDep, client_ip, require_permission
 from ..models import AuditLog, Configuration, SystemLog
 from ._helpers import clamp_pagination, offset, parse_uuid
 

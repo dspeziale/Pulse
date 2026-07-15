@@ -16,7 +16,7 @@ from .. import errors, schemas, serializers
 from ..audit import write_audit
 from ..commands import execute_command
 from ..context import SecretBoxDep
-from ..deps import CurrentUser, CurrentUserDep, SessionDep, client_ip, require_permission
+from ..deps import CurrentUser, SessionDep, client_ip, require_permission
 from ..models import ChannelIdentity, NotificationChannel
 from ..notifications import decrypt_config
 from ..security import verify_hmac_sha256
