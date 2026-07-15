@@ -1,0 +1,101 @@
+# =============================================================================
+# Pulse — Stack PROBE (Docker Compose)
+# File: deploy/docker-compose.probe.yml
+#
+# Servizi:
+#   - opensearch      : OpenSearch single-node (serie temporali heartbeat/eventi)
+#   - probe-agent     : agent FastAPI (AGENTE 3 — BE): poller + API di query
+#   - probe-dashboard : dashboard Flask locale (AGENTE 4 — FE), context = radice repo
+#
+# Avvio (dalla RADICE del repository):
+#   docker compose -f deploy/docker-compose.probe.yml --env-file deploy/.env.probe up -d --build
+# Stop:
+#   docker compose -f deploy/docker-compose.probe.yml down
+#
+# La Probe si registra sul Server usando PULSE_PROBE_ENROLLMENT_TOKEN (ottenuto
+# creando la Probe nel Server) oppure un PULSE_PROBE_PROBE_TOKEN preconfigurato.
+# =============================================================================
+
+name: pulse-probe
+
+services:
+  opensearch:
+    image: opensearchproject/opensearch:2.17.1
+    container_name: pulse-opensearch
+    restart: unless-stopped
+    environment:
+      discovery.type: single-node
+      bootstrap.memory_lock: "true"
+      OPENSEARCH_JAVA_OPTS: "-Xms512m -Xmx512m"
+      # Ambiente di sviluppo: sicurezza demo disabilitata (abilitarla in produzione).
+      DISABLE_SECURITY_PLUGIN: "true"
+      OPENSEARCH_INITIAL_ADMIN_PASSWORD: ${OPENSEARCH_ADMIN_PASSWORD:-Pulse_OS_Admin1!}
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    volumes:
+      - pulse_osdata:/usr/share/opensearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:9200/_cluster/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+    networks: [pulse]
+
+  probe-agent:
+    build:
+      context: ..
+      dockerfile: probe/agent/Dockerfile
+    image: pulse-probe-agent:latest
+    container_name: pulse-probe-agent
+    restart: unless-stopped
+    depends_on:
+      opensearch:
+        condition: service_healthy
+    environment:
+      PULSE_PROBE_API_PORT: ${PULSE_PROBE_API_PORT:-8444}
+      PULSE_PROBE_SERVER_BASE_URL: ${PULSE_PROBE_SERVER_BASE_URL:-https://server-backend:9443}
+      PULSE_PROBE_ENROLLMENT_TOKEN: ${PULSE_PROBE_ENROLLMENT_TOKEN:-}
+      PULSE_PROBE_PROBE_TOKEN: ${PULSE_PROBE_PROBE_TOKEN:-}
+      PULSE_PROBE_SERVER_QUERY_TOKEN: ${PULSE_PROBE_SERVER_QUERY_TOKEN:-server-to-probe-token}
+      PULSE_PROBE_OPENSEARCH_URL: http://opensearch:9200
+      PULSE_PROBE_HTTP_VERIFY: ${PULSE_PROBE_HTTP_VERIFY:-false}
+      PULSE_PROBE_LOG_LEVEL: ${PULSE_PROBE_LOG_LEVEL:-info}
+    ports:
+      - "${PULSE_PROBE_API_PORT:-8444}:${PULSE_PROBE_API_PORT:-8444}"
+    networks: [pulse]
+
+  probe-dashboard:
+    build:
+      context: ..
+      dockerfile: probe/dashboard/Dockerfile
+    image: pulse-probe-dashboard:latest
+    container_name: pulse-probe-dashboard
+    restart: unless-stopped
+    depends_on:
+      - probe-agent
+    environment:
+      PULSE_PROBE_DASH_PORT: ${PULSE_PROBE_DASH_PORT:-5001}
+      PULSE_PROBE_API_BASE: http://probe-agent:${PULSE_PROBE_API_PORT:-8444}/api/v1
+      PULSE_PROBE_AGENT_TOKEN: ${PULSE_PROBE_SERVER_QUERY_TOKEN:-server-to-probe-token}
+      PULSE_PROBE_DASH_USER: ${PULSE_PROBE_DASH_USER:-probe}
+      PULSE_PROBE_DASH_PASSWORD: ${PULSE_PROBE_DASH_PASSWORD:-probe}
+      PULSE_PROBE_SECRET_KEY: ${PULSE_PROBE_SECRET_KEY:-dev-probe-secret}
+      PULSE_HTTP_TIMEOUT: ${PULSE_HTTP_TIMEOUT:-10}
+      PULSE_VERIFY_TLS: ${PULSE_VERIFY_TLS:-false}
+    ports:
+      - "${PULSE_PROBE_DASH_PORT:-5001}:${PULSE_PROBE_DASH_PORT:-5001}"
+    networks: [pulse]
+
+volumes:
+  pulse_osdata:
+    name: pulse_osdata
+
+networks:
+  pulse:
+    name: pulse-probe-net

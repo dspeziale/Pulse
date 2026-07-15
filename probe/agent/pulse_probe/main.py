@@ -54,7 +54,7 @@ def sync_config(state: RuntimeState) -> None:
         state.probe_id = config.get("probe_id", state.probe_id)
 
 
-async def _poller_loop(app: FastAPI) -> None:
+async def _poller_loop(app: FastAPI) -> None:  # pragma: no cover - loop periodico runtime
     state: RuntimeState = app.state.runtime
     state.poller_running = True
     interval = state.settings.poll_default_interval_seconds
