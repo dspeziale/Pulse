@@ -1151,3 +1151,41 @@ Decisioni prese
 - Macro pagination e helper paging replicati (non condivisi) nella dashboard Sonda per coerenza col Server, dato che i due frontend hanno moduli/entrypoint distinti.
 
 ================================================
+
+ITERAZIONE 30
+
+Agente: FE
+Data: 2026-07-16
+
+Input ricevuti
+- Richiesta orchestratore: rendere la pagina Configurazione (P-18, server/dashboard) piu' utile e organizzata a TAB.
+- Vincoli: modificare SOLO server/dashboard (eventualmente frontend_common); NON toccare il backend; NON cambiare i nomi dei campi del form ("value:<key>") ne' la rotta/logica di salvataggio (config_bp.update_config invariata).
+
+Lavoro svolto
+- Riprogettata server/dashboard/templates/config/list.html: da tabella piatta a navigazione a TAB (Bootstrap nav-tabs + tab-pane, coerente con AdminLTE, nessun CDN; usa il bootstrap.bundle gia' vendorizzato). Ogni tab ha icona bootstrap-icons e badge con il numero di parametri.
+- Raggruppamento robusto centralizzato nella view (build_config_groups in views/config_bp.py) per testabilita': mappa ordinata categoria->key/prefisso con FALLBACK esplicito "Altro". Gruppi: "Rete & porte" (api_port, probe_endpoint_port), "Autenticazione" (access/refresh_token_ttl_seconds, failed_login_threshold), "Sonde" (probe_offline_timeout_seconds), "Retention" (prefisso retention_*), "Altro" (qualunque key non mappata). I gruppi vuoti non vengono emessi: la scheda "Altro" appare solo se contiene almeno un parametro. Nessun parametro puo' sparire (le key future confluiscono in "Altro").
+- Pagina piu' utile: etichetta leggibile per ogni parametro (mappa _LABELS con fallback prettify della key, es. access_token_ttl_seconds -> "Durata access token"); key tecnica mostrata sotto in monospace; input coerente col type (type=number per gli 'int', mascheramento invariato per i sensitive); descrizione come help sotto il campo; hint unita' deducibile dal suffisso (_seconds -> "secondi", _days -> "giorni") come addon input-group; badge evidente "Riavvio richiesto" sui parametri con requires_restart.
+- Un unico <form> avvolge TUTTE le tab con un solo pulsante "Salva modifiche": i campi restano name="value:<key>", quindi il salvataggio (update_config) funziona invariato su tutte le schede insieme. RBAC rispettato: senza config.update i campi sono readonly e il pulsante e' nascosto. Aggiunto novalidate sul form perche' una validazione HTML in una tab non attiva (nascosta) non blocchi il submit (validazione lasca: number con min=0, non bloccante).
+- Nessun nuovo endpoint. La rotta show_config passa al template sia data sia i groups precalcolati.
+
+File creati
+- Nessun nuovo file (solo modifiche).
+
+File modificati (solo server/dashboard)
+- server/dashboard/views/config_bp.py (helper di raggruppamento build_config_groups + _LABELS/_unit_for/_group_id_for; show_config passa groups).
+- server/dashboard/templates/config/list.html (layout a tab).
+- server/dashboard/tests/test_views_more.py (nuovi test config: mapping gruppi, fallback "Altro", nascondi "Altro" se vuoto, rendering tab, campi value:<key>, unico submit, etichette/unita'/badge, readonly senza update).
+
+Problemi trovati
+- Nessuno. Le validazioni HTML5 su input number in tab nascoste potevano teoricamente bloccare il submit cross-tab: risolto con novalidate (validazione lasca come richiesto).
+
+Decisioni prese
+- Logica di raggruppamento nella view (non nel template) per pulizia e testabilita' diretta (test unit su build_config_groups oltre ai test di rendering).
+- Etichette leggibili via mappa esplicita con fallback prettify: nessuna key resta senza etichetta anche se non mappata.
+
+Output consegnati
+- Pagina Configurazione a TAB (Rete & porte / Autenticazione / Sonde / Retention / Altro), fallback "Altro" garantito per key non mappate, nomi campo "value:<key>" e salvataggio invariati.
+- Test: server/dashboard 118 test, 0 falliti; probe/dashboard 40, frontend_common 29, tutti verdi. Coverage app code 100% (config_bp.py 52/52 statement, 100%; app.py/sdk.py/tutte le views 100%); le uniche righe non coperte sono helper difensivi pre-esistenti nel conftest di test (non codice applicativo).
+- Verifica reale (app Flask con backend simulato FakeApiClient): l'HTML servito su GET /config contiene nav-tabs e tab-pane, tutte le schede attese (incl. pane-other per una key non mappata), tutti i campi name="value:<key>", un unico pulsante submit, etichette leggibili, hint "secondi"/"giorni" e badge "Riavvio richiesto"; con soli parametri mappati la scheda "Altro" non viene emessa.
+
+================================================

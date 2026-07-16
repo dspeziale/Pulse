@@ -1,42 +1,81 @@
 {% extends "base.html" %}
-{% from "_macros.html" import bool_badge %}
 {% block title %}Configurazione — Pulse{% endblock %}
 {% block content %}
 <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
   <h1 class="h3 mb-0"><i class="bi bi-gear me-2"></i>Configurazione</h1>
 </div>
-<p class="text-body-secondary">Parametri di sistema. I valori sensibili sono mascherati; alcune modifiche richiedono il riavvio del servizio.</p>
+<p class="text-body-secondary">Parametri di sistema raggruppati per area. I valori sensibili sono mascherati; alcune modifiche richiedono il riavvio del servizio.</p>
 
-<form method="post" action="{{ url_for('config_bp.update_config') }}">
+{% if groups %}
+{# Un unico form avvolge TUTTE le tab: un solo "Salva modifiche" invia insieme
+   i campi di ogni scheda (name="value:<key>"). novalidate evita che una
+   validazione HTML in una tab non attiva (nascosta) blocchi il submit. #}
+<form method="post" action="{{ url_for('config_bp.update_config') }}" novalidate>
 <div class="card">
-  <div class="table-responsive">
-    <table class="table table-hover align-middle mb-0">
-      <thead><tr><th style="width:22%">Chiave</th><th style="width:30%">Valore</th><th>Riavvio</th><th>Descrizione</th></tr></thead>
-      <tbody>
-      {% for item in data['items'] %}
-      <tr>
-        <td class="font-monospace">{{ item.key }}</td>
-        <td>
-          {% if item.sensitive %}
-            <input class="form-control form-control-sm" name="value:{{ item.key }}" placeholder="•••• (mascherato)" {% if not can('config.update') %}readonly{% endif %}>
-          {% else %}
-            <input class="form-control form-control-sm" name="value:{{ item.key }}" value="{{ item.value }}" {% if not can('config.update') %}readonly{% endif %}>
-          {% endif %}
-        </td>
-        <td>{{ bool_badge(item.requires_restart) }}</td>
-        <td class="text-body-secondary">{{ item.description }}</td>
-      </tr>
-      {% else %}
-      <tr><td colspan="4" class="text-center text-body-secondary py-5">Nessun parametro di configurazione.</td></tr>
+  <div class="card-header p-0 border-bottom-0">
+    <ul class="nav nav-tabs card-header-tabs mx-0 mt-2 px-2" id="configTabs" role="tablist">
+      {% for g in groups %}
+      <li class="nav-item" role="presentation">
+        <button class="nav-link{{ ' active' if loop.first }}" id="tab-{{ g.id }}"
+                data-bs-toggle="tab" data-bs-target="#pane-{{ g.id }}" type="button"
+                role="tab" aria-controls="pane-{{ g.id }}"
+                aria-selected="{{ 'true' if loop.first else 'false' }}">
+          <i class="bi {{ g.icon }} me-1"></i>{{ g.label }}
+          <span class="badge text-bg-secondary ms-1">{{ g['items'] | length }}</span>
+        </button>
+      </li>
       {% endfor %}
-      </tbody>
-    </table>
+    </ul>
   </div>
-  {% if can('config.update') and data['items'] %}
+
+  <div class="tab-content">
+    {% for g in groups %}
+    <div class="tab-pane fade{{ ' show active' if loop.first }}" id="pane-{{ g.id }}"
+         role="tabpanel" aria-labelledby="tab-{{ g.id }}">
+      <div class="row g-4 p-3">
+        {% for item in g['items'] %}
+        <div class="col-12 col-lg-6">
+          <label class="form-label mb-1 d-flex flex-wrap align-items-center gap-2" for="cfg-{{ item.key }}">
+            <span class="fw-semibold">{{ item.label }}</span>
+            {% if item.requires_restart %}
+            <span class="badge b-warn"><i class="bi bi-arrow-clockwise me-1"></i>Riavvio richiesto</span>
+            {% endif %}
+          </label>
+          <div class="input-group">
+            {% if item.sensitive %}
+            <input class="form-control" id="cfg-{{ item.key }}" name="value:{{ item.key }}"
+                   placeholder="•••• (mascherato)" autocomplete="off"
+                   {% if not can('config.update') %}readonly{% endif %}>
+            {% elif item.type == 'int' %}
+            <input class="form-control" id="cfg-{{ item.key }}" name="value:{{ item.key }}"
+                   type="number" min="0" step="1" value="{{ item.value }}"
+                   {% if not can('config.update') %}readonly{% endif %}>
+            {% else %}
+            <input class="form-control" id="cfg-{{ item.key }}" name="value:{{ item.key }}"
+                   value="{{ item.value }}"
+                   {% if not can('config.update') %}readonly{% endif %}>
+            {% endif %}
+            {% if item.unit %}<span class="input-group-text">{{ item.unit }}</span>{% endif %}
+          </div>
+          <div class="form-text font-monospace">{{ item.key }}</div>
+          {% if item.description %}<div class="form-text">{{ item.description }}</div>{% endif %}
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  {% if can('config.update') %}
   <div class="card-footer">
     <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1"></i>Salva modifiche</button>
   </div>
   {% endif %}
 </div>
 </form>
+{% else %}
+<div class="card">
+  <div class="card-body text-center text-body-secondary py-5">Nessun parametro di configurazione.</div>
+</div>
+{% endif %}
 {% endblock %}

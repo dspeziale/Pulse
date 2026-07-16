@@ -206,6 +206,33 @@ def test_logs(client, login, fake):
 
 
 # -- P-18 Config --------------------------------------------------------------
+# I 10 parametri reali + una key NON mappata (deve confluire in "Altro").
+_CONFIG_ITEMS = [
+    {"key": "api_port", "value": "8443", "type": "int",
+     "sensitive": False, "requires_restart": True, "description": "Porta API"},
+    {"key": "probe_endpoint_port", "value": "9443", "type": "int",
+     "sensitive": False, "requires_restart": True, "description": ""},
+    {"key": "access_token_ttl_seconds", "value": "900", "type": "int",
+     "sensitive": False, "requires_restart": False, "description": "TTL access"},
+    {"key": "refresh_token_ttl_seconds", "value": "3600", "type": "int",
+     "sensitive": False, "requires_restart": False, "description": ""},
+    {"key": "failed_login_threshold", "value": "5", "type": "int",
+     "sensitive": False, "requires_restart": False, "description": ""},
+    {"key": "probe_offline_timeout_seconds", "value": "120", "type": "int",
+     "sensitive": False, "requires_restart": False, "description": ""},
+    {"key": "retention_system_logs_days", "value": "30", "type": "int",
+     "sensitive": False, "requires_restart": False, "description": ""},
+    {"key": "retention_notification_deliveries_days", "value": "90", "type": "int",
+     "sensitive": False, "requires_restart": False, "description": ""},
+    {"key": "retention_inbound_commands_days", "value": "30", "type": "int",
+     "sensitive": False, "requires_restart": False, "description": ""},
+    {"key": "retention_probe_rollups_days", "value": "365", "type": "int",
+     "sensitive": False, "requires_restart": False, "description": ""},
+    {"key": "some_new_unmapped_key", "value": "x", "type": "string",
+     "sensitive": False, "requires_restart": False, "description": "Nuovo"},
+]
+
+
 def test_config_show_and_update(client, login, fake):
     login(["config.read", "config.update"])
     fake.set("GET", "/config", {"items": []})
@@ -219,6 +246,79 @@ def test_config_update_no_restart(client, login, fake):
     login(["config.update"])
     fake.set("PUT", "/config", {"updated": [], "requires_restart": []})
     assert client.post("/config", data={"value:k1": "v"}).status_code == 302
+
+
+def test_config_build_groups_mapping():
+    """Ogni parametro finisce nella tab giusta; la key non mappata in 'other'."""
+    from views.config_bp import build_config_groups
+    groups = build_config_groups(_CONFIG_ITEMS)
+    by_id = {g["id"]: [i["key"] for i in g["items"]] for g in groups}
+    assert by_id["network"] == ["api_port", "probe_endpoint_port"]
+    assert set(by_id["auth"]) == {"access_token_ttl_seconds",
+                                  "refresh_token_ttl_seconds",
+                                  "failed_login_threshold"}
+    assert by_id["probes"] == ["probe_offline_timeout_seconds"]
+    assert len(by_id["retention"]) == 4
+    assert all(k.startswith("retention_") for k in by_id["retention"])
+    # FALLBACK: la key sconosciuta non viene persa, finisce in "Altro".
+    assert by_id["other"] == ["some_new_unmapped_key"]
+    # Nessun parametro perso.
+    assert sum(len(v) for v in by_id.values()) == len(_CONFIG_ITEMS)
+    # Ogni item arricchito con label leggibile e (dove deducibile) unita'.
+    auth = next(g for g in groups if g["id"] == "auth")
+    access = next(i for i in auth["items"]
+                  if i["key"] == "access_token_ttl_seconds")
+    assert access["label"] == "Durata access token"
+    assert access["unit"] == "secondi"
+
+
+def test_config_groups_hide_empty_other():
+    """Il gruppo 'Altro' non e' emesso se non contiene parametri."""
+    from views.config_bp import build_config_groups
+    mapped = [i for i in _CONFIG_ITEMS if i["key"] != "some_new_unmapped_key"]
+    ids = [g["id"] for g in build_config_groups(mapped)]
+    assert "other" not in ids
+    assert build_config_groups([]) == []
+
+
+def test_config_tabs_rendered(client, login, fake):
+    """La pagina rende le tab e tutti i campi value:<key>, un solo submit."""
+    login(["config.read", "config.update"])
+    fake.set("GET", "/config", {"items": _CONFIG_ITEMS})
+    html = client.get("/config").get_data(as_text=True)
+    assert "nav-tabs" in html
+    assert "tab-pane" in html
+    for pane in ("pane-network", "pane-auth", "pane-probes",
+                 "pane-retention", "pane-other"):
+        assert pane in html
+    # Ogni parametro presente come campo del form (nome invariato).
+    for it in _CONFIG_ITEMS:
+        assert ('name="value:%s"' % it["key"]) in html
+    # Un unico pulsante di salvataggio per tutte le tab.
+    assert html.count('type="submit"') == 1
+    # Etichette leggibili, unita' e badge "Riavvio richiesto".
+    assert "Durata access token" in html
+    assert "secondi" in html
+    assert "giorni" in html
+    assert "Riavvio richiesto" in html
+
+
+def test_config_all_mapped_no_other_tab(client, login, fake):
+    login(["config.read"])
+    mapped = [i for i in _CONFIG_ITEMS if i["key"] != "some_new_unmapped_key"]
+    fake.set("GET", "/config", {"items": mapped})
+    html = client.get("/config").get_data(as_text=True)
+    assert "pane-network" in html
+    assert "pane-other" not in html
+
+
+def test_config_readonly_without_update(client, login, fake):
+    """Senza config.update i campi sono readonly e manca il pulsante Salva."""
+    login(["config.read"])
+    fake.set("GET", "/config", {"items": _CONFIG_ITEMS})
+    html = client.get("/config").get_data(as_text=True)
+    assert "readonly" in html
+    assert "Salva modifiche" not in html
 
 
 # -- P-19 Profilo -------------------------------------------------------------
