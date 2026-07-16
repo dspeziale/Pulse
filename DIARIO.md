@@ -510,3 +510,40 @@ Output consegnati
 - Enrollment end-to-end verificato: Probe "online" sul Server; token monouso (re-register -> 401); identita' assegnata all'agent (probe_id, OpenSearch healthy, poller attivo); drill-down Server->Probe (proxy heartbeats) -> 200.
 
 ================================================
+
+ITERAZIONE 13
+
+Agente: FE
+Data: 2026-07-16
+
+Input ricevuti
+- Richiesta utente: riprogettare l'aspetto delle due dashboard Flask (Server e Sonda), giudicate inguardabili. Vincoli: base grafica AdminLTE 4.0 (Bootstrap 5), tema chiaro di default con toggle chiaro/scuro persistente (data-bs-theme), carattere PT Sans Narrow base 19px con toggle A-/A+ persistente. Vincolo assoluto: NESSUN CDN, tutti gli asset vendorizzati localmente. Intervento SOLO frontend, senza toccare backend/agent, rotte, contratti REST o logica.
+
+Lavoro svolto
+- Asset vendorizzati (approccio: asset ufficiali scaricati e copiati in locale, nessun CDN a runtime): Bootstrap 5.3.3 (css + bundle js con Popper), AdminLTE 4.0.0 (css + js), Bootstrap Icons 1.11.3 (css woff2-only), font PT Sans Narrow 400/700 subset latin + latin-ext (woff2 ufficiali Google Fonts). Rimossi i commenti sourceMappingURL; ridotto bootstrap-icons.css al solo woff2.
+- Shell AdminLTE 4 in entrambe le base.html: top navbar (toggle sidebar, controlli A-/A+/reset, toggle tema, utente, logout), sidebar scura con brand ("Pulse - Server" / "Pulse - Sonda") e voci di menu governate dai permessi RBAC esistenti (server) / voci fisse (sonda), content wrapper e footer. Mantenuti i blocchi Jinja esistenti (title, head_extra, content) piu' un nuovo blocco opzionale body_extra; blocco content definito una sola volta (fix TemplateAssertionError iniziale).
+- Livello tema locale (static/css/pulse-theme.css): PT Sans Narrow globale, base 19px via font-size su <html> (scala tutta la UI in rem), mappatura stati ok/warn/error/down/unknown/online/offline/pending a colori badge coerenti, ponte tra classi legacy dei template (.card/.kpi/.badge.b-*/.flash/.btn-ghost/.grid2/.muted/tabelle/form) ed estetica Bootstrap/AdminLTE con supporto chiaro/scuro.
+- JS tema locale (static/js/pulse-theme.js): toggle chiaro/scuro (data-bs-theme) e dimensione carattere (A-/A+/reset, range 13-30px, default 19), persistenza in localStorage; snippet inline anti-flash in <head> applica le preferenze salvate prima del paint.
+- Login "boxed" e pagine errore ridisegnate per entrambe; pulse-charts.js reso theme-aware (assi/etichette da variabili CSS Bootstrap) mantenendo l'API compatibile.
+- Coerenza garantita tra le due dashboard: stessi asset, stesso tema, stessi controlli.
+
+File creati
+- server/dashboard/static/{css/pulse-theme.css, js/pulse-theme.js} e vendor/{bootstrap, adminlte, bootstrap-icons, fonts/pt-sans-narrow}/... (idem sotto probe/dashboard/static/).
+
+File modificati
+- server/dashboard/templates/{base.html, auth/login.html, error.html}; probe/dashboard/templates/{base.html, auth/login.html, error.html}; server|probe/dashboard/static/pulse-charts.js.
+
+Problemi trovati
+- Jinja non consente il blocco 'content' definito due volte in rami if/else mutuamente esclusivi: ristrutturata la base.html con un unico blocco content e tag di apertura/chiusura shell distribuiti nei rami if/else.
+
+Decisioni prese
+- Asset vendorizzati per-dashboard sotto static/vendor/ (non in frontend_common/, che e' un pacchetto pip non servito come static): i Dockerfile fanno gia' COPY dell'intera cartella dashboard, quindi NESSUN adeguamento ai Dockerfile ne' al .dockerignore e' necessario.
+- Icone: Bootstrap Icons vendorizzate (woff2) per un risultato fedele allo stile AdminLTE 4.
+
+Output consegnati
+- Suite pytest per-pacchetto: frontend_common 27, server/dashboard 50, probe/dashboard 27 = 104 test, 0 falliti. Coverage combinata (.coveragerc radice): 1054 statement, 92 branch, 0 miss -> 100%.
+- Smoke WSGI (entrambe): /login 200, /healthz 200, pagina protetta anonima -> 302 redirect a /login. Login referenzia tutti gli asset vendorizzati.
+- Verifica assenza CDN: nessun URL esterno in template o static autorati; nei file minificati vendorizzati restano solo i banner-commento di licenza MIT (getbootstrap.com, adminlte.io, ecc.) e namespace SVG w3.org nei data-URI: nessun fetch di rete a runtime.
+- Confermati: toggle tema chiaro/scuro e toggle dimensione carattere funzionanti e persistenti (localStorage); font PT Sans Narrow 19px base.
+
+================================================
