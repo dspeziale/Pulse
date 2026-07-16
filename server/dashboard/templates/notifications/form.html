@@ -1,39 +1,204 @@
 {% extends "base.html" %}
 {% block title %}{{ 'Modifica' if channel else 'Nuovo' }} canale — Pulse{% endblock %}
+{% set cfg = channel.config if channel else None %}
 {% block content %}
-<h1>{{ 'Modifica' if channel else 'Nuovo' }} canale</h1>
-<div class="card">
-<form method="post" action="{{ url_for('notifications.update_channel', channel_id=channel.id) if channel else url_for('notifications.create_channel') }}">
-  <label>Nome</label><input name="name" value="{{ channel.name if channel else '' }}" required>
-  <label>Tipo</label>
-  <select name="type" id="type">
-    {% for t in ['email','telegram','whatsapp'] %}
-      <option value="{{ t }}" {% if channel and channel.type==t %}selected{% endif %}>{{ t }}</option>
-    {% endfor %}
-  </select>
-  <label><input type="checkbox" name="enabled" style="width:auto" {% if channel and channel.enabled %}checked{% endif %}> Abilitato</label>
-  <label><input type="checkbox" name="inbound_enabled" style="width:auto" {% if channel and channel.inbound_enabled %}checked{% endif %}> Inbound abilitato</label>
-  <fieldset><legend class="muted">Config email</legend>
-    <input name="smtp_host" placeholder="smtp_host">
-    <input name="smtp_port" placeholder="smtp_port" type="number">
-    <label><input type="checkbox" name="use_tls" style="width:auto"> use_tls</label>
-    <input name="username" placeholder="username">
-    <input name="password" placeholder="password" type="password">
-    <input name="from_address" placeholder="from_address">
-    <input name="imap_host" placeholder="imap_host">
-    <input name="imap_port" placeholder="imap_port" type="number">
-  </fieldset>
-  <fieldset><legend class="muted">Config telegram</legend>
-    <input name="bot_token" placeholder="bot_token">
-    <input name="webhook_secret" placeholder="webhook_secret">
-  </fieldset>
-  <fieldset><legend class="muted">Config whatsapp</legend>
-    <input name="provider" placeholder="provider">
-    <input name="api_base" placeholder="api_base">
-    <input name="api_token" placeholder="api_token">
-    <input name="phone_number_id" placeholder="phone_number_id">
-  </fieldset>
-  <button type="submit">Salva</button>
-</form>
+<div class="d-flex align-items-center gap-2 mb-3">
+  <h1 class="h3 mb-0"><i class="bi bi-broadcast me-2"></i>{{ ('Modifica canale: ' ~ channel.name) if channel else 'Nuovo canale di notifica' }}</h1>
 </div>
+
+<form method="post" action="{{ url_for('notifications.update_channel', channel_id=channel.id) if channel else url_for('notifications.create_channel') }}">
+<div class="row g-3">
+  <div class="col-lg-8">
+    <div class="card">
+      <div class="card-header"><i class="bi bi-info-circle me-1"></i>Impostazioni generali</div>
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label" for="name">Nome canale</label>
+            <input class="form-control" id="name" name="name" value="{{ channel.name if channel else '' }}" placeholder="es. Email operations" required>
+            <div class="form-text">Nome univoco del canale (duplicato → 409).</div>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label" for="type">Tipo</label>
+            <select class="form-select" id="type" name="type">
+              {% for t in ['email','telegram','whatsapp'] %}
+                <option value="{{ t }}" {% if channel and channel.type==t %}selected{% endif %}>{{ t }}</option>
+              {% endfor %}
+            </select>
+            <div class="form-text">Determina i parametri di connessione richiesti sotto.</div>
+          </div>
+          <div class="col-md-6">
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" role="switch" id="enabled" name="enabled" {% if channel and channel.enabled %}checked{% endif %}>
+              <label class="form-check-label" for="enabled">Canale abilitato (invio)</label>
+            </div>
+            <div class="form-text">Se disattivato, il canale non invia notifiche.</div>
+          </div>
+          <div class="col-md-6">
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" role="switch" id="inbound_enabled" name="inbound_enabled" {% if channel and channel.inbound_enabled %}checked{% endif %}>
+              <label class="form-check-label" for="inbound_enabled">Inbound abilitato (comandi in ingresso)</label>
+            </div>
+            <div class="form-text">Consente di ricevere comandi (es. <code>/ack</code>, <code>/status</code>) sul canale.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {# ---- Config EMAIL ---- #}
+    <div class="card mt-3 ch-config" data-ch-type="email">
+      <div class="card-header"><i class="bi bi-envelope me-1"></i>Configurazione Email (SMTP / IMAP)</div>
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-md-8">
+            <label class="form-label" for="smtp_host">SMTP host</label>
+            <input class="form-control" id="smtp_host" name="smtp_host" value="{{ cfg.smtp_host if cfg else '' }}" placeholder="smtp.example.com">
+            <div class="form-text">Server SMTP usato per l'invio delle email.</div>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label" for="smtp_port">SMTP port</label>
+            <input class="form-control" id="smtp_port" name="smtp_port" type="number" value="{{ cfg.smtp_port if cfg else '' }}" placeholder="587">
+            <div class="form-text">587 (STARTTLS) o 465 (TLS implicito).</div>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label" for="username">Username</label>
+            <input class="form-control" id="username" name="username" value="{{ cfg.username if cfg else '' }}" placeholder="notifiche@example.com">
+            <div class="form-text">Utente per l'autenticazione SMTP.</div>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label" for="password">Password</label>
+            <input class="form-control" id="password" name="password" type="password" placeholder="{{ '•••• (invariata)' if channel else '' }}">
+            <div class="form-text">Segreto SMTP. In modifica lasciare vuoto per non cambiarlo (in lettura è mascherato).</div>
+          </div>
+          <div class="col-md-8">
+            <label class="form-label" for="from_address">From address</label>
+            <input class="form-control" id="from_address" name="from_address" value="{{ cfg.from_address if cfg else '' }}" placeholder="Pulse &lt;notifiche@example.com&gt;">
+            <div class="form-text">Indirizzo mittente mostrato nelle email inviate.</div>
+          </div>
+          <div class="col-md-4 d-flex align-items-center">
+            <div class="form-check form-switch mt-3">
+              <input class="form-check-input" type="checkbox" role="switch" id="use_tls" name="use_tls" {% if cfg and cfg.use_tls %}checked{% endif %}>
+              <label class="form-check-label" for="use_tls">Usa TLS</label>
+            </div>
+          </div>
+          <div class="col-md-8">
+            <label class="form-label" for="imap_host">IMAP host <span class="text-body-secondary">(opzionale, inbound)</span></label>
+            <input class="form-control" id="imap_host" name="imap_host" value="{{ cfg.imap_host if cfg else '' }}" placeholder="imap.example.com">
+            <div class="form-text">Casella IMAP interrogata per i comandi in ingresso via email.</div>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label" for="imap_port">IMAP port</label>
+            <input class="form-control" id="imap_port" name="imap_port" type="number" value="{{ cfg.imap_port if cfg else '' }}" placeholder="993">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {# ---- Config TELEGRAM ---- #}
+    <div class="card mt-3 ch-config" data-ch-type="telegram">
+      <div class="card-header"><i class="bi bi-telegram me-1"></i>Configurazione Telegram</div>
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-12">
+            <label class="form-label" for="bot_token">Bot token</label>
+            <input class="form-control" id="bot_token" name="bot_token" type="password" placeholder="{{ '•••• (invariato)' if channel else '123456:ABC-DEF...' }}">
+            <div class="form-text">Token del Bot Telegram (BotFather). Segreto: in modifica lasciare vuoto per non cambiarlo.</div>
+          </div>
+          <div class="col-12">
+            <label class="form-label" for="tg_webhook_secret">Webhook secret</label>
+            <input class="form-control" id="tg_webhook_secret" name="webhook_secret" placeholder="stringa segreta condivisa">
+            <div class="form-text">Inviato come header <code>X-Telegram-Bot-Api-Secret-Token</code> per validare il webhook inbound.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {# ---- Config WHATSAPP ---- #}
+    <div class="card mt-3 ch-config" data-ch-type="whatsapp">
+      <div class="card-header"><i class="bi bi-whatsapp me-1"></i>Configurazione WhatsApp (Business API)</div>
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label" for="provider">Provider</label>
+            <input class="form-control" id="provider" name="provider" value="{{ cfg.provider if cfg else '' }}" placeholder="es. meta, twilio">
+            <div class="form-text">Provider della WhatsApp Business API.</div>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label" for="api_base">API base URL</label>
+            <input class="form-control" id="api_base" name="api_base" value="{{ cfg.api_base if cfg else '' }}" placeholder="https://graph.facebook.com/v19.0">
+            <div class="form-text">Base URL delle API del provider.</div>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label" for="api_token">API token</label>
+            <input class="form-control" id="api_token" name="api_token" type="password" placeholder="{{ '•••• (invariato)' if channel else '' }}">
+            <div class="form-text">Token API del provider (segreto).</div>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label" for="phone_number_id">Phone number ID</label>
+            <input class="form-control" id="phone_number_id" name="phone_number_id" value="{{ cfg.phone_number_id if cfg else '' }}" placeholder="1234567890">
+            <div class="form-text">Identificativo del numero WhatsApp Business.</div>
+          </div>
+          <div class="col-12">
+            <label class="form-label" for="wa_webhook_secret">Webhook secret</label>
+            <input class="form-control" id="wa_webhook_secret" name="webhook_secret" placeholder="stringa segreta condivisa">
+            <div class="form-text">Usato per verificare la firma <code>X-Hub-Signature-256</code> del webhook inbound.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="mt-3 d-flex gap-2">
+      <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1"></i>Salva</button>
+      <a class="btn btn-secondary" href="{{ url_for('notifications.detail', channel_id=channel.id) if channel else url_for('notifications.list_channels') }}">Annulla</a>
+    </div>
+  </div>
+
+  <div class="col-lg-4">
+    <div class="card">
+      <div class="card-header"><i class="bi bi-arrow-down-left-square me-1"></i>Comandi in ingresso (inbound)</div>
+      <div class="card-body small">
+        <div class="ch-inbound" data-ch-type="email">
+          <p class="mb-1"><span class="badge b-warn">Limitato</span></p>
+          <p class="mb-0">Ingest via webhook del provider inbound-email o polling IMAP. Identità = indirizzo mittente. Bassa affidabilità e mittente falsificabile: richiede verifica aggiuntiva (token nel corpo, DKIM/SPF). Sconsigliato per comandi critici come <code>/silence</code>.</p>
+        </div>
+        <div class="ch-inbound" data-ch-type="telegram">
+          <p class="mb-1"><span class="badge b-ok">Pieno</span></p>
+          <p class="mb-0">Bot API + webhook verso <code>/inbound/telegram</code> con secret token. Identità stabile (<code>chat_id</code>/<code>user_id</code>). Canale ideale per comandi bidirezionali: <code>/ack</code>, <code>/status</code>, <code>/silence</code>, <code>/probes</code>.</p>
+        </div>
+        <div class="ch-inbound" data-ch-type="whatsapp">
+          <p class="mb-1"><span class="badge b-warn">Condizionato</span></p>
+          <p class="mb-0">Richiede WhatsApp Business API. Webhook verso <code>/inbound/whatsapp</code> con firma verificata. Identità = numero di telefono. Vincoli su finestre di conversazione (24h) e template. Senza Business API la ricezione non è possibile.</p>
+        </div>
+        <hr>
+        <p class="text-body-secondary mb-0">Ogni comando è comunque vincolato a identità→utente e ai permessi RBAC.</p>
+      </div>
+    </div>
+  </div>
+</div>
+</form>
+
+<script>
+(function () {
+  var sel = document.getElementById('type');
+  var configs = Array.prototype.slice.call(document.querySelectorAll('.ch-config'));
+  var inbounds = Array.prototype.slice.call(document.querySelectorAll('.ch-inbound'));
+  function apply() {
+    var t = sel.value;
+    configs.forEach(function (el) {
+      var match = el.getAttribute('data-ch-type') === t;
+      el.style.display = match ? '' : 'none';
+      // Disabilita gli input delle sezioni nascoste così non vengono inviati
+      // (evita ambiguità sul campo webhook_secret condiviso tra i tipi).
+      Array.prototype.forEach.call(el.querySelectorAll('input,select,textarea'), function (i) {
+        i.disabled = !match;
+      });
+    });
+    inbounds.forEach(function (el) {
+      el.style.display = el.getAttribute('data-ch-type') === t ? '' : 'none';
+    });
+  }
+  sel.addEventListener('change', apply);
+  apply();
+})();
+</script>
 {% endblock %}

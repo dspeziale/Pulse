@@ -1,12 +1,25 @@
 {% extends "base.html" %}
 {% block title %}Simulazione workflow — Pulse{% endblock %}
 {% block content %}
-<h1>Esito simulazione</h1>
-<div class="card">
-  <p><strong>Match:</strong> {{ 'sì' if result.matched else 'no' }}</p>
-  {% if result.suppressed_by %}<p><strong>Soppresso da:</strong> {{ result.suppressed_by }}</p>{% endif %}
-  <h2>Azioni pianificate</h2>
-  <pre>{{ result.planned_actions|tojson(indent=2) }}</pre>
-  <a class="btn-ghost" href="{{ url_for('workflows.detail', workflow_id=workflow_id) }}">Torna al workflow</a>
+<h1 class="h3 mb-3"><i class="bi bi-play-circle me-2"></i>Esito simulazione</h1>
+
+<div class="card mb-3">
+  <div class="card-body">
+    {% if result.matched %}
+    <div class="alert alert-success mb-2"><i class="bi bi-check-circle me-1"></i>L'evento <strong>corrisponde</strong> al workflow.</div>
+    {% else %}
+    <div class="alert alert-secondary mb-2"><i class="bi bi-dash-circle me-1"></i>L'evento <strong>non corrisponde</strong> al workflow.</div>
+    {% endif %}
+    {% if result.suppressed_by %}
+    <div class="alert alert-warning mb-0"><i class="bi bi-shield-slash me-1"></i>Notifica soppressa da: <strong>{{ result.suppressed_by }}</strong></div>
+    {% endif %}
+  </div>
 </div>
+
+<div class="card mb-3">
+  <div class="card-header"><i class="bi bi-list-ol me-1"></i>Azioni pianificate</div>
+  <div class="card-body"><pre class="pulse-code mb-0">{{ result.planned_actions|tojson(indent=2) }}</pre></div>
+</div>
+
+<a class="btn btn-secondary" href="{{ url_for('workflows.detail', workflow_id=workflow_id) }}"><i class="bi bi-arrow-left me-1"></i>Torna al workflow</a>
 {% endblock %}

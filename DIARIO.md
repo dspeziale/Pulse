@@ -547,3 +547,43 @@ Output consegnati
 - Confermati: toggle tema chiaro/scuro e toggle dimensione carattere funzionanti e persistenti (localStorage); font PT Sans Narrow 19px base.
 
 ================================================
+
+ITERAZIONE 14
+
+Agente: FE
+Data: 2026-07-16
+
+Input ricevuti
+- Richiesta utente: il restyling AdminLTE precedente aveva aggiornato SOLO lo shell (base.html/login/error); le pagine interne (form, tabelle, dettagli) usavano ancora il vecchio markup e classi CSS ormai rimosse (risultavano spoglie/illeggibili) e la sidebar era un elenco piatto. Richiesto: menu logicamente organizzati e form "belle, ricche di dati e informazioni". Intervento SOLO frontend (server/dashboard, probe/dashboard, frontend_common), senza toccare backend, rotte, nomi dei campi form, contratti REST o logica.
+
+Lavoro svolto
+- MENU (sidebar): riorganizzata la sidebar di server/dashboard/templates/base.html in sezioni con intestazioni AdminLTE (li.nav-header): MONITORAGGIO (Dashboard, Sonde, Sistemi monitorati, Query dati, Grafici, Allarmi), NOTIFICHE (Canali, Workflow, Storico invii, Identità canali), AMMINISTRAZIONE (Utenti, Ruoli, Permessi), SISTEMA (Audit log, Log di sistema, Configurazione), ACCOUNT (Profilo). Ogni intestazione di sezione compare solo se l'utente ha almeno una voce visibile (calcolo via can('...')). Voce attiva evidenziata (classe active) confrontando request.endpoint. Sidebar della Sonda riorganizzata in scala ridotta: MONITORAGGIO (Dashboard, Query dati) + SONDA (Stato).
+- FORM/PAGINE: migrate a Bootstrap 5 / AdminLTE 4 TUTTE le pagine interne di entrambe le dashboard. Standard form: card con card-header/card-body, layout a griglia (row/col), form-label + form-control/form-select, form-switch per i booleani, un div.form-text sotto ogni campo con descrizione/formato/vincoli dedotti dal DOCUMENTO_API e da 07_workflow_notifiche.md, placeholder ed esempi realistici, pulsanti Salva (btn-primary) + Annulla (btn-secondary) e azioni distruttive con conferma (btn-outline-danger). Pagine lista: table table-hover align-middle, badge di stato coerenti, colonna azioni, stato vuoto con call-to-action, barra strumenti con ricerca/filtri (solo quelli già supportati dalle rotte) e pulsante "Nuovo". Pagine dettaglio: definition list etichetta/valore, sezioni e link alle azioni correlate.
+- Form ricche chiave: (1) systems/form.html: contesto Sonda assegnata con stato live aggiornato via JS, help su URL heartbeat/poll/timeout/soglie warn-error in ms. (2) notifications/form.html: sezione di configurazione mostrata dinamicamente in base al tipo (email/telegram/whatsapp) via JS locale, con help per ogni campo e nota inbound per canale (Telegram pieno / WhatsApp condizionato / Email limitato); gli input delle sezioni non selezionate vengono disabilitati per non inviare campi ambigui (es. webhook_secret condiviso). (3) workflows/form.html: campi comuni amichevoli in alto (nome, descrizione, trigger come SELECT degli 8 trigger noti con descrizione dinamica, abilitato) e sezione "Avanzato" collassabile con scope/conditions/suppression/actions in JSON, help dettagliato, pulsanti "Inserisci esempio" (JSON pronti da 07_workflow_notifiche.md/DOCUMENTO_API) e validazione client-side (JSON valido) prima dell'invio.
+- CSS: riscritto static/css/pulse-theme.css (server e probe, identici) rimuovendo gli shim legacy (.grid2, .muted, .kpi/.kpis, .flash, .inline e gli override globali su table/input/label/select/textarea/button/.card) non più necessari; mantenuti font PT Sans Narrow 19px + scaling, colori/badge di stato b-*, btn-ghost, login, più utility coerenti (.pulse-code, .pulse-kpi-value, .nav-header, .nav-link.active). Flash convertiti da .flash a alert Bootstrap dismissibili in entrambe le base.html.
+- Macro condivise (_macros.html per server e probe): status_badge() (normalizza e ripiega su unknown) e bool_badge(); lo stato "active" degli utenti usa una mappa dedicata (verde) distinta da "active" degli allarmi (rosso).
+
+File creati
+- server/dashboard/templates/_macros.html; probe/dashboard/templates/_macros.html.
+
+File modificati
+- server/dashboard/templates/base.html + tutte le pagine interne: dashboard/index, probes/{list,detail,form,enrollment}, systems/{list,detail,form}, query/{builder,charts}, alarms/list, notifications/{list,detail,form,history}, workflows/{list,detail,form,simulate}, identities/list, users/{list,detail,form}, roles/{list,detail,form}, permissions/list, audit/{list,detail}, logs/list, config/list, profile/index, auth/login, error.
+- probe/dashboard/templates/base.html + dashboard/{index,system}, query/builder, status/index, auth/login, error.
+- server/dashboard/static/css/pulse-theme.css; probe/dashboard/static/css/pulse-theme.css.
+
+Problemi trovati
+- Nel form workflow gli esempi JSON delle azioni contengono segnaposto {{...}} che Jinja avrebbe interpretato: risolto con blocco {% raw %} nel <template> di esempio.
+- Campo webhook_secret condiviso tra config telegram e whatsapp: risolto disabilitando via JS gli input delle sezioni non selezionate (i disabilitati non vengono inviati), senza cambiare i nomi dei campi attesi dal backend.
+- Rimuovendo gli shim CSS globali, login/error richiedevano card-body espliciti: aggiunti.
+
+Decisioni prese
+- Tutti gli stati instradati tramite macro status_badge per garantire sempre una classe colore nota (niente badge senza colore); nessuno stile CSS orfano lasciato.
+- Sidebar Sonda senza voce "Sistemi" separata (non esiste una rotta elenco dedicata: la Dashboard è già la vista sistemi): sezioni oneste sulle pagine reali.
+
+Output consegnati
+- Suite pytest per-pacchetto: frontend_common 27, server/dashboard 50, probe/dashboard 27 = 104 test, 0 falliti (nessun selettore di test rotto dal nuovo markup: le asserzioni esistenti su testi/rotte/RBAC restano valide).
+- Coverage combinata (.coveragerc radice): 1054 statement, 92 branch, 0 miss -> 100%.
+- Smoke WSGI (entrambe): /healthz 200, /login 200, pagina protetta anonima -> 302 redirect a /login?next=/dashboard. Le pagine lista e form vengono renderizzate senza errori Jinja anche dai test autenticati con backend mockato.
+- Grep finale: nessun URL esterno (CDN) nei template o negli asset autorati; nessun riferimento alle vecchie classi rimosse (.muted/.grid2/.kpi/.flash) né a rotte/classi inesistenti; nessuna tabella/campo "nudo" senza classi Bootstrap.
+
+================================================

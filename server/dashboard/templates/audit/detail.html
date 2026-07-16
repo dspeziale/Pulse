@@ -1,13 +1,28 @@
 {% extends "base.html" %}
+{% from "_macros.html" import status_badge %}
 {% block title %}Voce audit — Pulse{% endblock %}
 {% block content %}
-<h1>Voce audit</h1>
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <h1 class="h3 mb-0"><i class="bi bi-journal-text me-2"></i>Voce di audit</h1>
+  <a class="btn btn-secondary" href="{{ url_for('audit.list_audit') }}"><i class="bi bi-arrow-left me-1"></i>Torna all'elenco</a>
+</div>
+
+<div class="card mb-3">
+  <div class="card-header"><i class="bi bi-info-circle me-1"></i>Dettaglio</div>
+  <div class="card-body">
+    <dl class="row mb-0">
+      <dt class="col-sm-3 text-body-secondary">Data</dt><dd class="col-sm-9">{{ entry.timestamp }}</dd>
+      <dt class="col-sm-3 text-body-secondary">Attore</dt><dd class="col-sm-9">{{ entry.actor_type }} {{ entry.actor_id }}</dd>
+      <dt class="col-sm-3 text-body-secondary">Azione</dt><dd class="col-sm-9"><code>{{ entry.action }}</code></dd>
+      <dt class="col-sm-3 text-body-secondary">Entità</dt><dd class="col-sm-9">{{ entry.entity_type }} {{ entry.entity_id }}</dd>
+      <dt class="col-sm-3 text-body-secondary">Esito</dt><dd class="col-sm-9">{{ status_badge(entry.outcome) }}</dd>
+      <dt class="col-sm-3 text-body-secondary">IP</dt><dd class="col-sm-9">{{ entry.ip or '—' }}</dd>
+    </dl>
+  </div>
+</div>
+
 <div class="card">
-  <p><strong>Data:</strong> {{ entry.timestamp }}</p>
-  <p><strong>Attore:</strong> {{ entry.actor_type }} {{ entry.actor_id }}</p>
-  <p><strong>Azione:</strong> {{ entry.action }}</p>
-  <p><strong>Entità:</strong> {{ entry.entity_type }} {{ entry.entity_id }}</p>
-  <p><strong>Esito:</strong> {{ entry.outcome }} · <strong>IP:</strong> {{ entry.ip or '—' }}</p>
-  <pre>{{ entry.details|tojson(indent=2) }}</pre>
+  <div class="card-header"><i class="bi bi-braces me-1"></i>Dettagli</div>
+  <div class="card-body"><pre class="pulse-code mb-0">{{ entry.details|tojson(indent=2) }}</pre></div>
 </div>
 {% endblock %}

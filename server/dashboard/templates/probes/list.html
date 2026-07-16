@@ -1,23 +1,63 @@
 {% extends "base.html" %}
+{% from "_macros.html" import status_badge %}
 {% block title %}Sonde — Pulse{% endblock %}
 {% block content %}
-<h1>Sonde (Probe)</h1>
-{% if can('probes.create') %}<p><a class="btn" href="{{ url_for('probes.new_probe') }}">Nuova Probe</a></p>{% endif %}
-<form method="get">
-  <input name="q" placeholder="Cerca" value="{{ request.args.get('q','') }}" style="width:auto">
-  <button class="btn-ghost">Filtra</button>
-</form>
-<table>
-  <tr><th>Nome</th><th>Stato</th><th>Sistemi</th><th>Ultimo contatto</th><th></th></tr>
-  {% for p in data['items'] %}
-  <tr>
-    <td><a href="{{ url_for('probes.detail', probe_id=p.id) }}">{{ p.name }}</a></td>
-    <td><span class="badge b-{{ p.status }}">{{ p.status }}</span></td>
-    <td>{{ p.systems_count }}</td>
-    <td class="muted">{{ p.last_seen_at or '—' }}</td>
-    <td>{% if can('probes.update') %}<a href="{{ url_for('probes.edit_probe', probe_id=p.id) }}">Modifica</a>{% endif %}</td>
-  </tr>
-  {% endfor %}
-</table>
-<p class="muted">Totale: {{ data['total'] }}</p>
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <h1 class="h3 mb-0"><i class="bi bi-hdd-network me-2"></i>Sonde</h1>
+  {% if can('probes.create') %}
+  <a class="btn btn-primary" href="{{ url_for('probes.new_probe') }}"><i class="bi bi-plus-lg me-1"></i>Nuova Sonda</a>
+  {% endif %}
+</div>
+
+<div class="card mb-3">
+  <div class="card-body">
+    <form method="get" class="row g-2 align-items-end">
+      <div class="col-sm-6">
+        <label class="form-label small text-body-secondary mb-1">Ricerca</label>
+        <input name="q" class="form-control" placeholder="Nome Sonda" value="{{ request.args.get('q','') }}">
+      </div>
+      <div class="col-sm-4">
+        <label class="form-label small text-body-secondary mb-1">Stato</label>
+        <select name="status" class="form-select">
+          <option value="">Tutti gli stati</option>
+          {% for st in ['online','offline','pending'] %}
+            <option value="{{ st }}" {% if request.args.get('status')==st %}selected{% endif %}>{{ st }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-sm-2 d-grid">
+        <button class="btn btn-outline-secondary"><i class="bi bi-funnel me-1"></i>Filtra</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead><tr><th>Nome</th><th>Stato</th><th class="text-end">Sistemi</th><th>Ultimo contatto</th><th class="text-end">Azioni</th></tr></thead>
+      <tbody>
+      {% for p in data['items'] %}
+      <tr>
+        <td><a class="fw-semibold text-decoration-none" href="{{ url_for('probes.detail', probe_id=p.id) }}">{{ p.name }}</a></td>
+        <td>{{ status_badge(p.status) }}</td>
+        <td class="text-end">{{ p.systems_count }}</td>
+        <td class="text-body-secondary">{{ p.last_seen_at or '—' }}</td>
+        <td class="text-end">
+          <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('probes.detail', probe_id=p.id) }}" title="Dettaglio"><i class="bi bi-eye"></i></a>
+          {% if can('probes.update') %}<a class="btn btn-sm btn-outline-secondary" href="{{ url_for('probes.edit_probe', probe_id=p.id) }}" title="Modifica"><i class="bi bi-pencil"></i></a>{% endif %}
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="5" class="text-center text-body-secondary py-5">
+        <i class="bi bi-inbox fs-2 d-block mb-2"></i>
+        Nessuna Sonda registrata.
+        {% if can('probes.create') %}<div class="mt-2"><a class="btn btn-sm btn-primary" href="{{ url_for('probes.new_probe') }}"><i class="bi bi-plus-lg me-1"></i>Registra la prima Sonda</a></div>{% endif %}
+      </td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if data['items'] %}<div class="card-footer text-body-secondary small">Totale: {{ data['total'] }}</div>{% endif %}
+</div>
 {% endblock %}

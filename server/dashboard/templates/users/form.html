@@ -1,49 +1,105 @@
 {% extends "base.html" %}
 {% block title %}{{ 'Modifica' if user else 'Nuovo' }} utente — Pulse{% endblock %}
 {% block content %}
-<h1>{{ 'Modifica' if user else 'Nuovo' }} utente</h1>
-<div class="card">
-<form method="post" action="{{ url_for('users.update_user', user_id=user.id) if user else url_for('users.create_user') }}">
-  {% if not user %}
-    <label>Username</label><input name="username" required>
-    <label>Password</label><input name="password" type="password" required>
+<div class="d-flex align-items-center gap-2 mb-3">
+  <h1 class="h3 mb-0"><i class="bi bi-person-gear me-2"></i>{{ ('Modifica utente: ' ~ user.username) if user else 'Nuovo utente' }}</h1>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-{{ 7 if user else 12 }}">
+    <div class="card">
+      <div class="card-header"><i class="bi bi-person me-1"></i>Dati utente</div>
+      <div class="card-body">
+        <form method="post" action="{{ url_for('users.update_user', user_id=user.id) if user else url_for('users.create_user') }}">
+          <div class="row g-3">
+            {% if not user %}
+            <div class="col-md-6">
+              <label class="form-label" for="username">Username</label>
+              <input class="form-control" id="username" name="username" required placeholder="nome.utente">
+              <div class="form-text">Univoco, usato per l'accesso (duplicato → 409).</div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="password">Password</label>
+              <input class="form-control" id="password" name="password" type="password" required>
+              <div class="form-text">Deve rispettare la policy di sicurezza (altrimenti 422).</div>
+            </div>
+            {% endif %}
+            <div class="col-md-6">
+              <label class="form-label" for="full_name">Nome completo</label>
+              <input class="form-control" id="full_name" name="full_name" value="{{ user.full_name if user else '' }}" placeholder="Mario Rossi">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="email">Email</label>
+              <input class="form-control" id="email" name="email" type="email" value="{{ user.email if user else '' }}" placeholder="mario.rossi@example.com">
+              <div class="form-text">Univoca (duplicato → 409).</div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="status">Stato</label>
+              <select class="form-select" id="status" name="status">
+                {% for st in ['active','disabled'] %}
+                  <option value="{{ st }}" {% if user and user.status==st %}selected{% endif %}>{{ st }}</option>
+                {% endfor %}
+              </select>
+              <div class="form-text">Un utente <em>disabled</em> non può accedere.</div>
+            </div>
+            {% if not user %}
+            <div class="col-12">
+              <label class="form-label">Ruoli</label>
+              <div class="row row-cols-1 row-cols-md-2 g-1">
+                {% for r in roles['items'] %}
+                <div class="col">
+                  <div class="form-check">
+                    <input class="form-check-input" type="checkbox" name="role_ids" value="{{ r.id }}" id="role_{{ r.id }}">
+                    <label class="form-check-label" for="role_{{ r.id }}">{{ r.name }}</label>
+                  </div>
+                </div>
+                {% endfor %}
+              </div>
+              <div class="form-text">I permessi effettivi derivano dai ruoli assegnati.</div>
+            </div>
+            {% endif %}
+          </div>
+          <div class="mt-3 d-flex gap-2">
+            <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1"></i>Salva</button>
+            <a class="btn btn-secondary" href="{{ url_for('users.detail', user_id=user.id) if user else url_for('users.list_users') }}">Annulla</a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  {% if user %}
+  <div class="col-lg-5">
+    {% if can('users.assign_roles') %}
+    <div class="card">
+      <div class="card-header"><i class="bi bi-person-badge me-1"></i>Ruoli assegnati</div>
+      <div class="card-body">
+        <form method="post" action="{{ url_for('users.assign_roles', user_id=user.id) }}">
+          {% for r in roles['items'] %}
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="role_ids" value="{{ r.id }}" id="arole_{{ r.id }}" {% if r.name in user.roles %}checked{% endif %}>
+            <label class="form-check-label" for="arole_{{ r.id }}">{{ r.name }}</label>
+          </div>
+          {% endfor %}
+          <button class="btn btn-outline-primary mt-2"><i class="bi bi-save me-1"></i>Aggiorna ruoli</button>
+        </form>
+      </div>
+    </div>
+    {% endif %}
+    {% if can('users.update') %}
+    <div class="card mt-3">
+      <div class="card-header"><i class="bi bi-key me-1"></i>Reset password</div>
+      <div class="card-body">
+        <form method="post" action="{{ url_for('users.reset_password', user_id=user.id) }}">
+          <label class="form-label" for="new_password">Nuova password</label>
+          <input class="form-control" id="new_password" name="new_password" type="password" required>
+          <div class="form-text mb-2">L'utente dovrà usare questa password al prossimo accesso.</div>
+          <button class="btn btn-outline-warning"><i class="bi bi-arrow-repeat me-1"></i>Reimposta</button>
+        </form>
+      </div>
+    </div>
+    {% endif %}
+  </div>
   {% endif %}
-  <label>Nome completo</label><input name="full_name" value="{{ user.full_name if user else '' }}">
-  <label>Email</label><input name="email" type="email" value="{{ user.email if user else '' }}">
-  <label>Stato</label>
-  <select name="status">
-    {% for st in ['active','disabled'] %}
-      <option value="{{ st }}" {% if user and user.status==st %}selected{% endif %}>{{ st }}</option>
-    {% endfor %}
-  </select>
-  {% if not user %}
-    <label>Ruoli</label>
-    {% for r in roles['items'] %}
-      <label><input type="checkbox" name="role_ids" value="{{ r.id }}" style="width:auto"> {{ r.name }}</label>
-    {% endfor %}
-  {% endif %}
-  <button type="submit">Salva</button>
-</form>
 </div>
-{% if user and can('users.assign_roles') %}
-<div class="card">
-  <h2>Ruoli</h2>
-  <form method="post" action="{{ url_for('users.assign_roles', user_id=user.id) }}">
-    {% for r in roles['items'] %}
-      <label><input type="checkbox" name="role_ids" value="{{ r.id }}" style="width:auto"
-        {% if r.name in user.roles %}checked{% endif %}> {{ r.name }}</label>
-    {% endfor %}
-    <button class="btn-ghost">Aggiorna ruoli</button>
-  </form>
-</div>
-{% endif %}
-{% if user and can('users.update') %}
-<div class="card">
-  <h2>Reset password</h2>
-  <form method="post" action="{{ url_for('users.reset_password', user_id=user.id) }}">
-    <input name="new_password" type="password" placeholder="Nuova password" required>
-    <button class="btn-ghost">Reimposta</button>
-  </form>
-</div>
-{% endif %}
 {% endblock %}

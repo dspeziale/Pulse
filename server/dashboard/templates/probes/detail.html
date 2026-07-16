@@ -1,49 +1,93 @@
 {% extends "base.html" %}
-{% block title %}Probe {{ probe.name }} — Pulse{% endblock %}
+{% from "_macros.html" import status_badge %}
+{% block title %}Sonda {{ probe.name }} — Pulse{% endblock %}
 {% block head_extra %}<script src="{{ url_for('static', filename='pulse-charts.js') }}"></script>{% endblock %}
 {% block content %}
-<h1>Probe: {{ probe.name }}</h1>
-<p>
-  Stato: <span class="badge b-{{ status.status }}">{{ status.status }}</span>
-  {% if can('probes.update') %}· <a href="{{ url_for('probes.edit_probe', probe_id=probe.id) }}">Gestisci</a>{% endif %}
-</p>
-<div class="card">
-  <p class="muted">Ultimo contatto: {{ status.last_seen_at or '—' }} ·
-     Ultima sync: {{ status.last_sync_at or '—' }} · Versione: {{ status.version or '—' }}</p>
-  {% if status.last_error %}<p class="badge b-error">{{ status.last_error }}</p>{% endif %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <h1 class="h3 mb-0"><i class="bi bi-hdd-network me-2"></i>{{ probe.name }} {{ status_badge(status.status) }}</h1>
+  <div class="d-flex align-items-center gap-2">
+    <form method="get" class="d-flex align-items-center gap-2">
+      <label class="form-label mb-0 text-body-secondary small">Finestra</label>
+      <select name="window" class="form-select form-select-sm" style="width:auto" onchange="this.form.submit()">
+        {% for w in ['1h','24h','7d'] %}<option value="{{ w }}" {% if w==window %}selected{% endif %}>{{ w }}</option>{% endfor %}
+      </select>
+    </form>
+    {% if can('probes.update') %}<a class="btn btn-outline-secondary" href="{{ url_for('probes.edit_probe', probe_id=probe.id) }}"><i class="bi bi-gear me-1"></i>Gestisci</a>{% endif %}
+  </div>
 </div>
 
-<h2>Sistemi ({{ overview.generated_at }})</h2>
-<table>
-  <tr><th>Sistema</th><th>Stato</th><th>Avg ms</th><th>Uptime %</th></tr>
-  {% for s in overview.systems %}
-  <tr>
-    <td>{{ s.system_name }}</td>
-    <td><span class="badge b-{{ s.status }}">{{ s.status }}</span></td>
-    <td>{{ s.avg_response_ms }}</td><td>{{ s.uptime_pct }}</td>
-  </tr>
-  {% endfor %}
-</table>
+<div class="card mb-3">
+  <div class="card-header"><i class="bi bi-activity me-1"></i>Stato Sonda</div>
+  <div class="card-body">
+    <dl class="row mb-0">
+      <dt class="col-sm-3 text-body-secondary">Ultimo contatto</dt><dd class="col-sm-3">{{ status.last_seen_at or '—' }}</dd>
+      <dt class="col-sm-3 text-body-secondary">Ultima sync</dt><dd class="col-sm-3">{{ status.last_sync_at or '—' }}</dd>
+      <dt class="col-sm-3 text-body-secondary">Versione</dt><dd class="col-sm-3">{{ status.version or '—' }}</dd>
+      <dt class="col-sm-3 text-body-secondary">Stato</dt><dd class="col-sm-3">{{ status_badge(status.status) }}</dd>
+    </dl>
+    {% if status.last_error %}
+    <div class="alert alert-danger mt-3 mb-0"><i class="bi bi-exclamation-octagon me-1"></i>{{ status.last_error }}</div>
+    {% endif %}
+  </div>
+</div>
 
-<h2>Heartbeat recenti</h2>
-<table>
-  <tr><th>Timestamp</th><th>Sistema</th><th>Check</th><th>Stato</th><th>ms</th></tr>
-  {% for h in heartbeats['items'] %}
-  <tr>
-    <td class="muted">{{ h['@timestamp'] }}</td>
-    <td>{{ h.system_name }}</td><td>{{ h.check_name }}</td>
-    <td><span class="badge b-{{ h.status }}">{{ h.status }}</span></td>
-    <td>{{ h.response_ms }}</td>
-  </tr>
-  {% endfor %}
-</table>
-<div class="card"><canvas id="rt" height="90"></canvas></div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between">
+    <span><i class="bi bi-hdd-stack me-1"></i>Sistemi</span>
+    <span class="text-body-secondary small">{{ overview.generated_at }}</span>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead><tr><th>Sistema</th><th>Stato</th><th class="text-end">Avg ms</th><th class="text-end">Uptime %</th></tr></thead>
+      <tbody>
+      {% for s in overview.systems %}
+      <tr>
+        <td>{{ s.system_name }}</td>
+        <td>{{ status_badge(s.status) }}</td>
+        <td class="text-end">{{ s.avg_response_ms }}</td>
+        <td class="text-end">{{ s.uptime_pct }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="4" class="text-center text-body-secondary py-4">Nessun sistema assegnato a questa Sonda.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="card mb-3">
+  <div class="card-header"><i class="bi bi-graph-up me-1"></i>Tempo di risposta (heartbeat recenti)</div>
+  <div class="card-body"><canvas id="rt" height="90"></canvas></div>
+</div>
+
+<div class="card">
+  <div class="card-header"><i class="bi bi-clock-history me-1"></i>Heartbeat recenti</div>
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead><tr><th>Timestamp</th><th>Sistema</th><th>Check</th><th>Stato</th><th class="text-end">ms</th></tr></thead>
+      <tbody>
+      {% for h in heartbeats['items'] %}
+      <tr>
+        <td class="text-body-secondary">{{ h['@timestamp'] }}</td>
+        <td>{{ h.system_name }}</td>
+        <td>{{ h.check_name }}</td>
+        <td>{{ status_badge(h.status) }}</td>
+        <td class="text-end">{{ h.response_ms }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="5" class="text-center text-body-secondary py-4">Nessun heartbeat nella finestra selezionata.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
 <script>
 const hb = {{ heartbeats['items']|tojson }};
 new Chart(document.getElementById('rt'), {
   type:'line',
   data:{ labels: hb.map(h=>h['@timestamp']),
-    datasets:[{label:'response_ms', data:hb.map(h=>h.response_ms), borderColor:'#38bdf8'}] }
+    datasets:[{label:'response_ms', data:hb.map(h=>h.response_ms), borderColor:'#0d6efd'}] }
 });
 </script>
 {% endblock %}

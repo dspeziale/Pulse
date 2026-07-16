@@ -2,8 +2,11 @@
 {% block title %}Errore {{ code }} — Pulse{% endblock %}
 {% block content %}
 <div class="card">
-  <h1 class="text-danger"><i class="bi bi-exclamation-octagon"></i> Errore {{ code }}</h1>
-  <p class="fs-5">{{ message }}</p>
-  <p><a class="btn btn-ghost" href="{{ url_for('dashboard.index') }}"><i class="bi bi-arrow-left"></i> Torna alla dashboard</a></p>
+  <div class="card-body text-center py-5">
+    <i class="bi bi-exclamation-octagon text-danger" style="font-size:3rem"></i>
+    <h1 class="h3 mt-3 text-danger">Errore {{ code }}</h1>
+    <p class="fs-5 text-body-secondary">{{ message }}</p>
+    <a class="btn btn-secondary mt-2" href="{{ url_for('dashboard.index') }}"><i class="bi bi-arrow-left me-1"></i>Torna alla dashboard</a>
+  </div>
 </div>
 {% endblock %}

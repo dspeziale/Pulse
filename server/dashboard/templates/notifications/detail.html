@@ -1,26 +1,68 @@
 {% extends "base.html" %}
+{% from "_macros.html" import bool_badge %}
 {% block title %}Canale {{ channel.name }} — Pulse{% endblock %}
+{% set type_icons = {'email':'bi-envelope','telegram':'bi-telegram','whatsapp':'bi-whatsapp'} %}
 {% block content %}
-<h1>{{ channel.name }}</h1>
-<div class="card">
-  <p><strong>Tipo:</strong> {{ channel.type }}</p>
-  <p><strong>Abilitato:</strong> {{ 'sì' if channel.enabled else 'no' }} ·
-     <strong>Inbound:</strong> {{ 'sì' if channel.inbound_enabled else 'no' }}</p>
-  {% if can('notifications.update') %}<a class="btn-ghost" href="{{ url_for('notifications.edit_channel', channel_id=channel.id) }}">Modifica</a>{% endif %}
-  {% if can('notifications.delete') %}
-  <form method="post" action="{{ url_for('notifications.delete_channel', channel_id=channel.id) }}" class="inline">
-    <button class="btn-danger">Elimina</button>
-  </form>
-  {% endif %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <h1 class="h3 mb-0"><i class="bi {{ type_icons.get(channel.type, 'bi-broadcast') }} me-2"></i>{{ channel.name }}</h1>
+  <div class="d-flex gap-2">
+    {% if can('notifications.update') %}<a class="btn btn-outline-secondary" href="{{ url_for('notifications.edit_channel', channel_id=channel.id) }}"><i class="bi bi-pencil me-1"></i>Modifica</a>{% endif %}
+    {% if can('notifications.delete') %}
+    <form method="post" action="{{ url_for('notifications.delete_channel', channel_id=channel.id) }}" onsubmit="return confirm('Eliminare il canale {{ channel.name }}?');">
+      <button class="btn btn-outline-danger"><i class="bi bi-trash me-1"></i>Elimina</button>
+    </form>
+    {% endif %}
+  </div>
 </div>
+
+<div class="row g-3">
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-header"><i class="bi bi-info-circle me-1"></i>Riepilogo</div>
+      <div class="card-body">
+        <dl class="row mb-0">
+          <dt class="col-sm-4 text-body-secondary">Tipo</dt><dd class="col-sm-8">{{ channel.type }}</dd>
+          <dt class="col-sm-4 text-body-secondary">Abilitato</dt><dd class="col-sm-8">{{ bool_badge(channel.enabled) }}</dd>
+          <dt class="col-sm-4 text-body-secondary">Inbound</dt><dd class="col-sm-8">{{ bool_badge(channel.inbound_enabled) }}</dd>
+        </dl>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-header"><i class="bi bi-sliders me-1"></i>Configurazione <span class="text-body-secondary small">(segreti mascherati)</span></div>
+      <div class="card-body">
+        <dl class="row mb-0">
+          {% for k, v in channel.config.items() %}
+          <dt class="col-sm-5 text-body-secondary">{{ k }}</dt><dd class="col-sm-7 text-break">{{ v }}</dd>
+          {% else %}
+          <dd class="col-12 text-body-secondary mb-0">Nessun parametro visibile.</dd>
+          {% endfor %}
+        </dl>
+      </div>
+    </div>
+  </div>
+</div>
+
 {% if can('notifications.test') %}
-<div class="card">
-  <h2>Invio di prova</h2>
-  <form method="post" action="{{ url_for('notifications.test_channel', channel_id=channel.id) }}">
-    <input name="recipient" placeholder="Destinatario" required>
-    <input name="message" placeholder="Messaggio (opzionale)">
-    <button class="btn-ghost">Invia test</button>
-  </form>
+<div class="card mt-3">
+  <div class="card-header"><i class="bi bi-send me-1"></i>Invio di prova</div>
+  <div class="card-body">
+    <form method="post" action="{{ url_for('notifications.test_channel', channel_id=channel.id) }}" class="row g-3 align-items-end">
+      <div class="col-md-5">
+        <label class="form-label" for="recipient">Destinatario</label>
+        <input class="form-control" id="recipient" name="recipient" required placeholder="email / chat_id / numero">
+        <div class="form-text">Indirizzo coerente col tipo di canale.</div>
+      </div>
+      <div class="col-md-5">
+        <label class="form-label" for="message">Messaggio</label>
+        <input class="form-control" id="message" name="message" placeholder="Messaggio di prova (opzionale)">
+      </div>
+      <div class="col-md-2 d-grid">
+        <button class="btn btn-primary"><i class="bi bi-send me-1"></i>Invia test</button>
+      </div>
+    </form>
+  </div>
 </div>
 {% endif %}
 {% endblock %}

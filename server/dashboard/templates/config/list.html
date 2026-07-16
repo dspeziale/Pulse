@@ -1,27 +1,42 @@
 {% extends "base.html" %}
+{% from "_macros.html" import bool_badge %}
 {% block title %}Configurazione — Pulse{% endblock %}
 {% block content %}
-<h1>Configurazione</h1>
-<div class="card">
-<form method="post" action="{{ url_for('config_bp.update_config') }}">
-  <table>
-    <tr><th>Chiave</th><th>Valore</th><th>Riavvio?</th><th>Descrizione</th></tr>
-    {% for item in data['items'] %}
-    <tr>
-      <td>{{ item.key }}</td>
-      <td>
-        {% if item.sensitive %}
-          <input name="value:{{ item.key }}" placeholder="•••• (mascherato)" {% if not can('config.update') %}readonly{% endif %}>
-        {% else %}
-          <input name="value:{{ item.key }}" value="{{ item.value }}" {% if not can('config.update') %}readonly{% endif %}>
-        {% endif %}
-      </td>
-      <td>{{ 'sì' if item.requires_restart else 'no' }}</td>
-      <td class="muted">{{ item.description }}</td>
-    </tr>
-    {% endfor %}
-  </table>
-  {% if can('config.update') %}<button type="submit">Salva</button>{% endif %}
-</form>
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <h1 class="h3 mb-0"><i class="bi bi-gear me-2"></i>Configurazione</h1>
 </div>
+<p class="text-body-secondary">Parametri di sistema. I valori sensibili sono mascherati; alcune modifiche richiedono il riavvio del servizio.</p>
+
+<form method="post" action="{{ url_for('config_bp.update_config') }}">
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead><tr><th style="width:22%">Chiave</th><th style="width:30%">Valore</th><th>Riavvio</th><th>Descrizione</th></tr></thead>
+      <tbody>
+      {% for item in data['items'] %}
+      <tr>
+        <td class="font-monospace">{{ item.key }}</td>
+        <td>
+          {% if item.sensitive %}
+            <input class="form-control form-control-sm" name="value:{{ item.key }}" placeholder="•••• (mascherato)" {% if not can('config.update') %}readonly{% endif %}>
+          {% else %}
+            <input class="form-control form-control-sm" name="value:{{ item.key }}" value="{{ item.value }}" {% if not can('config.update') %}readonly{% endif %}>
+          {% endif %}
+        </td>
+        <td>{{ bool_badge(item.requires_restart) }}</td>
+        <td class="text-body-secondary">{{ item.description }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="4" class="text-center text-body-secondary py-5">Nessun parametro di configurazione.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if can('config.update') and data['items'] %}
+  <div class="card-footer">
+    <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1"></i>Salva modifiche</button>
+  </div>
+  {% endif %}
+</div>
+</form>
 {% endblock %}

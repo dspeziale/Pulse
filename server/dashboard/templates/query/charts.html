@@ -1,58 +1,89 @@
 {% extends "base.html" %}
+{% from "_macros.html" import status_badge %}
 {% block title %}Grafici / Analisi — Pulse Server{% endblock %}
 {% block head_extra %}<script src="{{ url_for('static', filename='pulse-charts.js') }}"></script>{% endblock %}
 {% block content %}
-<h1>Grafici / Analisi (P-05)</h1>
+<h1 class="h3 mb-1"><i class="bi bi-graph-up me-2"></i>Grafici / Analisi (P-05)</h1>
+<p class="text-body-secondary">Andamento del tempo di risposta e uptime per un sistema, sulla finestra temporale scelta.</p>
 
-<form method="get" class="card">
-  <div class="grid2">
-    <div>
-      <label>Probe</label>
-      <select name="probe_id" required>
-        <option value="">— seleziona —</option>
-        {% for p in probes['items'] %}
-          <option value="{{ p.id }}" {% if p.id==probe_id %}selected{% endif %}>{{ p.name }}</option>
-        {% endfor %}
-      </select>
-    </div>
-    <div>
-      <label>system_id</label>
-      <input name="system_id" value="{{ system_id }}" placeholder="sys-1" required>
-    </div>
-    <div><label>Da (ISO)</label><input name="from" value="{{ time_from }}"></div>
-    <div><label>A (ISO)</label><input name="to" value="{{ time_to }}"></div>
+<div class="card mb-3">
+  <div class="card-header"><i class="bi bi-sliders me-1"></i>Selezione</div>
+  <div class="card-body">
+    <form method="get" class="row g-3 align-items-end">
+      <div class="col-md-4">
+        <label class="form-label" for="probe_id">Sonda</label>
+        <select class="form-select" id="probe_id" name="probe_id" required>
+          <option value="">— seleziona —</option>
+          {% for p in probes['items'] %}
+            <option value="{{ p.id }}" {% if p.id==probe_id %}selected{% endif %}>{{ p.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label" for="system_id">System ID</label>
+        <input class="form-control" id="system_id" name="system_id" value="{{ system_id }}" placeholder="es. crm-prod" required>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label" for="from">Da (ISO)</label>
+        <input class="form-control" id="from" name="from" value="{{ time_from }}" placeholder="2026-07-15T00:00:00Z">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label" for="to">A (ISO)</label>
+        <input class="form-control" id="to" name="to" value="{{ time_to }}" placeholder="2026-07-15T23:59:59Z">
+      </div>
+      <div class="col-md-1 d-grid">
+        <button type="submit" class="btn btn-primary" title="Aggiorna"><i class="bi bi-arrow-clockwise"></i></button>
+      </div>
+    </form>
   </div>
-  <button type="submit">Aggiorna grafici</button>
-</form>
+</div>
 
 {% if aggregations %}
-<div class="card">
-  <h3>Aggregazioni</h3>
-  <pre class="muted">{{ aggregations|tojson(indent=2) }}</pre>
+<div class="card mb-3">
+  <div class="card-header"><i class="bi bi-calculator me-1"></i>Aggregazioni</div>
+  <div class="card-body"><pre class="pulse-code mb-0">{{ aggregations|tojson(indent=2) }}</pre></div>
 </div>
 {% endif %}
 
 {% if heartbeats %}
-<div class="card"><h3>response_ms</h3><canvas id="rt" height="120"></canvas></div>
-<table>
-  <tr><th>Timestamp</th><th>Check</th><th>Stato</th><th>ms</th></tr>
-  {% for h in heartbeats['items'] %}
-  <tr>
-    <td class="muted">{{ h['@timestamp'] }}</td><td>{{ h.check_name }}</td>
-    <td><span class="badge b-{{ h.status }}">{{ h.status }}</span></td>
-    <td>{{ h.response_ms }}</td>
-  </tr>
-  {% endfor %}
-</table>
+<div class="card mb-3">
+  <div class="card-header"><i class="bi bi-graph-up me-1"></i>response_ms</div>
+  <div class="card-body"><canvas id="rt" height="120"></canvas></div>
+</div>
+<div class="card">
+  <div class="card-header"><i class="bi bi-clock-history me-1"></i>Heartbeat</div>
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead><tr><th>Timestamp</th><th>Check</th><th>Stato</th><th class="text-end">ms</th></tr></thead>
+      <tbody>
+      {% for h in heartbeats['items'] %}
+      <tr>
+        <td class="text-body-secondary">{{ h['@timestamp'] }}</td>
+        <td>{{ h.check_name }}</td>
+        <td>{{ status_badge(h.status) }}</td>
+        <td class="text-end">{{ h.response_ms }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="4" class="text-center text-body-secondary py-4">Nessun heartbeat nella finestra.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
 <script>
 const hb = {{ heartbeats['items']|tojson }};
 new Chart(document.getElementById('rt'), {
   type:'line',
   data:{ labels: hb.map(h=>h['@timestamp']),
-    datasets:[{label:'response_ms', data:hb.map(h=>h.response_ms), borderColor:'#38bdf8'}] }
+    datasets:[{label:'response_ms', data:hb.map(h=>h.response_ms), borderColor:'#0d6efd'}] }
 });
 </script>
 {% else %}
-<p class="muted">Seleziona Probe e system_id per visualizzare i grafici.</p>
+<div class="card">
+  <div class="card-body text-center text-body-secondary py-5">
+    <i class="bi bi-graph-up fs-1 d-block mb-2"></i>
+    Seleziona Sonda e System ID per visualizzare i grafici.
+  </div>
+</div>
 {% endif %}
 {% endblock %}

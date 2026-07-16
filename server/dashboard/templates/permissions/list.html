@@ -1,14 +1,24 @@
 {% extends "base.html" %}
 {% block title %}Permessi — Pulse{% endblock %}
 {% block content %}
-<h1>Catalogo permessi</h1>
+<h1 class="h3 mb-1"><i class="bi bi-shield-lock me-2"></i>Catalogo permessi</h1>
+<p class="text-body-secondary">Elenco di sola lettura di tutti i permessi RBAC, raggruppati per area funzionale.</p>
+
 {% for area, items in grouped.items() %}
-<div class="card">
-  <h2>{{ area }}</h2>
-  <table>
-    <tr><th>Codice</th><th>Descrizione</th></tr>
-    {% for p in items %}<tr><td>{{ p.code }}</td><td>{{ p.description }}</td></tr>{% endfor %}
-  </table>
+<div class="card mb-3">
+  <div class="card-header"><i class="bi bi-folder me-1"></i>{{ area }}</div>
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead><tr><th style="width:30%">Codice</th><th>Descrizione</th></tr></thead>
+      <tbody>
+        {% for p in items %}
+        <tr><td class="font-monospace">{{ p.code }}</td><td class="text-body-secondary">{{ p.description }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
 </div>
+{% else %}
+<div class="card"><div class="card-body text-center text-body-secondary py-5">Nessun permesso disponibile.</div></div>
 {% endfor %}
 {% endblock %}

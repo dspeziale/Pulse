@@ -1,32 +1,75 @@
 {% extends "base.html" %}
+{% from "_macros.html" import bool_badge %}
 {% block title %}Workflow {{ workflow.name }} — Pulse{% endblock %}
 {% block content %}
-<h1>{{ workflow.name }}</h1>
-<div class="card">
-  <p>{{ workflow.description }}</p>
-  <p><strong>Trigger:</strong> {{ workflow.trigger }} ·
-     <strong>Abilitato:</strong> {{ 'sì' if workflow.enabled else 'no' }}</p>
-  {% if can('workflows.update') %}
-  <a class="btn-ghost" href="{{ url_for('workflows.edit_workflow', workflow_id=workflow.id) }}">Modifica</a>
-  <form method="post" action="{{ url_for('workflows.toggle_enabled', workflow_id=workflow.id) }}" class="inline">
-    <input type="hidden" name="enabled" value="{{ 'off' if workflow.enabled else 'on' }}">
-    <button class="btn-ghost">{{ 'Disabilita' if workflow.enabled else 'Abilita' }}</button>
-  </form>
-  {% endif %}
-  {% if can('workflows.delete') %}
-  <form method="post" action="{{ url_for('workflows.delete_workflow', workflow_id=workflow.id) }}" class="inline">
-    <button class="btn-danger">Elimina</button>
-  </form>
-  {% endif %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <h1 class="h3 mb-0"><i class="bi bi-diagram-3 me-2"></i>{{ workflow.name }} {{ bool_badge(workflow.enabled, 'Abilitato', 'Disabilitato') }}</h1>
+  <div class="d-flex gap-2">
+    {% if can('workflows.update') %}
+    <a class="btn btn-outline-secondary" href="{{ url_for('workflows.edit_workflow', workflow_id=workflow.id) }}"><i class="bi bi-pencil me-1"></i>Modifica</a>
+    <form method="post" action="{{ url_for('workflows.toggle_enabled', workflow_id=workflow.id) }}">
+      <input type="hidden" name="enabled" value="{{ 'off' if workflow.enabled else 'on' }}">
+      <button class="btn btn-outline-secondary"><i class="bi bi-power me-1"></i>{{ 'Disabilita' if workflow.enabled else 'Abilita' }}</button>
+    </form>
+    {% endif %}
+    {% if can('workflows.delete') %}
+    <form method="post" action="{{ url_for('workflows.delete_workflow', workflow_id=workflow.id) }}" onsubmit="return confirm('Eliminare il workflow {{ workflow.name }}?');">
+      <button class="btn btn-outline-danger"><i class="bi bi-trash me-1"></i>Elimina</button>
+    </form>
+    {% endif %}
+  </div>
 </div>
+
+<div class="card mb-3">
+  <div class="card-header"><i class="bi bi-info-circle me-1"></i>Riepilogo</div>
+  <div class="card-body">
+    <dl class="row mb-0">
+      <dt class="col-sm-2 text-body-secondary">Descrizione</dt><dd class="col-sm-10">{{ workflow.description or '—' }}</dd>
+      <dt class="col-sm-2 text-body-secondary">Trigger</dt><dd class="col-sm-10"><code>{{ workflow.trigger }}</code></dd>
+      <dt class="col-sm-2 text-body-secondary">Abilitato</dt><dd class="col-sm-10">{{ bool_badge(workflow.enabled) }}</dd>
+    </dl>
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-header"><i class="bi bi-bullseye me-1"></i>Scope</div>
+      <div class="card-body"><pre class="pulse-code mb-0">{{ workflow.scope|tojson(indent=2) }}</pre></div>
+    </div>
+  </div>
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-header"><i class="bi bi-funnel me-1"></i>Conditions</div>
+      <div class="card-body"><pre class="pulse-code mb-0">{{ workflow.conditions|tojson(indent=2) }}</pre></div>
+    </div>
+  </div>
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-header"><i class="bi bi-shield-slash me-1"></i>Suppression</div>
+      <div class="card-body"><pre class="pulse-code mb-0">{{ workflow.suppression|tojson(indent=2) }}</pre></div>
+    </div>
+  </div>
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-header"><i class="bi bi-send me-1"></i>Actions</div>
+      <div class="card-body"><pre class="pulse-code mb-0">{{ workflow.actions|tojson(indent=2) }}</pre></div>
+    </div>
+  </div>
+</div>
+
 {% if can('workflows.update') %}
-<div class="card">
-  <h2>Simulazione (dry-run)</h2>
-  <form method="post" action="{{ url_for('workflows.simulate', workflow_id=workflow.id) }}">
-    <label>Evento (JSON)</label><textarea name="event" rows="4"></textarea>
-    <button class="btn-ghost">Simula</button>
-  </form>
+<div class="card mt-3">
+  <div class="card-header"><i class="bi bi-play-circle me-1"></i>Simulazione (dry-run)</div>
+  <div class="card-body">
+    <p class="text-body-secondary small">Verifica se un evento farebbe scattare il workflow, senza inviare notifiche.</p>
+    <form method="post" action="{{ url_for('workflows.simulate', workflow_id=workflow.id) }}">
+      <label class="form-label" for="event">Evento (JSON)</label>
+      <textarea class="form-control font-monospace" id="event" name="event" rows="5" placeholder='{"status":"error","previous_status":"ok","response_ms":800,"system_id":"myapp"}'></textarea>
+      <div class="form-text mb-2">Campi tipici: status, previous_status, response_ms, system_id, check_id, probe_id, reachable.</div>
+      <button class="btn btn-primary"><i class="bi bi-play-fill me-1"></i>Simula</button>
+    </form>
+  </div>
 </div>
 {% endif %}
-<div class="card"><pre>{{ workflow|tojson(indent=2) }}</pre></div>
 {% endblock %}

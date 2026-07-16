@@ -1,16 +1,60 @@
 {% extends "base.html" %}
+{% from "_macros.html" import bool_badge %}
 {% block title %}Workflow — Pulse{% endblock %}
 {% block content %}
-<h1>Workflow di notifica</h1>
-{% if can('workflows.create') %}<p><a class="btn" href="{{ url_for('workflows.new_workflow') }}">Nuovo workflow</a></p>{% endif %}
-<table>
-  <tr><th>Nome</th><th>Trigger</th><th>Abilitato</th></tr>
-  {% for w in data['items'] %}
-  <tr>
-    <td><a href="{{ url_for('workflows.detail', workflow_id=w.id) }}">{{ w.name }}</a></td>
-    <td>{{ w.trigger }}</td><td>{{ 'sì' if w.enabled else 'no' }}</td>
-  </tr>
-  {% endfor %}
-</table>
-<p class="muted">Totale: {{ data['total'] }}</p>
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <h1 class="h3 mb-0"><i class="bi bi-diagram-3 me-2"></i>Workflow di notifica</h1>
+  {% if can('workflows.create') %}
+  <a class="btn btn-primary" href="{{ url_for('workflows.new_workflow') }}"><i class="bi bi-plus-lg me-1"></i>Nuovo workflow</a>
+  {% endif %}
+</div>
+
+<div class="card mb-3">
+  <div class="card-body">
+    <form method="get" class="row g-2 align-items-end">
+      <div class="col-sm-8">
+        <label class="form-label small text-body-secondary mb-1">Ricerca</label>
+        <input name="q" class="form-control" placeholder="Nome workflow" value="{{ request.args.get('q','') }}">
+      </div>
+      <div class="col-sm-2">
+        <label class="form-label small text-body-secondary mb-1">Stato</label>
+        <select name="enabled" class="form-select">
+          <option value="">Tutti</option>
+          <option value="true" {% if request.args.get('enabled')=='true' %}selected{% endif %}>Abilitati</option>
+          <option value="false" {% if request.args.get('enabled')=='false' %}selected{% endif %}>Disabilitati</option>
+        </select>
+      </div>
+      <div class="col-sm-2 d-grid">
+        <button class="btn btn-outline-secondary"><i class="bi bi-funnel me-1"></i>Filtra</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead><tr><th>Nome</th><th>Trigger</th><th>Abilitato</th><th class="text-end">Azioni</th></tr></thead>
+      <tbody>
+      {% for w in data['items'] %}
+      <tr>
+        <td><a class="fw-semibold text-decoration-none" href="{{ url_for('workflows.detail', workflow_id=w.id) }}">{{ w.name }}</a></td>
+        <td><code>{{ w.trigger }}</code></td>
+        <td>{{ bool_badge(w.enabled) }}</td>
+        <td class="text-end">
+          <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('workflows.detail', workflow_id=w.id) }}" title="Dettaglio"><i class="bi bi-eye"></i></a>
+          {% if can('workflows.update') %}<a class="btn btn-sm btn-outline-secondary" href="{{ url_for('workflows.edit_workflow', workflow_id=w.id) }}" title="Modifica"><i class="bi bi-pencil"></i></a>{% endif %}
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="4" class="text-center text-body-secondary py-5">
+        <i class="bi bi-inbox fs-2 d-block mb-2"></i>Nessun workflow definito.
+        {% if can('workflows.create') %}<div class="mt-2"><a class="btn btn-sm btn-primary" href="{{ url_for('workflows.new_workflow') }}"><i class="bi bi-plus-lg me-1"></i>Crea il primo workflow</a></div>{% endif %}
+      </td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if data['items'] %}<div class="card-footer text-body-secondary small">Totale: {{ data['total'] }}</div>{% endif %}
+</div>
 {% endblock %}

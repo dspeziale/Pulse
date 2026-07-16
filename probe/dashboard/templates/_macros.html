@@ -1,0 +1,28 @@
+{# ==========================================================================
+   Macro condivise della dashboard SERVER: badge di stato coerenti e helper
+   per valori booleani. Importare con:
+     {% from "_macros.html" import status_badge, bool_badge %}
+   ========================================================================== #}
+
+{# Stati noti mappati a una classe colore b-* (vedi pulse-theme.css). #}
+{% set _KNOWN_STATUS = [
+  'ok','warn','error','down','unknown','online','offline','pending',
+  'sent','failed','retrying','active','acknowledged','resolved',
+  'success','failure','disabled'
+] %}
+
+{# Badge di stato: normalizza il valore e ripiega su "unknown" se ignoto/vuoto. #}
+{% macro status_badge(value) %}
+  {%- set v = (value | string | lower | trim) if value is not none else '' -%}
+  {%- set cls = ('b-' ~ v) if v in _KNOWN_STATUS else 'b-unknown' -%}
+  <span class="badge {{ cls }}">{{ value if (value is not none and v) else '—' }}</span>
+{%- endmacro %}
+
+{# Badge Sì/No per campi booleani. #}
+{% macro bool_badge(value, yes='Sì', no='No') %}
+  {%- if value -%}
+    <span class="badge b-ok">{{ yes }}</span>
+  {%- else -%}
+    <span class="badge b-off">{{ no }}</span>
+  {%- endif -%}
+{%- endmacro %}

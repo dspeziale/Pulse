@@ -1,26 +1,53 @@
 {% extends "base.html" %}
-{% block title %}Audit — Pulse{% endblock %}
+{% from "_macros.html" import status_badge %}
+{% block title %}Audit log — Pulse{% endblock %}
 {% block content %}
-<h1>Audit log</h1>
-<form method="get">
-  <input name="action" placeholder="Azione" value="{{ request.args.get('action','') }}" style="width:auto">
-  <select name="outcome" style="width:auto">
-    <option value="">Tutti</option>
-    {% for o in ['success','failure'] %}
-      <option value="{{ o }}" {% if request.args.get('outcome')==o %}selected{% endif %}>{{ o }}</option>
-    {% endfor %}
-  </select>
-  <button class="btn-ghost">Filtra</button>
-</form>
-<table>
-  <tr><th>Data</th><th>Attore</th><th>Azione</th><th>Entità</th><th>Esito</th></tr>
-  {% for e in data['items'] %}
-  <tr>
-    <td class="muted"><a href="{{ url_for('audit.detail', entry_id=e.id) }}">{{ e.timestamp }}</a></td>
-    <td>{{ e.actor_type }}:{{ e.actor_id }}</td><td>{{ e.action }}</td>
-    <td>{{ e.entity_type }}</td><td>{{ e.outcome }}</td>
-  </tr>
-  {% endfor %}
-</table>
-<p class="muted">Totale: {{ data['total'] }}</p>
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <h1 class="h3 mb-0"><i class="bi bi-journal-text me-2"></i>Audit log</h1>
+</div>
+
+<div class="card mb-3">
+  <div class="card-body">
+    <form method="get" class="row g-2 align-items-end">
+      <div class="col-sm-4">
+        <label class="form-label small text-body-secondary mb-1">Azione</label>
+        <input name="action" class="form-control" placeholder="es. user.create" value="{{ request.args.get('action','') }}">
+      </div>
+      <div class="col-sm-3">
+        <label class="form-label small text-body-secondary mb-1">Esito</label>
+        <select name="outcome" class="form-select">
+          <option value="">Tutti</option>
+          {% for o in ['success','failure'] %}
+            <option value="{{ o }}" {% if request.args.get('outcome')==o %}selected{% endif %}>{{ o }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-sm-2 d-grid">
+        <button class="btn btn-outline-secondary"><i class="bi bi-funnel me-1"></i>Filtra</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead><tr><th>Data</th><th>Attore</th><th>Azione</th><th>Entità</th><th>Esito</th></tr></thead>
+      <tbody>
+      {% for e in data['items'] %}
+      <tr>
+        <td><a class="text-decoration-none" href="{{ url_for('audit.detail', entry_id=e.id) }}">{{ e.timestamp }}</a></td>
+        <td class="text-body-secondary">{{ e.actor_type }}:{{ e.actor_id }}</td>
+        <td><code>{{ e.action }}</code></td>
+        <td>{{ e.entity_type }}</td>
+        <td>{{ status_badge(e.outcome) }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="5" class="text-center text-body-secondary py-5">Nessuna voce di audit per i filtri selezionati.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if data['items'] %}<div class="card-footer text-body-secondary small">Totale: {{ data['total'] }}</div>{% endif %}
+</div>
 {% endblock %}

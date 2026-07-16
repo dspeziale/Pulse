@@ -1,20 +1,210 @@
 {% extends "base.html" %}
 {% block title %}{{ 'Modifica' if workflow else 'Nuovo' }} workflow — Pulse{% endblock %}
+{% set triggers = [
+  ('status_changed', 'Cambio dello stato normalizzato di un check (es. ok→error).'),
+  ('status_is', 'Lo stato assume un valore specifico.'),
+  ('system_unreachable', 'Sistema non raggiungibile (connettività).'),
+  ('system_recovered', 'Ritorno a ok/raggiungibile dopo un allarme.'),
+  ('response_time_exceeded', 'response_ms supera una soglia.'),
+  ('sustained_state', 'Uno stato persiste per almeno N minuti/M occorrenze.'),
+  ('probe_offline', 'Una Sonda non contatta il Server entro il timeout.'),
+  ('probe_online', 'Una Sonda torna a contattare il Server.')
+] %}
+{% set trigger_values = ['status_changed','status_is','system_unreachable','system_recovered','response_time_exceeded','sustained_state','probe_offline','probe_online'] %}
+{% set current_trigger = workflow.trigger if workflow else '' %}
 {% block content %}
-<h1>{{ 'Modifica' if workflow else 'Nuovo' }} workflow</h1>
-<p class="muted">Canali disponibili:
-  {% for c in channels['items'] %}{{ c.name }} ({{ c.id }}){% if not loop.last %}, {% endif %}{% endfor %}</p>
-<div class="card">
-<form method="post" action="{{ url_for('workflows.update_workflow', workflow_id=workflow.id) if workflow else url_for('workflows.create_workflow') }}">
-  <label>Nome</label><input name="name" value="{{ workflow.name if workflow else '' }}" required>
-  <label>Descrizione</label><input name="description" value="{{ workflow.description if workflow else '' }}">
-  <label>Trigger</label><input name="trigger" value="{{ workflow.trigger if workflow else '' }}">
-  <label><input type="checkbox" name="enabled" style="width:auto" {% if workflow and workflow.enabled %}checked{% endif %}> Abilitato</label>
-  <label>Scope (JSON)</label><textarea name="scope" rows="3">{{ workflow.scope|tojson if workflow else '' }}</textarea>
-  <label>Conditions (JSON)</label><textarea name="conditions" rows="3">{{ workflow.conditions|tojson if workflow else '' }}</textarea>
-  <label>Suppression (JSON)</label><textarea name="suppression" rows="3">{{ workflow.suppression|tojson if workflow else '' }}</textarea>
-  <label>Actions (JSON)</label><textarea name="actions" rows="4">{{ workflow.actions|tojson if workflow else '' }}</textarea>
-  <button type="submit">Salva</button>
-</form>
+<div class="d-flex align-items-center gap-2 mb-3">
+  <h1 class="h3 mb-0"><i class="bi bi-diagram-3 me-2"></i>{{ ('Modifica workflow: ' ~ workflow.name) if workflow else 'Nuovo workflow' }}</h1>
 </div>
+
+<form method="post" id="wf-form" action="{{ url_for('workflows.update_workflow', workflow_id=workflow.id) if workflow else url_for('workflows.create_workflow') }}">
+<div class="row g-3">
+  <div class="col-lg-8">
+    <div class="card">
+      <div class="card-header"><i class="bi bi-info-circle me-1"></i>Informazioni workflow</div>
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label" for="name">Nome</label>
+            <input class="form-control" id="name" name="name" value="{{ workflow.name if workflow else '' }}" placeholder="es. Alert CRM produzione" required>
+            <div class="form-text">Nome identificativo del workflow.</div>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label" for="trigger">Trigger (evento scatenante)</label>
+            <select class="form-select" id="trigger" name="trigger">
+              <option value="">— seleziona —</option>
+              {% for value, desc in triggers %}
+                <option value="{{ value }}" {% if current_trigger==value %}selected{% endif %}>{{ value }}</option>
+              {% endfor %}
+              {% if current_trigger and current_trigger not in trigger_values %}
+                <option value="{{ current_trigger }}" selected>{{ current_trigger }} (personalizzato)</option>
+              {% endif %}
+            </select>
+            <div class="form-text" id="trigger-desc">Tipo di evento che attiva il workflow.</div>
+          </div>
+          <div class="col-12">
+            <label class="form-label" for="description">Descrizione</label>
+            <input class="form-control" id="description" name="description" value="{{ workflow.description if workflow else '' }}" placeholder="A cosa serve questo workflow">
+          </div>
+          <div class="col-12">
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" role="switch" id="enabled" name="enabled" {% if workflow and workflow.enabled %}checked{% endif %}>
+              <label class="form-check-label" for="enabled">Workflow abilitato</label>
+            </div>
+            <div class="form-text">Se disattivato, il workflow non genera notifiche.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {# ---- Sezione avanzata (JSON) ---- #}
+    <div class="card mt-3">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-braces me-1"></i>Configurazione avanzata (JSON)</span>
+        <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#adv-json" aria-expanded="{{ 'true' if workflow else 'false' }}">
+          <i class="bi bi-chevron-expand me-1"></i>Mostra/nascondi
+        </button>
+      </div>
+      <div class="collapse {{ 'show' if workflow else '' }}" id="adv-json">
+        <div class="card-body">
+          <p class="text-body-secondary small">Ambito, condizioni, soppressione e azioni sono espressi in JSON (schema del DOCUMENTO_API). Usa i pulsanti "Inserisci esempio" come punto di partenza. I campi vuoti assumono i valori predefiniti.</p>
+
+          {# Scope #}
+          <div class="mb-4">
+            <label class="form-label" for="scope">Scope — ambito di applicazione</label>
+            <textarea class="form-control font-monospace wf-json" id="scope" name="scope" rows="4" placeholder='{"probe_ids": [], "system_ids": [], "check_ids": []}'>{{ workflow.scope|tojson if workflow else '' }}</textarea>
+            <div class="d-flex justify-content-between align-items-start mt-1">
+              <div class="form-text mb-0">Filtri per Sonda/sistema/check. Liste vuote o omesse = tutti.</div>
+              <button type="button" class="btn btn-sm btn-link p-0 wf-example" data-target="scope">Inserisci esempio</button>
+            </div>
+            <template class="wf-sample" data-for="scope">{
+  "probe_ids": ["probe-A"],
+  "system_ids": ["myapp"],
+  "check_ids": ["db"]
+}</template>
+          </div>
+
+          {# Conditions #}
+          <div class="mb-4">
+            <label class="form-label" for="conditions">Conditions — condizioni sull'evento</label>
+            <textarea class="form-control font-monospace wf-json" id="conditions" name="conditions" rows="5" placeholder='[{"field":"status","op":"eq","value":"error","group":"g1"}]'>{{ workflow.conditions|tojson if workflow else '' }}</textarea>
+            <div class="d-flex justify-content-between align-items-start mt-1">
+              <div class="form-text mb-0">Array di regole <code>field/op/value/group</code>. Campi: status, previous_status, response_ms, system_id, check_id, probe_id, reachable, message. Operatori: eq, neq, gt, gte, lt, lte, in, not_in, contains, matches. Regole nello stesso <code>group</code> sono in AND; gruppi diversi in OR.</div>
+              <button type="button" class="btn btn-sm btn-link p-0 wf-example" data-target="conditions">Inserisci esempio</button>
+            </div>
+            <template class="wf-sample" data-for="conditions">[
+  { "field": "status", "op": "eq", "value": "error", "group": "g1" },
+  { "field": "response_ms", "op": "gt", "value": 500, "group": "g1" }
+]</template>
+          </div>
+
+          {# Suppression #}
+          <div class="mb-4">
+            <label class="form-label" for="suppression">Suppression — throttling e deduplica</label>
+            <textarea class="form-control font-monospace wf-json" id="suppression" name="suppression" rows="4" placeholder='{"cooldown_seconds":300,"dedup_window_seconds":600,"respect_maintenance":true}'>{{ workflow.suppression|tojson if workflow else '' }}</textarea>
+            <div class="d-flex justify-content-between align-items-start mt-1">
+              <div class="form-text mb-0"><code>cooldown_seconds</code> (intervallo minimo tra notifiche ripetute), <code>dedup_window_seconds</code> (finestra anti-duplicati), <code>respect_maintenance</code> (ignora eventi in manutenzione), <code>active_hours</code> (fasce orarie attive).</div>
+              <button type="button" class="btn btn-sm btn-link p-0 wf-example" data-target="suppression">Inserisci esempio</button>
+            </div>
+            <template class="wf-sample" data-for="suppression">{
+  "cooldown_seconds": 300,
+  "dedup_window_seconds": 600,
+  "respect_maintenance": true
+}</template>
+          </div>
+
+          {# Actions #}
+          <div class="mb-2">
+            <label class="form-label" for="actions">Actions — step di notifica ed escalation</label>
+            <textarea class="form-control font-monospace wf-json" id="actions" name="actions" rows="8" placeholder='[{"step_order":1,"channel_id":"...","recipients":[],"template":"...","delay_seconds":0}]'>{{ workflow.actions|tojson if workflow else '' }}</textarea>
+            <div class="d-flex justify-content-between align-items-start mt-1">
+              <div class="form-text mb-0">Array di step ordinati (<code>step_order</code>). Ogni step: <code>channel_id</code>, <code>recipients</code>, <code>template</code> (con segnaposto <code>{{ '{{system_name}}' }}</code>, <code>{{ '{{status}}' }}</code>, <code>{{ '{{response_ms}}' }}</code>, <code>{{ '{{probe}}' }}</code>, <code>{{ '{{timestamp}}' }}</code>), <code>delay_seconds</code>, <code>escalation_condition</code> (es. <code>no_ack_within</code>).</div>
+              <button type="button" class="btn btn-sm btn-link p-0 wf-example" data-target="actions">Inserisci esempio</button>
+            </div>
+            <template class="wf-sample" data-for="actions">{% raw %}[
+  {
+    "step_order": 1,
+    "channel_id": "chan-telegram-ops",
+    "recipients": ["-1001234567890"],
+    "template": "Sistema {{system_name}} in stato {{status}} ({{response_ms}} ms) su {{probe}}",
+    "delay_seconds": 0,
+    "escalation_condition": { "no_ack_within": 600 }
+  }
+]{% endraw %}</template>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="mt-3 d-flex gap-2">
+      <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1"></i>Salva</button>
+      <a class="btn btn-secondary" href="{{ url_for('workflows.detail', workflow_id=workflow.id) if workflow else url_for('workflows.list_workflows') }}">Annulla</a>
+    </div>
+  </div>
+
+  <div class="col-lg-4">
+    <div class="card">
+      <div class="card-header"><i class="bi bi-broadcast me-1"></i>Canali disponibili</div>
+      <div class="card-body small">
+        {% if channels and channels['items'] %}
+        <p class="text-body-secondary mb-2">Usa questi <code>channel_id</code> nel blocco Actions:</p>
+        <ul class="list-unstyled mb-0">
+          {% for c in channels['items'] %}<li><code>{{ c.id }}</code> — {{ c.name }}</li>{% endfor %}
+        </ul>
+        {% else %}
+        <p class="text-body-secondary mb-0">Nessun canale configurato. Creane uno nella sezione Canali prima di definire le azioni.</p>
+        {% endif %}
+      </div>
+    </div>
+    <div class="card mt-3">
+      <div class="card-body small text-body-secondary">
+        <p class="mb-1"><i class="bi bi-lightbulb me-1"></i><strong>Suggerimento</strong></p>
+        <p class="mb-0">Dopo il salvataggio puoi verificare il comportamento con la <strong>simulazione (dry-run)</strong> dalla pagina di dettaglio, senza inviare notifiche reali.</p>
+      </div>
+    </div>
+  </div>
+</div>
+</form>
+
+<script>
+(function () {
+  // Descrizione dinamica del trigger.
+  var descs = {
+    {% for value, desc in triggers %}"{{ value }}": "{{ desc }}"{% if not loop.last %},{% endif %}{% endfor %}
+  };
+  var sel = document.getElementById('trigger');
+  var out = document.getElementById('trigger-desc');
+  function updateDesc() {
+    out.textContent = descs[sel.value] || 'Tipo di evento che attiva il workflow.';
+  }
+  sel.addEventListener('change', updateDesc);
+  updateDesc();
+
+  // Pulsanti "Inserisci esempio".
+  Array.prototype.forEach.call(document.querySelectorAll('.wf-example'), function (btn) {
+    btn.addEventListener('click', function () {
+      var id = btn.getAttribute('data-target');
+      var tpl = document.querySelector('.wf-sample[data-for="' + id + '"]');
+      if (tpl) document.getElementById(id).value = tpl.textContent.trim();
+    });
+  });
+
+  // Validazione client-side minima: JSON valido nei campi avanzati.
+  document.getElementById('wf-form').addEventListener('submit', function (e) {
+    var bad = null;
+    Array.prototype.forEach.call(document.querySelectorAll('.wf-json'), function (ta) {
+      ta.classList.remove('is-invalid');
+      var v = ta.value.trim();
+      if (v) { try { JSON.parse(v); } catch (err) { if (!bad) bad = ta; ta.classList.add('is-invalid'); } }
+    });
+    if (bad) {
+      e.preventDefault();
+      var adv = document.getElementById('adv-json');
+      if (adv && !adv.classList.contains('show')) adv.classList.add('show');
+      bad.focus();
+      alert('Il campo "' + bad.getAttribute('name') + '" non contiene JSON valido.');
+    }
+  });
+})();
+</script>
 {% endblock %}

@@ -1,27 +1,74 @@
 {% extends "base.html" %}
-{% block title %}Sistemi — Pulse{% endblock %}
+{% from "_macros.html" import status_badge, bool_badge %}
+{% block title %}Sistemi monitorati — Pulse{% endblock %}
 {% block content %}
-<h1>Sistemi monitorati</h1>
-{% if can('systems.create') %}<p><a class="btn" href="{{ url_for('systems.new_system') }}">Nuovo sistema</a></p>{% endif %}
-<form method="get">
-  <input name="q" placeholder="Cerca" value="{{ request.args.get('q','') }}" style="width:auto">
-  <select name="probe_id" style="width:auto">
-    <option value="">Tutte le Probe</option>
-    {% for p in probes['items'] %}
-      <option value="{{ p.id }}" {% if request.args.get('probe_id')==p.id %}selected{% endif %}>{{ p.name }}</option>
-    {% endfor %}
-  </select>
-  <button class="btn-ghost">Filtra</button>
-</form>
-<table>
-  <tr><th>ID</th><th>Nome</th><th>URL heartbeat</th><th>Probe</th><th>Abilitato</th></tr>
-  {% for s in data['items'] %}
-  <tr>
-    <td><a href="{{ url_for('systems.detail', system_id=s.id) }}">{{ s.system_id }}</a></td>
-    <td>{{ s.system_name }}</td><td class="muted">{{ s.heartbeat_url }}</td>
-    <td>{{ s.probe_id }}</td><td>{{ 'sì' if s.enabled else 'no' }}</td>
-  </tr>
-  {% endfor %}
-</table>
-<p class="muted">Totale: {{ data['total'] }}</p>
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <h1 class="h3 mb-0"><i class="bi bi-hdd-stack me-2"></i>Sistemi monitorati</h1>
+  {% if can('systems.create') %}
+  <a class="btn btn-primary" href="{{ url_for('systems.new_system') }}"><i class="bi bi-plus-lg me-1"></i>Nuovo sistema</a>
+  {% endif %}
+</div>
+
+<div class="card mb-3">
+  <div class="card-body">
+    <form method="get" class="row g-2 align-items-end">
+      <div class="col-sm-5">
+        <label class="form-label small text-body-secondary mb-1">Ricerca</label>
+        <input name="q" class="form-control" placeholder="ID o nome sistema" value="{{ request.args.get('q','') }}">
+      </div>
+      <div class="col-sm-4">
+        <label class="form-label small text-body-secondary mb-1">Sonda</label>
+        <select name="probe_id" class="form-select">
+          <option value="">Tutte le Sonde</option>
+          {% for p in probes['items'] %}
+            <option value="{{ p.id }}" {% if request.args.get('probe_id')==p.id %}selected{% endif %}>{{ p.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-sm-2">
+        <label class="form-label small text-body-secondary mb-1">Stato</label>
+        <select name="enabled" class="form-select">
+          <option value="">Tutti</option>
+          <option value="true" {% if request.args.get('enabled')=='true' %}selected{% endif %}>Abilitati</option>
+          <option value="false" {% if request.args.get('enabled')=='false' %}selected{% endif %}>Disabilitati</option>
+        </select>
+      </div>
+      <div class="col-sm-1 d-grid">
+        <button class="btn btn-outline-secondary" title="Filtra"><i class="bi bi-funnel"></i></button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead>
+        <tr><th>System ID</th><th>Nome</th><th>URL heartbeat</th><th>Sonda</th><th>Abilitato</th><th class="text-end">Azioni</th></tr>
+      </thead>
+      <tbody>
+      {% for s in data['items'] %}
+      <tr>
+        <td><a class="fw-semibold text-decoration-none" href="{{ url_for('systems.detail', system_id=s.id) }}">{{ s.system_id }}</a></td>
+        <td>{{ s.system_name }}</td>
+        <td class="text-body-secondary text-truncate" style="max-width:22rem">{{ s.heartbeat_url }}</td>
+        <td>{{ s.probe_id }}</td>
+        <td>{{ bool_badge(s.enabled) }}</td>
+        <td class="text-end">
+          <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('systems.detail', system_id=s.id) }}" title="Dettaglio"><i class="bi bi-eye"></i></a>
+          {% if can('systems.update') %}<a class="btn btn-sm btn-outline-secondary" href="{{ url_for('systems.edit_system', system_id=s.id) }}" title="Modifica"><i class="bi bi-pencil"></i></a>{% endif %}
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="6" class="text-center text-body-secondary py-5">
+        <i class="bi bi-inbox fs-2 d-block mb-2"></i>
+        Nessun sistema monitorato.
+        {% if can('systems.create') %}<div class="mt-2"><a class="btn btn-sm btn-primary" href="{{ url_for('systems.new_system') }}"><i class="bi bi-plus-lg me-1"></i>Aggiungi il primo sistema</a></div>{% endif %}
+      </td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if data['items'] %}<div class="card-footer text-body-secondary small">Totale: {{ data['total'] }}</div>{% endif %}
+</div>
 {% endblock %}

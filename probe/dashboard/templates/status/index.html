@@ -1,16 +1,20 @@
 {% extends "base.html" %}
-{% block title %}Stato Probe — Pulse{% endblock %}
+{% block title %}Stato Sonda — Pulse{% endblock %}
 {% block content %}
-<h1>Stato Probe / Salute (PP-05)</h1>
+<h1 class="h3 mb-3"><i class="bi bi-heart-pulse me-2"></i>Stato Sonda / Salute (PP-05)</h1>
 
-<div class="card">
-  <h2>Readiness</h2>
-  <p>Stato: <span class="badge {{ 'b-ok' if ready.status in ('ready','ok') else 'b-error' }}">{{ ready.status }}</span></p>
-  <pre class="muted">{{ ready|tojson(indent=2) }}</pre>
+<div class="card mb-3">
+  <div class="card-header"><i class="bi bi-clipboard-heart me-1"></i>Readiness</div>
+  <div class="card-body">
+    <p class="mb-2">Stato:
+      <span class="badge {{ 'b-ok' if ready.status in ('ready','ok') else 'b-error' }}">{{ ready.status }}</span>
+    </p>
+    <pre class="pulse-code mb-0">{{ ready|tojson(indent=2) }}</pre>
+  </div>
 </div>
 
 <div class="card">
-  <h2>Stato interno</h2>
-  <pre class="muted">{{ status|tojson(indent=2) }}</pre>
+  <div class="card-header"><i class="bi bi-cpu me-1"></i>Stato interno</div>
+  <div class="card-body"><pre class="pulse-code mb-0">{{ status|tojson(indent=2) }}</pre></div>
 </div>
 {% endblock %}

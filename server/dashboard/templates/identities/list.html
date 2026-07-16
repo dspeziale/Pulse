@@ -1,30 +1,61 @@
 {% extends "base.html" %}
 {% block title %}Identità di canale — Pulse{% endblock %}
+{% set type_icons = {'email':'bi-envelope','telegram':'bi-telegram','whatsapp':'bi-whatsapp'} %}
 {% block content %}
-<h1>Le mie identità di canale</h1>
-<table>
-  <tr><th>Canale</th><th>External ID</th><th></th></tr>
-  {% for i in data['items'] %}
-  <tr>
-    <td>{{ i.channel_type }}</td><td>{{ i.external_id }}</td>
-    <td>
-      <form method="post" action="{{ url_for('identities.delete_identity', identity_id=i.id) }}" class="inline">
-        <button class="btn-danger">Rimuovi</button>
-      </form>
-    </td>
-  </tr>
-  {% endfor %}
-</table>
-<div class="card">
-  <h2>Associa nuova identità</h2>
-  <form method="post" action="{{ url_for('identities.create_identity') }}">
-    <label>Tipo canale</label>
-    <select name="channel_type">
-      {% for t in ['telegram','whatsapp','email'] %}<option value="{{ t }}">{{ t }}</option>{% endfor %}
-    </select>
-    <label>External ID</label><input name="external_id" required>
-    <label>Codice di verifica</label><input name="verification_code" required>
-    <button type="submit">Associa</button>
-  </form>
+<h1 class="h3 mb-3"><i class="bi bi-key me-2"></i>Le mie identità di canale</h1>
+<p class="text-body-secondary">Associa la tua identità sui canali (chat Telegram, numero WhatsApp, email) al tuo account Pulse per poter inviare comandi in ingresso (<code>/ack</code>, <code>/status</code>, ...).</p>
+
+<div class="row g-3">
+  <div class="col-lg-7">
+    <div class="card">
+      <div class="card-header"><i class="bi bi-list me-1"></i>Identità associate</div>
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+          <thead><tr><th>Canale</th><th>External ID</th><th class="text-end">Azioni</th></tr></thead>
+          <tbody>
+          {% for i in data['items'] %}
+          <tr>
+            <td><i class="bi {{ type_icons.get(i.channel_type, 'bi-broadcast') }} me-1"></i>{{ i.channel_type }}</td>
+            <td class="font-monospace">{{ i.external_id }}</td>
+            <td class="text-end">
+              <form method="post" action="{{ url_for('identities.delete_identity', identity_id=i.id) }}" class="d-inline" onsubmit="return confirm('Rimuovere questa identità?');">
+                <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash me-1"></i>Rimuovi</button>
+              </form>
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="3" class="text-center text-body-secondary py-4">Nessuna identità associata.</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-5">
+    <div class="card">
+      <div class="card-header"><i class="bi bi-plus-circle me-1"></i>Associa nuova identità</div>
+      <div class="card-body">
+        <form method="post" action="{{ url_for('identities.create_identity') }}">
+          <div class="mb-3">
+            <label class="form-label" for="channel_type">Tipo canale</label>
+            <select class="form-select" id="channel_type" name="channel_type">
+              {% for t in ['telegram','whatsapp','email'] %}<option value="{{ t }}">{{ t }}</option>{% endfor %}
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="external_id">External ID</label>
+            <input class="form-control" id="external_id" name="external_id" required placeholder="chat_id / numero / email">
+            <div class="form-text">Identificatore sul canale: <code>chat_id</code> (Telegram), numero (WhatsApp) o indirizzo email.</div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="verification_code">Codice di verifica</label>
+            <input class="form-control" id="verification_code" name="verification_code" required placeholder="codice ricevuto sul canale">
+            <div class="form-text">Codice ottenuto sul canale per confermare la titolarità (codice errato/scaduto → 400).</div>
+          </div>
+          <button type="submit" class="btn btn-primary"><i class="bi bi-link-45deg me-1"></i>Associa</button>
+        </form>
+      </div>
+    </div>
+  </div>
 </div>
 {% endblock %}

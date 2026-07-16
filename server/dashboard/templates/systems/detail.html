@@ -1,24 +1,79 @@
 {% extends "base.html" %}
+{% from "_macros.html" import status_badge, bool_badge %}
 {% block title %}Sistema {{ system.system_name }} — Pulse{% endblock %}
 {% block content %}
-<h1>{{ system.system_name }}</h1>
-<div class="card">
-  <p><strong>ID:</strong> {{ system.system_id }} · <strong>Probe:</strong> {{ system.probe_id }}</p>
-  <p class="muted">{{ system.heartbeat_url }}</p>
-  {% if can('systems.update') %}<a class="btn-ghost" href="{{ url_for('systems.edit_system', system_id=system.id) }}">Modifica</a>{% endif %}
-  {% if can('systems.delete') %}
-  <form method="post" action="{{ url_for('systems.delete_system', system_id=system.id) }}" class="inline">
-    <button class="btn-danger">Elimina</button>
-  </form>
-  {% endif %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <h1 class="h3 mb-0"><i class="bi bi-hdd-stack me-2"></i>{{ system.system_name }}</h1>
+  <div class="d-flex gap-2">
+    {% if can('systems.update') %}<a class="btn btn-outline-secondary" href="{{ url_for('systems.edit_system', system_id=system.id) }}"><i class="bi bi-pencil me-1"></i>Modifica</a>{% endif %}
+    {% if can('systems.delete') %}
+    <form method="post" action="{{ url_for('systems.delete_system', system_id=system.id) }}" onsubmit="return confirm('Eliminare il sistema {{ system.system_name }}? Gli storici restano su OpenSearch.');">
+      <button class="btn btn-outline-danger"><i class="bi bi-trash me-1"></i>Elimina</button>
+    </form>
+    {% endif %}
+  </div>
 </div>
-<h2>Check scoperti</h2>
-<table>
-  <tr><th>Check</th><th>Nome</th><th>Ultimo stato</th><th>Ultimo contatto</th></tr>
-  {% for c in checks['items'] %}
-  <tr><td>{{ c.check_id }}</td><td>{{ c.check_name }}</td>
-      <td><span class="badge b-{{ c.last_status }}">{{ c.last_status }}</span></td>
-      <td class="muted">{{ c.last_seen_at }}</td></tr>
-  {% endfor %}
-</table>
+
+<div class="row g-3">
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-header"><i class="bi bi-info-circle me-1"></i>Configurazione</div>
+      <div class="card-body">
+        <dl class="row mb-0">
+          <dt class="col-sm-4 text-body-secondary">System ID</dt><dd class="col-sm-8">{{ system.system_id }}</dd>
+          <dt class="col-sm-4 text-body-secondary">Sonda</dt>
+          <dd class="col-sm-8">{% if can('probes.read') %}<a href="{{ url_for('probes.detail', probe_id=system.probe_id) }}">{{ system.probe_id }}</a>{% else %}{{ system.probe_id }}{% endif %}</dd>
+          <dt class="col-sm-4 text-body-secondary">URL heartbeat</dt><dd class="col-sm-8 text-break">{{ system.heartbeat_url }}</dd>
+          <dt class="col-sm-4 text-body-secondary">Poll interval</dt><dd class="col-sm-8">{{ system.poll_interval_seconds }} s</dd>
+          <dt class="col-sm-4 text-body-secondary">Timeout</dt><dd class="col-sm-8">{{ system.timeout_seconds }} s</dd>
+          <dt class="col-sm-4 text-body-secondary">Abilitato</dt><dd class="col-sm-8">{{ bool_badge(system.enabled) }}</dd>
+          <dt class="col-sm-4 text-body-secondary">Creato il</dt><dd class="col-sm-8 text-body-secondary">{{ system.created_at or '—' }}</dd>
+        </dl>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-header"><i class="bi bi-speedometer me-1"></i>Soglie di risposta</div>
+      <div class="card-body">
+        <dl class="row mb-0">
+          <dt class="col-sm-6 text-body-secondary">Soglia warn</dt>
+          <dd class="col-sm-6">{% if system.thresholds and system.thresholds.response_ms_warn is not none %}{{ system.thresholds.response_ms_warn }} ms{% else %}<span class="text-body-secondary">non impostata</span>{% endif %}</dd>
+          <dt class="col-sm-6 text-body-secondary">Soglia error</dt>
+          <dd class="col-sm-6">{% if system.thresholds and system.thresholds.response_ms_error is not none %}{{ system.thresholds.response_ms_error }} ms{% else %}<span class="text-body-secondary">non impostata</span>{% endif %}</dd>
+        </dl>
+        {% if system.maintenance_windows %}
+        <hr>
+        <h2 class="h6"><i class="bi bi-tools me-1"></i>Finestre di manutenzione</h2>
+        <ul class="list-unstyled small mb-0">
+          {% for w in system.maintenance_windows %}
+          <li><span class="text-body-secondary">{{ w.start }} → {{ w.end }}</span>{% if w.note %} — {{ w.note }}{% endif %}</li>
+          {% endfor %}
+        </ul>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card mt-3">
+  <div class="card-header"><i class="bi bi-list-check me-1"></i>Check scoperti</div>
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead><tr><th>Check</th><th>Nome</th><th>Ultimo stato</th><th>Ultimo contatto</th></tr></thead>
+      <tbody>
+      {% for c in checks['items'] %}
+      <tr>
+        <td>{{ c.check_id }}</td>
+        <td>{{ c.check_name }}</td>
+        <td>{{ status_badge(c.last_status) }}</td>
+        <td class="text-body-secondary">{{ c.last_seen_at or '—' }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="4" class="text-center text-body-secondary py-4">Nessun check ancora scoperto per questo sistema.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
 {% endblock %}

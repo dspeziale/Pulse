@@ -29,6 +29,14 @@
 </head>
 <body class="{% if is_authenticated %}layout-fixed sidebar-expand-lg{% else %}login-page{% endif %} bg-body-tertiary">
 {% if is_authenticated %}
+{% set ep = request.endpoint or '' %}
+{%- macro navlink(href, icon, text, active) -%}
+  <li class="nav-item">
+    <a href="{{ href }}" class="nav-link{{ ' active' if active else '' }}">
+      <i class="nav-icon bi {{ icon }}"></i><p>{{ text }}</p>
+    </a>
+  </li>
+{%- endmacro -%}
 <div class="app-wrapper">
 
   {# ===================== Top navbar ===================== #}
@@ -81,23 +89,46 @@
     <div class="sidebar-wrapper">
       <nav class="mt-2">
         <ul class="nav sidebar-menu flex-column" data-lte-toggle="treeview" role="menu">
-          {% if can('dashboard.read') %}<li class="nav-item"><a href="{{ url_for('dashboard.index') }}" class="nav-link"><i class="nav-icon bi bi-speedometer2"></i><p>Dashboard</p></a></li>{% endif %}
-          {% if can('probes.read') %}<li class="nav-item"><a href="{{ url_for('probes.list_probes') }}" class="nav-link"><i class="nav-icon bi bi-hdd-network"></i><p>Sonde</p></a></li>{% endif %}
-          {% if can('systems.read') %}<li class="nav-item"><a href="{{ url_for('systems.list_systems') }}" class="nav-link"><i class="nav-icon bi bi-hdd-stack"></i><p>Sistemi</p></a></li>{% endif %}
-          {% if can('heartbeats.query') %}<li class="nav-item"><a href="{{ url_for('query.builder') }}" class="nav-link"><i class="nav-icon bi bi-search"></i><p>Query</p></a></li>{% endif %}
-          {% if can('heartbeats.read') %}<li class="nav-item"><a href="{{ url_for('query.charts') }}" class="nav-link"><i class="nav-icon bi bi-graph-up"></i><p>Grafici</p></a></li>{% endif %}
-          {% if can('workflows.read') %}<li class="nav-item"><a href="{{ url_for('alarms.list_alarms') }}" class="nav-link"><i class="nav-icon bi bi-exclamation-triangle"></i><p>Allarmi</p></a></li>{% endif %}
-          {% if can('notifications.read') %}<li class="nav-item"><a href="{{ url_for('notifications.list_channels') }}" class="nav-link"><i class="nav-icon bi bi-broadcast"></i><p>Canali</p></a></li>{% endif %}
-          {% if can('workflows.read') %}<li class="nav-item"><a href="{{ url_for('workflows.list_workflows') }}" class="nav-link"><i class="nav-icon bi bi-diagram-3"></i><p>Workflow</p></a></li>{% endif %}
-          {% if can('notifications.read') %}<li class="nav-item"><a href="{{ url_for('notifications.history') }}" class="nav-link"><i class="nav-icon bi bi-clock-history"></i><p>Storico</p></a></li>{% endif %}
-          {% if can('commands.execute') %}<li class="nav-item"><a href="{{ url_for('identities.list_identities') }}" class="nav-link"><i class="nav-icon bi bi-key"></i><p>Identità</p></a></li>{% endif %}
-          {% if can('users.read') %}<li class="nav-item"><a href="{{ url_for('users.list_users') }}" class="nav-link"><i class="nav-icon bi bi-people"></i><p>Utenti</p></a></li>{% endif %}
-          {% if can('roles.read') %}<li class="nav-item"><a href="{{ url_for('roles.list_roles') }}" class="nav-link"><i class="nav-icon bi bi-person-badge"></i><p>Ruoli</p></a></li>{% endif %}
-          {% if can('permissions.read') %}<li class="nav-item"><a href="{{ url_for('permissions.list_permissions') }}" class="nav-link"><i class="nav-icon bi bi-shield-lock"></i><p>Permessi</p></a></li>{% endif %}
-          {% if can('audit.read') %}<li class="nav-item"><a href="{{ url_for('audit.list_audit') }}" class="nav-link"><i class="nav-icon bi bi-journal-text"></i><p>Audit</p></a></li>{% endif %}
-          {% if can('syslog.read') %}<li class="nav-item"><a href="{{ url_for('logs.list_logs') }}" class="nav-link"><i class="nav-icon bi bi-terminal"></i><p>Log</p></a></li>{% endif %}
-          {% if can('config.read') %}<li class="nav-item"><a href="{{ url_for('config_bp.show_config') }}" class="nav-link"><i class="nav-icon bi bi-gear"></i><p>Config</p></a></li>{% endif %}
-          <li class="nav-item"><a href="{{ url_for('profile.show_profile') }}" class="nav-link"><i class="nav-icon bi bi-person-circle"></i><p>Profilo</p></a></li>
+
+          {# ---- MONITORAGGIO ---- #}
+          {% if can('dashboard.read') or can('probes.read') or can('systems.read') or can('heartbeats.query') or can('heartbeats.read') or can('workflows.read') %}
+          <li class="nav-header">Monitoraggio</li>
+          {% if can('dashboard.read') %}{{ navlink(url_for('dashboard.index'), 'bi-speedometer2', 'Dashboard', ep == 'dashboard.index') }}{% endif %}
+          {% if can('probes.read') %}{{ navlink(url_for('probes.list_probes'), 'bi-hdd-network', 'Sonde', ep.startswith('probes.')) }}{% endif %}
+          {% if can('systems.read') %}{{ navlink(url_for('systems.list_systems'), 'bi-hdd-stack', 'Sistemi monitorati', ep.startswith('systems.')) }}{% endif %}
+          {% if can('heartbeats.query') %}{{ navlink(url_for('query.builder'), 'bi-search', 'Query dati', ep == 'query.builder') }}{% endif %}
+          {% if can('heartbeats.read') %}{{ navlink(url_for('query.charts'), 'bi-graph-up', 'Grafici', ep == 'query.charts') }}{% endif %}
+          {% if can('workflows.read') %}{{ navlink(url_for('alarms.list_alarms'), 'bi-exclamation-triangle', 'Allarmi', ep.startswith('alarms.')) }}{% endif %}
+          {% endif %}
+
+          {# ---- NOTIFICHE ---- #}
+          {% if can('notifications.read') or can('workflows.read') or can('commands.execute') %}
+          <li class="nav-header">Notifiche</li>
+          {% if can('notifications.read') %}{{ navlink(url_for('notifications.list_channels'), 'bi-broadcast', 'Canali', ep.startswith('notifications.') and ep != 'notifications.history') }}{% endif %}
+          {% if can('workflows.read') %}{{ navlink(url_for('workflows.list_workflows'), 'bi-diagram-3', 'Workflow', ep.startswith('workflows.')) }}{% endif %}
+          {% if can('notifications.read') %}{{ navlink(url_for('notifications.history'), 'bi-clock-history', 'Storico invii', ep == 'notifications.history') }}{% endif %}
+          {% if can('commands.execute') %}{{ navlink(url_for('identities.list_identities'), 'bi-key', 'Identità canali', ep.startswith('identities.')) }}{% endif %}
+          {% endif %}
+
+          {# ---- AMMINISTRAZIONE ---- #}
+          {% if can('users.read') or can('roles.read') or can('permissions.read') %}
+          <li class="nav-header">Amministrazione</li>
+          {% if can('users.read') %}{{ navlink(url_for('users.list_users'), 'bi-people', 'Utenti', ep.startswith('users.')) }}{% endif %}
+          {% if can('roles.read') %}{{ navlink(url_for('roles.list_roles'), 'bi-person-badge', 'Ruoli', ep.startswith('roles.')) }}{% endif %}
+          {% if can('permissions.read') %}{{ navlink(url_for('permissions.list_permissions'), 'bi-shield-lock', 'Permessi', ep.startswith('permissions.')) }}{% endif %}
+          {% endif %}
+
+          {# ---- SISTEMA ---- #}
+          {% if can('audit.read') or can('syslog.read') or can('config.read') %}
+          <li class="nav-header">Sistema</li>
+          {% if can('audit.read') %}{{ navlink(url_for('audit.list_audit'), 'bi-journal-text', 'Audit log', ep.startswith('audit.')) }}{% endif %}
+          {% if can('syslog.read') %}{{ navlink(url_for('logs.list_logs'), 'bi-terminal', 'Log di sistema', ep.startswith('logs.')) }}{% endif %}
+          {% if can('config.read') %}{{ navlink(url_for('config_bp.show_config'), 'bi-gear', 'Configurazione', ep.startswith('config_bp.')) }}{% endif %}
+          {% endif %}
+
+          {# ---- ACCOUNT ---- #}
+          <li class="nav-header">Account</li>
+          {{ navlink(url_for('profile.show_profile'), 'bi-person-circle', 'Profilo', ep.startswith('profile.')) }}
         </ul>
       </nav>
     </div>
@@ -109,15 +140,21 @@
       <div class="container-fluid">
         {% with messages = get_flashed_messages(with_categories=true) %}
           {% for category, message in messages %}
-            <div class="flash {{ category }}">{{ message }}</div>
+            <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show" role="alert">
+              {{ message }}
+              <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Chiudi"></button>
+            </div>
           {% endfor %}
         {% endwith %}
 {% else %}
   {% with messages = get_flashed_messages(with_categories=true) %}
     {% if messages %}
-    <div class="position-fixed top-0 start-50 translate-middle-x mt-3" style="z-index:1080;width:22rem;max-width:92vw">
+    <div class="position-fixed top-0 start-50 translate-middle-x mt-3" style="z-index:1080;width:24rem;max-width:94vw">
       {% for category, message in messages %}
-        <div class="flash {{ category }}">{{ message }}</div>
+        <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show" role="alert">
+          {{ message }}
+          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Chiudi"></button>
+        </div>
       {% endfor %}
     </div>
     {% endif %}

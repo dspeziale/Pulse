@@ -1,25 +1,93 @@
 {% extends "base.html" %}
-{% block title %}{{ 'Modifica' if probe else 'Nuova' }} Probe — Pulse{% endblock %}
+{% from "_macros.html" import status_badge %}
+{% block title %}{{ 'Modifica' if probe else 'Nuova' }} Sonda — Pulse{% endblock %}
 {% block content %}
-<h1>{{ 'Modifica' if probe else 'Nuova' }} Probe</h1>
-<div class="card">
-<form method="post" action="{{ url_for('probes.update_probe', probe_id=probe.id) if probe else url_for('probes.create_probe') }}">
-  <label>Nome</label><input name="name" value="{{ probe.name if probe else '' }}" required>
-  <label>Descrizione</label><input name="description" value="{{ probe.description if probe else '' }}">
-  <label>Query endpoint</label><input name="query_endpoint" value="{{ probe.query_endpoint if probe else '' }}">
-  <label>Tag (separati da virgola)</label><input name="tags" value="{{ probe.tags|join(', ') if probe else '' }}">
-  <label><input type="checkbox" name="enabled" style="width:auto" {% if not probe or probe.enabled %}checked{% endif %}> Abilitata</label>
-  <button type="submit">Salva</button>
-</form>
+<div class="d-flex align-items-center gap-2 mb-3">
+  <h1 class="h3 mb-0"><i class="bi bi-hdd-network me-2"></i>{{ ('Modifica Sonda: ' ~ probe.name) if probe else 'Nuova Sonda' }}</h1>
 </div>
-{% if probe and can('probes.rotate_key') %}
-<form method="post" action="{{ url_for('probes.rotate_probe', probe_id=probe.id) }}">
-  <button class="btn-ghost">Ruota credenziali</button>
-</form>
-{% endif %}
-{% if probe and can('probes.delete') %}
-<form method="post" action="{{ url_for('probes.delete_probe', probe_id=probe.id) }}">
-  <button class="btn-danger">Elimina</button>
-</form>
-{% endif %}
+
+<div class="row g-3">
+  <div class="col-lg-8">
+    <div class="card">
+      <div class="card-header"><i class="bi bi-info-circle me-1"></i>Dati della Sonda</div>
+      <div class="card-body">
+        <form method="post" action="{{ url_for('probes.update_probe', probe_id=probe.id) if probe else url_for('probes.create_probe') }}">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label" for="name">Nome</label>
+              <input class="form-control" id="name" name="name" value="{{ probe.name if probe else '' }}" placeholder="es. Sonda Milano DC1" required>
+              <div class="form-text">Nome univoco della Sonda (un duplicato viene rifiutato con 409).</div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="tags">Tag</label>
+              <input class="form-control" id="tags" name="tags" value="{{ probe.tags|join(', ') if probe else '' }}" placeholder="es. produzione, milano, dmz">
+              <div class="form-text">Etichette libere separate da virgola, utili per raggruppare e filtrare le Sonde.</div>
+            </div>
+            <div class="col-12">
+              <label class="form-label" for="description">Descrizione</label>
+              <input class="form-control" id="description" name="description" value="{{ probe.description if probe else '' }}" placeholder="Sede e contesto di deployment della Sonda">
+              <div class="form-text">Testo libero descrittivo (posizione, rete, responsabile...).</div>
+            </div>
+            <div class="col-12">
+              <label class="form-label" for="query_endpoint">Query endpoint</label>
+              <input class="form-control" id="query_endpoint" name="query_endpoint" type="url" value="{{ probe.query_endpoint if probe else '' }}" placeholder="https://sonda-milano:8500/api/v1">
+              <div class="form-text">URL dell'API di query locale della Sonda, usato dal Server per il drill-down sui dati (OpenSearch locale).</div>
+            </div>
+            <div class="col-12">
+              <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" role="switch" id="enabled" name="enabled" {% if not probe or probe.enabled %}checked{% endif %}>
+                <label class="form-check-label" for="enabled">Sonda abilitata</label>
+              </div>
+              <div class="form-text">Se disabilitata, la Sonda non viene considerata attiva dal Server.</div>
+            </div>
+          </div>
+          <div class="mt-3 d-flex gap-2">
+            <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1"></i>Salva</button>
+            <a class="btn btn-secondary" href="{{ url_for('probes.detail', probe_id=probe.id) if probe else url_for('probes.list_probes') }}">Annulla</a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-4">
+    {% if probe %}
+    <div class="card">
+      <div class="card-header"><i class="bi bi-activity me-1"></i>Stato attuale</div>
+      <div class="card-body">
+        <dl class="row mb-0 small">
+          <dt class="col-5 text-body-secondary">Stato</dt><dd class="col-7">{{ status_badge(probe.status) }}</dd>
+          <dt class="col-5 text-body-secondary">Ultimo contatto</dt><dd class="col-7">{{ probe.last_seen_at or '—' }}</dd>
+          <dt class="col-5 text-body-secondary">Versione</dt><dd class="col-7">{{ probe.version or '—' }}</dd>
+          <dt class="col-5 text-body-secondary">Sistemi</dt><dd class="col-7">{{ probe.systems_count if probe.systems_count is defined else '—' }}</dd>
+        </dl>
+      </div>
+    </div>
+    <div class="card mt-3">
+      <div class="card-header"><i class="bi bi-shield-lock me-1"></i>Credenziali e ciclo di vita</div>
+      <div class="card-body d-grid gap-2">
+        {% if can('probes.rotate_key') %}
+        <form method="post" action="{{ url_for('probes.rotate_probe', probe_id=probe.id) }}" onsubmit="return confirm('Ruotare le credenziali? Il token precedente sarà revocato.');">
+          <button class="btn btn-outline-warning w-100"><i class="bi bi-arrow-repeat me-1"></i>Ruota credenziali</button>
+        </form>
+        <div class="form-text">Genera un nuovo token di enrollment e revoca quello attuale.</div>
+        {% endif %}
+        {% if can('probes.delete') %}
+        <form method="post" action="{{ url_for('probes.delete_probe', probe_id=probe.id) }}" onsubmit="return confirm('Eliminare la Sonda {{ probe.name }}?');">
+          <button class="btn btn-outline-danger w-100"><i class="bi bi-trash me-1"></i>Elimina Sonda</button>
+        </form>
+        <div class="form-text">Non consentito se ci sono sistemi ancora assegnati (409).</div>
+        {% endif %}
+      </div>
+    </div>
+    {% else %}
+    <div class="card">
+      <div class="card-body small text-body-secondary">
+        <p class="mb-1"><i class="bi bi-lightbulb me-1"></i><strong>Enrollment</strong></p>
+        <p class="mb-0">Alla creazione verrà generato un <strong>token di enrollment monouso</strong> da copiare subito: serve alla Sonda per registrarsi presso il Server. Non sarà più mostrato in seguito.</p>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</div>
 {% endblock %}

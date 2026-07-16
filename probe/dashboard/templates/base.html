@@ -29,6 +29,14 @@
 </head>
 <body class="{% if is_authenticated %}layout-fixed sidebar-expand-lg{% else %}login-page{% endif %} bg-body-tertiary">
 {% if is_authenticated %}
+{% set ep = request.endpoint or '' %}
+{%- macro navlink(href, icon, text, active) -%}
+  <li class="nav-item">
+    <a href="{{ href }}" class="nav-link{{ ' active' if active else '' }}">
+      <i class="nav-icon bi {{ icon }}"></i><p>{{ text }}</p>
+    </a>
+  </li>
+{%- endmacro -%}
 <div class="app-wrapper">
 
   {# ===================== Top navbar ===================== #}
@@ -81,9 +89,14 @@
     <div class="sidebar-wrapper">
       <nav class="mt-2">
         <ul class="nav sidebar-menu flex-column" data-lte-toggle="treeview" role="menu">
-          <li class="nav-item"><a href="{{ url_for('dashboard.index') }}" class="nav-link"><i class="nav-icon bi bi-speedometer2"></i><p>Dashboard</p></a></li>
-          <li class="nav-item"><a href="{{ url_for('query.builder') }}" class="nav-link"><i class="nav-icon bi bi-search"></i><p>Query</p></a></li>
-          <li class="nav-item"><a href="{{ url_for('status.show_status') }}" class="nav-link"><i class="nav-icon bi bi-heart-pulse"></i><p>Stato</p></a></li>
+          {# ---- MONITORAGGIO ---- #}
+          <li class="nav-header">Monitoraggio</li>
+          {{ navlink(url_for('dashboard.index'), 'bi-speedometer2', 'Dashboard', ep.startswith('dashboard.')) }}
+          {{ navlink(url_for('query.builder'), 'bi-search', 'Query dati', ep.startswith('query.')) }}
+
+          {# ---- SONDA ---- #}
+          <li class="nav-header">Sonda</li>
+          {{ navlink(url_for('status.show_status'), 'bi-heart-pulse', 'Stato', ep.startswith('status.')) }}
         </ul>
       </nav>
     </div>
@@ -95,15 +108,21 @@
       <div class="container-fluid">
         {% with messages = get_flashed_messages(with_categories=true) %}
           {% for category, message in messages %}
-            <div class="flash {{ category }}">{{ message }}</div>
+            <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show" role="alert">
+              {{ message }}
+              <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Chiudi"></button>
+            </div>
           {% endfor %}
         {% endwith %}
 {% else %}
   {% with messages = get_flashed_messages(with_categories=true) %}
     {% if messages %}
-    <div class="position-fixed top-0 start-50 translate-middle-x mt-3" style="z-index:1080;width:22rem;max-width:92vw">
+    <div class="position-fixed top-0 start-50 translate-middle-x mt-3" style="z-index:1080;width:24rem;max-width:94vw">
       {% for category, message in messages %}
-        <div class="flash {{ category }}">{{ message }}</div>
+        <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show" role="alert">
+          {{ message }}
+          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Chiudi"></button>
+        </div>
       {% endfor %}
     </div>
     {% endif %}

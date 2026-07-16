@@ -1,26 +1,123 @@
 {% extends "base.html" %}
+{% from "_macros.html" import status_badge %}
 {% block title %}{{ 'Modifica' if system else 'Nuovo' }} sistema — Pulse{% endblock %}
 {% block content %}
-<h1>{{ 'Modifica' if system else 'Nuovo' }} sistema</h1>
-<div class="card">
-<form method="post" action="{{ url_for('systems.update_system', system_id=system.id) if system else url_for('systems.create_system') }}">
-  <label>System ID</label><input name="system_id" value="{{ system.system_id if system else '' }}" required>
-  <label>Nome</label><input name="system_name" value="{{ system.system_name if system else '' }}" required>
-  <label>URL heartbeat</label><input name="heartbeat_url" value="{{ system.heartbeat_url if system else '' }}" required>
-  <label>Probe</label>
-  <select name="probe_id" required>
-    {% for p in probes['items'] %}
-      <option value="{{ p.id }}" {% if system and system.probe_id==p.id %}selected{% endif %}>{{ p.name }}</option>
-    {% endfor %}
-  </select>
-  <div class="grid2">
-    <div><label>Poll interval (s)</label><input name="poll_interval_seconds" type="number" value="{{ system.poll_interval_seconds if system else 60 }}"></div>
-    <div><label>Timeout (s)</label><input name="timeout_seconds" type="number" value="{{ system.timeout_seconds if system else 10 }}"></div>
-    <div><label>Soglia warn (ms)</label><input name="response_ms_warn" type="number" value="{{ system.thresholds.response_ms_warn if system and system.thresholds else '' }}"></div>
-    <div><label>Soglia error (ms)</label><input name="response_ms_error" type="number" value="{{ system.thresholds.response_ms_error if system and system.thresholds else '' }}"></div>
-  </div>
-  <label><input type="checkbox" name="enabled" style="width:auto" {% if not system or system.enabled %}checked{% endif %}> Abilitato</label>
-  <button type="submit">Salva</button>
-</form>
+<div class="d-flex align-items-center gap-2 mb-3">
+  <h1 class="h3 mb-0"><i class="bi bi-hdd-stack me-2"></i>{{ ('Modifica sistema: ' ~ system.system_name) if system else 'Nuovo sistema' }}</h1>
 </div>
+
+<form method="post" action="{{ url_for('systems.update_system', system_id=system.id) if system else url_for('systems.create_system') }}">
+<div class="row g-3">
+  <div class="col-lg-8">
+    <div class="card">
+      <div class="card-header"><i class="bi bi-info-circle me-1"></i>Identificazione e polling</div>
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label" for="system_id">System ID</label>
+            <input class="form-control" id="system_id" name="system_id" value="{{ system.system_id if system else '' }}" placeholder="es. crm-prod" required>
+            <div class="form-text">Codice logico univoco del sistema (chiave di business). Deve essere univoco: un duplicato viene rifiutato dal backend (409).</div>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label" for="system_name">Nome</label>
+            <input class="form-control" id="system_name" name="system_name" value="{{ system.system_name if system else '' }}" placeholder="es. CRM Produzione" required>
+            <div class="form-text">Nome descrittivo mostrato nelle liste e nelle notifiche.</div>
+          </div>
+          <div class="col-12">
+            <label class="form-label" for="heartbeat_url">URL heartbeat</label>
+            <input class="form-control" id="heartbeat_url" name="heartbeat_url" type="url" value="{{ system.heartbeat_url if system else '' }}" placeholder="http://mio-sistema:9000/api/heartbeat" required>
+            <div class="form-text">Endpoint GET che la Sonda interrogherà a ogni ciclo di polling. Deve essere un URL valido raggiungibile dalla Sonda (URL invalido → errore 422).</div>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label" for="probe_id">Sonda assegnata</label>
+            <select class="form-select" id="probe_id" name="probe_id" required>
+              <option value="" disabled {% if not system %}selected{% endif %}>— seleziona una Sonda —</option>
+              {% for p in probes['items'] %}
+                <option value="{{ p.id }}" data-status="{{ p.status }}" {% if system and system.probe_id==p.id %}selected{% endif %}>{{ p.name }}{% if p.status %} ({{ p.status }}){% endif %}</option>
+              {% endfor %}
+            </select>
+            <div class="form-text">Sonda che eseguirà il polling di questo sistema. Deve esistere (probe inesistente → 422).</div>
+          </div>
+          <div class="col-md-3 col-6">
+            <label class="form-label" for="poll_interval_seconds">Poll interval (s)</label>
+            <input class="form-control" id="poll_interval_seconds" name="poll_interval_seconds" type="number" min="1" value="{{ system.poll_interval_seconds if system else 60 }}">
+            <div class="form-text">Ogni quanti secondi la Sonda interroga l'URL. Valore tipico: 30–60 s.</div>
+          </div>
+          <div class="col-md-3 col-6">
+            <label class="form-label" for="timeout_seconds">Timeout (s)</label>
+            <input class="form-control" id="timeout_seconds" name="timeout_seconds" type="number" min="1" value="{{ system.timeout_seconds if system else 10 }}">
+            <div class="form-text">Tempo massimo di attesa della risposta prima di considerare il check fallito.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card mt-3">
+      <div class="card-header"><i class="bi bi-speedometer me-1"></i>Soglie di risposta</div>
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label" for="response_ms_warn">Soglia warn (ms)</label>
+            <input class="form-control" id="response_ms_warn" name="response_ms_warn" type="number" min="0" value="{{ system.thresholds.response_ms_warn if system and system.thresholds else '' }}" placeholder="es. 500">
+            <div class="form-text">Oltre questo tempo di risposta (millisecondi) lo stato del sistema diventa <span class="badge b-warn">warn</span>. Lasciare vuoto per non applicare la soglia.</div>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label" for="response_ms_error">Soglia error (ms)</label>
+            <input class="form-control" id="response_ms_error" name="response_ms_error" type="number" min="0" value="{{ system.thresholds.response_ms_error if system and system.thresholds else '' }}" placeholder="es. 2000">
+            <div class="form-text">Oltre questo tempo di risposta lo stato diventa <span class="badge b-error">error</span>. Deve essere maggiore della soglia warn.</div>
+          </div>
+          <div class="col-12">
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" role="switch" id="enabled" name="enabled" {% if not system or system.enabled %}checked{% endif %}>
+              <label class="form-check-label" for="enabled">Monitoraggio abilitato</label>
+            </div>
+            <div class="form-text">Se disattivato, la Sonda non esegue il polling di questo sistema e non genera heartbeat.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-4">
+    <div class="card">
+      <div class="card-header"><i class="bi bi-hdd-network me-1"></i>Sonda di destinazione</div>
+      <div class="card-body">
+        <p class="text-body-secondary small mb-2">Il sistema verrà assegnato alla Sonda selezionata. Stato attuale:</p>
+        <div id="probe-context">
+          <span class="text-body-secondary">Nessuna Sonda selezionata.</span>
+        </div>
+      </div>
+    </div>
+    <div class="card mt-3">
+      <div class="card-body small text-body-secondary">
+        <p class="mb-1"><i class="bi bi-lightbulb me-1"></i><strong>Come funziona</strong></p>
+        <p class="mb-0">La Sonda chiama l'URL heartbeat ogni <em>poll interval</em>. La latenza misurata (<code>response_ms</code>) viene confrontata con le soglie per determinare lo stato <span class="badge b-ok">ok</span> / <span class="badge b-warn">warn</span> / <span class="badge b-error">error</span>. Gli storici restano su OpenSearch anche dopo l'eliminazione.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="mt-3 d-flex gap-2">
+  <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1"></i>Salva</button>
+  <a class="btn btn-secondary" href="{{ url_for('systems.detail', system_id=system.id) if system else url_for('systems.list_systems') }}">Annulla</a>
+</div>
+</form>
+
+<script>
+(function () {
+  var sel = document.getElementById('probe_id');
+  var ctx = document.getElementById('probe-context');
+  var map = { online: 'b-online', offline: 'b-offline', pending: 'b-pending' };
+  function render() {
+    var opt = sel.options[sel.selectedIndex];
+    if (!opt || !opt.value) { ctx.innerHTML = '<span class="text-body-secondary">Nessuna Sonda selezionata.</span>'; return; }
+    var st = (opt.getAttribute('data-status') || '').toLowerCase();
+    var cls = map[st] || 'b-unknown';
+    ctx.innerHTML = '<div class="fw-semibold mb-1">' + opt.text.replace(/\s*\(.*\)$/, '') + '</div>' +
+      '<span class="badge ' + cls + '">' + (st || 'sconosciuto') + '</span>';
+  }
+  sel.addEventListener('change', render);
+  render();
+})();
+</script>
 {% endblock %}

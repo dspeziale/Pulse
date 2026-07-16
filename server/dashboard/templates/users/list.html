@@ -1,21 +1,63 @@
 {% extends "base.html" %}
 {% block title %}Utenti — Pulse{% endblock %}
+{% set acct = {'active':'b-ok','disabled':'b-off','locked':'b-warn'} %}
 {% block content %}
-<h1>Utenti</h1>
-{% if can('users.create') %}<p><a class="btn" href="{{ url_for('users.new_user') }}">Nuovo utente</a></p>{% endif %}
-<form method="get">
-  <input name="q" placeholder="Cerca" value="{{ request.args.get('q','') }}" style="width:auto">
-  <button class="btn-ghost">Filtra</button>
-</form>
-<table>
-  <tr><th>Username</th><th>Nome</th><th>Email</th><th>Stato</th><th>Ruoli</th></tr>
-  {% for u in data['items'] %}
-  <tr>
-    <td><a href="{{ url_for('users.detail', user_id=u.id) }}">{{ u.username }}</a></td>
-    <td>{{ u.full_name }}</td><td>{{ u.email }}</td>
-    <td>{{ u.status }}</td><td>{{ u.roles|join(', ') }}</td>
-  </tr>
-  {% endfor %}
-</table>
-<p class="muted">Totale: {{ data['total'] }}</p>
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <h1 class="h3 mb-0"><i class="bi bi-people me-2"></i>Utenti</h1>
+  {% if can('users.create') %}
+  <a class="btn btn-primary" href="{{ url_for('users.new_user') }}"><i class="bi bi-plus-lg me-1"></i>Nuovo utente</a>
+  {% endif %}
+</div>
+
+<div class="card mb-3">
+  <div class="card-body">
+    <form method="get" class="row g-2 align-items-end">
+      <div class="col-sm-5">
+        <label class="form-label small text-body-secondary mb-1">Ricerca</label>
+        <input name="q" class="form-control" placeholder="Username, nome o email" value="{{ request.args.get('q','') }}">
+      </div>
+      <div class="col-sm-3">
+        <label class="form-label small text-body-secondary mb-1">Stato</label>
+        <select name="status" class="form-select">
+          <option value="">Tutti</option>
+          {% for st in ['active','disabled','locked'] %}
+            <option value="{{ st }}" {% if request.args.get('status')==st %}selected{% endif %}>{{ st }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-sm-2 d-grid">
+        <button class="btn btn-outline-secondary"><i class="bi bi-funnel me-1"></i>Filtra</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead><tr><th>Username</th><th>Nome</th><th>Email</th><th>Stato</th><th>Ruoli</th><th class="text-end">Azioni</th></tr></thead>
+      <tbody>
+      {% for u in data['items'] %}
+      <tr>
+        <td><a class="fw-semibold text-decoration-none" href="{{ url_for('users.detail', user_id=u.id) }}">{{ u.username }}</a></td>
+        <td>{{ u.full_name }}</td>
+        <td>{{ u.email }}</td>
+        <td><span class="badge {{ acct.get(u.status, 'b-unknown') }}">{{ u.status }}</span></td>
+        <td class="text-body-secondary">{{ u.roles|join(', ') }}</td>
+        <td class="text-end">
+          <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('users.detail', user_id=u.id) }}" title="Dettaglio"><i class="bi bi-eye"></i></a>
+          {% if can('users.update') %}<a class="btn btn-sm btn-outline-secondary" href="{{ url_for('users.edit_user', user_id=u.id) }}" title="Modifica"><i class="bi bi-pencil"></i></a>{% endif %}
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="6" class="text-center text-body-secondary py-5">
+        <i class="bi bi-inbox fs-2 d-block mb-2"></i>Nessun utente trovato.
+        {% if can('users.create') %}<div class="mt-2"><a class="btn btn-sm btn-primary" href="{{ url_for('users.new_user') }}"><i class="bi bi-plus-lg me-1"></i>Crea utente</a></div>{% endif %}
+      </td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if data['items'] %}<div class="card-footer text-body-secondary small">Totale: {{ data['total'] }}</div>{% endif %}
+</div>
 {% endblock %}
