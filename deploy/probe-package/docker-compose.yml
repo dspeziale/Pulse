@@ -1,0 +1,125 @@
+# =============================================================================
+# Pulse - PACCHETTO DI INSTALLAZIONE SONDA (Docker Compose)
+# File: deploy/probe-package/docker-compose.yml
+#
+# Servizi:
+#   - opensearch      : OpenSearch single-node (serie temporali heartbeat/eventi)
+#   - probe-agent     : agent FastAPI (poller + API di query), porta 8444
+#   - probe-dashboard : dashboard Flask locale della Sonda, porta 5001
+#
+# APPROCCIO BUILD CONTEXT (IMPORTANTE):
+#   I `build.context` sono relativi ALLA POSIZIONE DI QUESTO FILE
+#   (deploy/probe-package/), NON alla directory da cui lanci il comando.
+#   Docker Compose risolve sempre i context relativi alla cartella del file
+#   compose (project directory). Percio' questo stack funziona da QUALSIASI
+#   cwd, purche' il file resti dentro l'albero del repository (i Dockerfile
+#   compilano dai sorgenti del repo):
+#     - probe-agent     -> context ../../probe/agent   (Dockerfile: Dockerfile)
+#     - probe-dashboard -> context ../..  (radice repo) (Dockerfile: probe/dashboard/Dockerfile)
+#   Questo e' coerente con i Dockerfile esistenti:
+#     * probe/agent/Dockerfile     copia file relativi a probe/agent
+#     * probe/dashboard/Dockerfile dipende da frontend_common/ (serve la radice repo)
+#
+# Avvio (usa lo script install.sh / install.ps1 oppure, manualmente):
+#   docker compose -f deploy/probe-package/docker-compose.yml --env-file deploy/probe-package/.env up -d --build
+# Stop:
+#   docker compose -f deploy/probe-package/docker-compose.yml down
+#
+# NOTA rete Server<->Sonda: questo pacchetto e' pensato per installare la Sonda
+# su un host SEPARATO dal Server. La Sonda raggiunge il Server tramite
+# PULSE_PROBE_SERVER_BASE_URL (URL instradabile). NON viene usata una rete
+# Docker condivisa esterna (a differenza di deploy/docker-compose.probe.yml che
+# prevede la rete `pulse-shared` per il caso "tutto sullo stesso host").
+# =============================================================================
+
+name: pulse-probe
+
+services:
+  opensearch:
+    image: opensearchproject/opensearch:2.17.1
+    container_name: pulse-opensearch
+    restart: unless-stopped
+    environment:
+      discovery.type: single-node
+      bootstrap.memory_lock: "true"
+      OPENSEARCH_JAVA_OPTS: "-Xms512m -Xmx512m"
+      # Ambiente di sviluppo: sicurezza demo disabilitata (abilitarla in produzione).
+      DISABLE_SECURITY_PLUGIN: "true"
+      OPENSEARCH_INITIAL_ADMIN_PASSWORD: ${OPENSEARCH_ADMIN_PASSWORD:-Pulse_OS_Admin1!}
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    volumes:
+      - pulse_osdata:/usr/share/opensearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:9200/_cluster/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+    networks: [pulse]
+
+  probe-agent:
+    build:
+      context: ../../probe/agent
+      dockerfile: Dockerfile
+    image: pulse-probe-agent:latest
+    container_name: pulse-probe-agent
+    restart: unless-stopped
+    depends_on:
+      opensearch:
+        condition: service_healthy
+    environment:
+      PULSE_PROBE_API_PORT: ${PULSE_PROBE_API_PORT:-8444}
+      PULSE_PROBE_SERVER_BASE_URL: ${PULSE_PROBE_SERVER_BASE_URL:-https://server-backend:9443}
+      PULSE_PROBE_ENROLLMENT_TOKEN: ${PULSE_PROBE_ENROLLMENT_TOKEN:-}
+      PULSE_PROBE_PROBE_TOKEN: ${PULSE_PROBE_PROBE_TOKEN:-}
+      PULSE_PROBE_SERVER_QUERY_TOKEN: ${PULSE_PROBE_SERVER_QUERY_TOKEN:-server-to-probe-token}
+      PULSE_PROBE_OPENSEARCH_URL: http://opensearch:9200
+      PULSE_PROBE_HTTP_VERIFY: ${PULSE_PROBE_HTTP_VERIFY:-false}
+      PULSE_PROBE_LOG_LEVEL: ${PULSE_PROBE_LOG_LEVEL:-info}
+    ports:
+      - "${PULSE_PROBE_API_PORT:-8444}:${PULSE_PROBE_API_PORT:-8444}"
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import os,urllib.request,sys; p=os.environ.get('PULSE_PROBE_API_PORT','8444'); sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:'+p+'/api/v1/health',timeout=3).status==200 else 1)\""]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    networks: [pulse]
+
+  probe-dashboard:
+    build:
+      context: ../..
+      dockerfile: probe/dashboard/Dockerfile
+    image: pulse-probe-dashboard:latest
+    container_name: pulse-probe-dashboard
+    restart: unless-stopped
+    depends_on:
+      - probe-agent
+    environment:
+      PULSE_PROBE_DASH_PORT: ${PULSE_PROBE_DASH_PORT:-5001}
+      PULSE_PROBE_API_BASE: http://probe-agent:${PULSE_PROBE_API_PORT:-8444}/api/v1
+      PULSE_PROBE_AGENT_TOKEN: ${PULSE_PROBE_SERVER_QUERY_TOKEN:-server-to-probe-token}
+      PULSE_PROBE_DASH_USER: ${PULSE_PROBE_DASH_USER:-probe}
+      PULSE_PROBE_DASH_PASSWORD: ${PULSE_PROBE_DASH_PASSWORD:-probe}
+      PULSE_PROBE_SECRET_KEY: ${PULSE_PROBE_SECRET_KEY:-dev-probe-secret}
+      PULSE_PROBE_SESSION_COOKIE_NAME: ${PULSE_PROBE_SESSION_COOKIE_NAME:-pulse_probe_session}
+      PULSE_PROBE_SESSION_COOKIE_SECURE: ${PULSE_PROBE_SESSION_COOKIE_SECURE:-false}
+      PULSE_HTTP_TIMEOUT: ${PULSE_HTTP_TIMEOUT:-10}
+      PULSE_VERIFY_TLS: ${PULSE_VERIFY_TLS:-false}
+    ports:
+      - "${PULSE_PROBE_DASH_PORT:-5001}:${PULSE_PROBE_DASH_PORT:-5001}"
+    networks: [pulse]
+
+volumes:
+  pulse_osdata:
+    name: pulse_osdata
+
+networks:
+  pulse:
+    name: pulse-probe-net

@@ -111,6 +111,16 @@ per mTLS+token (RNF-002). Trigger `updated_at`. Indici su `status` e `enabled`
 (filtri `GET /probes?status`). `systems_count` dell'API e' derivato dalla vista
 `v_probe_system_counts`.
 
+**Dati anagrafici della Sonda** (tutti NULLABLE, opzionali):
+- `location varchar(255)` — posizione/sede fisica o logica.
+- `contact_name varchar(255)` — referente.
+- `contact_email varchar(255)` — email del referente.
+- `contact_phone varchar(50)` — telefono del referente.
+
+Su installazioni pulite i campi sono in `deploy/schema.sql`; sui DB gia'
+esistenti sono aggiunti dalla migrazione `deploy/migrations/003_probe_registry.sql`
+(idempotente). Essendo nullable, i dati preesistenti restano validi.
+
 ### 3.7 enrollment_tokens
 PK `id`. FK `probe_id`→probes `ON DELETE CASCADE`. Token monouso a scadenza
 (`expires_at`, `used_at`) — RNF-007. Indici: `probe_id`, `token_hash` (lookup in

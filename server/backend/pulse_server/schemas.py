@@ -11,7 +11,7 @@ import uuid
 from typing import Any, Literal
 from urllib.parse import urlparse
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, model_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator, model_validator
 from pydantic_core import PydanticCustomError
 
 
@@ -163,12 +163,24 @@ class PermissionList(_Model):
 # ============================ Probe ========================================
 
 
+# Converte una stringa vuota/whitespace in None per contact_email, cosi' un campo
+# lasciato vuoto dal FE non genera un 422 su EmailStr (esteso su richiesta utente).
+def _blank_to_none(value: object) -> object:
+    if isinstance(value, str) and not value.strip():
+        return None
+    return value
+
+
 class ProbeOut(_Model):
     id: str
     name: str
     description: str | None
     query_endpoint: str | None
     tags: list[Any]
+    location: str | None
+    contact_name: str | None
+    contact_email: str | None
+    contact_phone: str | None
     enabled: bool
     status: str
     last_seen_at: dt.datetime | None
@@ -187,7 +199,13 @@ class ProbeCreate(_Model):
     description: str | None = None
     query_endpoint: str | None = None
     tags: list[str] = Field(default_factory=list)
+    location: str | None = Field(default=None, max_length=255)
+    contact_name: str | None = Field(default=None, max_length=255)
+    contact_email: EmailStr | None = Field(default=None, max_length=255)
+    contact_phone: str | None = Field(default=None, max_length=50)
     enabled: bool = True
+
+    _norm_email = field_validator("contact_email", mode="before")(_blank_to_none)
 
 
 class ProbeUpdate(_Model):
@@ -195,7 +213,13 @@ class ProbeUpdate(_Model):
     description: str | None = None
     query_endpoint: str | None = None
     tags: list[str] | None = None
+    location: str | None = Field(default=None, max_length=255)
+    contact_name: str | None = Field(default=None, max_length=255)
+    contact_email: EmailStr | None = Field(default=None, max_length=255)
+    contact_phone: str | None = Field(default=None, max_length=50)
     enabled: bool | None = None
+
+    _norm_email = field_validator("contact_email", mode="before")(_blank_to_none)
 
 
 class EnrollmentInfo(_Model):

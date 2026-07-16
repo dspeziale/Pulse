@@ -165,6 +165,11 @@ CREATE TABLE IF NOT EXISTS probes (
     last_sync_at            timestamptz,
     last_error              text,
     config_version          varchar(40),
+    -- Dati anagrafici della Sonda (tutti opzionali).
+    location                varchar(255),
+    contact_name            varchar(255),
+    contact_email           varchar(255),
+    contact_phone           varchar(50),
     created_at              timestamptz  NOT NULL DEFAULT now(),
     updated_at              timestamptz  NOT NULL DEFAULT now(),
     CONSTRAINT chk_probes_tags_is_array CHECK (jsonb_typeof(tags) = 'array')

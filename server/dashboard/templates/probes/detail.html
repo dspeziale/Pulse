@@ -32,6 +32,22 @@
 </div>
 
 <div class="card mb-3">
+  <div class="card-header"><i class="bi bi-person-vcard me-1"></i>Anagrafica</div>
+  <div class="card-body">
+    <dl class="row mb-0">
+      <dt class="col-sm-3 text-body-secondary">Posizione</dt>
+      <dd class="col-sm-3">{{ probe.location or '—' }}</dd>
+      <dt class="col-sm-3 text-body-secondary">Referente</dt>
+      <dd class="col-sm-3">{{ probe.contact_name or '—' }}</dd>
+      <dt class="col-sm-3 text-body-secondary">Email</dt>
+      <dd class="col-sm-3">{% if probe.contact_email %}<a href="mailto:{{ probe.contact_email }}">{{ probe.contact_email }}</a>{% else %}—{% endif %}</dd>
+      <dt class="col-sm-3 text-body-secondary">Telefono</dt>
+      <dd class="col-sm-3">{% if probe.contact_phone %}<a href="tel:{{ probe.contact_phone }}">{{ probe.contact_phone }}</a>{% else %}—{% endif %}</dd>
+    </dl>
+  </div>
+</div>
+
+<div class="card mb-3">
   <div class="card-header d-flex justify-content-between">
     <span><i class="bi bi-hdd-stack me-1"></i>Sistemi</span>
     <span class="text-body-secondary small">{{ overview.generated_at }}</span>

@@ -1189,3 +1189,142 @@ Output consegnati
 - Verifica reale (app Flask con backend simulato FakeApiClient): l'HTML servito su GET /config contiene nav-tabs e tab-pane, tutte le schede attese (incl. pane-other per una key non mappata), tutti i campi name="value:<key>", un unico pulsante submit, etichette leggibili, hint "secondi"/"giorni" e badge "Riavvio richiesto"; con soli parametri mappati la scheda "Altro" non viene emessa.
 
 ================================================
+
+ITERAZIONE 31
+
+Agente: DBA
+Data: 2026-07-16
+
+Input ricevuti
+- Nuovo requisito: la Sonda deve avere dati anagrafici (posizione, referente, contatti). Estendere la tabella probes.
+- Vincolo: modificare SOLO deploy/schema.sql, deploy/migrations, docs/database. Nessun codice applicativo.
+
+Lavoro svolto
+- Aggiunte 4 colonne anagrafiche NULLABLE a probes in deploy/schema.sql (installazioni pulite): location varchar(255), contact_name varchar(255), contact_email varchar(255), contact_phone varchar(50).
+- Creata migrazione deploy/migrations/003_probe_registry.sql per DB esistenti: ALTER TABLE probes ADD COLUMN IF NOT EXISTS per le 4 colonne, in BEGIN/COMMIT, idempotente.
+- Aggiornati docs/database/SCHEMA_FISICO.md (sezione 3.6 probes con i campi anagrafici) ed ER_DIAGRAM.md (entita probes con location/contact_name/contact_email/contact_phone).
+- VALIDAZIONE sul DB vivo (container pulse-postgres, user pulse, db pulse):
+  * migrazione applicata con successo (exit 0); RI-esecuzione idempotente (solo NOTICE di skip, exit 0).
+  * verificate in information_schema.columns: le 4 colonne esistono, nullable=YES, tipi/lunghezze corretti (255/255/255/50).
+  * schema.sql pulito ri-validato su container fresco Postgres 16: le 4 colonne presenti (convergenza clean-install/migrazione).
+
+File creati
+- deploy/migrations/003_probe_registry.sql (nuovo)
+- Modificati: deploy/schema.sql, docs/database/SCHEMA_FISICO.md, docs/database/ER_DIAGRAM.md
+
+Problemi trovati
+- Nessuno. Colonne nullable: i dati probes preesistenti restano validi (valore NULL).
+
+Decisioni prese
+- Colonne tutte NULLABLE (dati anagrafici opzionali) senza vincoli aggiuntivi, coerente con la natura opzionale del requisito.
+- Migrazione idempotente via ADD COLUMN IF NOT EXISTS.
+
+Output consegnati
+- Tabella probes estesa con dati anagrafici (clean + migrazione), documentazione aggiornata, validazione su DB vivo superata (idempotenza + presenza colonne). Pronto per il BE che dovra esporre location/contact_* nelle API/modelli.
+
+================================================
+
+ITERAZIONE 32
+
+Agente: DEPLOY
+Data: 2026-07-16
+
+Input ricevuti
+- Richiesta orchestratore: creare un PACCHETTO DI INSTALLAZIONE della SONDA (probe) con procedura, per host Docker o Podman. Non modificare il codice applicativo; produrre solo artefatti di deploy e documentazione. Docker presente; Podman assente (file podman validati solo staticamente).
+
+Lavoro svolto
+- Creata la cartella dedicata deploy/probe-package/ con il pacchetto completo, riusando lo stack esistente (deploy/docker-compose.probe.yml / .env.probe.example) senza toccare i sorgenti.
+- docker-compose.yml e podman-compose.yml del pacchetto: servizi opensearch + probe-agent + probe-dashboard, coerenti con i Dockerfile esistenti e con nomi variabili/porte in uso (8444 agent, 5001 dashboard).
+- .env.probe.example completo e commentato (tutte le PULSE_PROBE_ + OpenSearch/dashboard), nessun segreto reale (placeholder CAMBIAMI su SERVER_BASE_URL).
+- install.sh / install.ps1: rilevano docker o podman, verificano prerequisiti, copiano .env da template se manca, controllano le variabili obbligatorie (SERVER_BASE_URL + ENROLLMENT_TOKEN o PROBE_TOKEN), buildano e avviano (up -d --build), attendono l'health dell'agent e stampano i passi di verifica. Idempotenti, exit code non-zero su errore.
+- uninstall.sh / uninstall.ps1: down con opzione rimozione volumi (--volumes / -Volumes).
+- INSTALL.md in italiano: prerequisiti, Passo 1 (creare Probe sul Server via dashboard o API POST /api/v1/probes e copiare enrollment token), Passo 2 (.env), Passo 3 (script o compose manuale), Passo 4 (verifica health/online/dashboard), Troubleshooting (token monouso/riavvio con rotate-credentials, rete Server<->Sonda, OpenSearch memoria/ulimits/max_map_count, Podman rootless/SELinux) e nota Docker vs Podman.
+
+Decisioni prese
+- APPROCCIO BUILD CONTEXT: context relativi alla cartella del file compose (deploy/probe-package/): probe-agent -> ../../probe/agent; probe-dashboard -> ../.. (radice repo). Docker/Podman Compose risolvono i context rispetto alla directory del file compose, quindi lo stack funziona da qualunque cwd (approccio piu' robusto), purche' il pacchetto resti nell'albero del repo (compila dai sorgenti). Documentato in compose e INSTALL.md.
+- Rimossa la dipendenza dalla rete esterna pulse-shared (presente in deploy/docker-compose.probe.yml): il pacchetto e' pensato per Sonda su host separato che raggiunge il Server via SERVER_BASE_URL, evitando il requisito di una rete Docker esterna inesistente su host nuovo. Documentato il caso "stesso host" (usare il compose esistente).
+- Aggiunto healthcheck HTTP a probe-agent nel pacchetto (assente nel compose originale) per rendere affidabile l'attesa di readiness.
+
+Problemi trovati
+- Nessuno bloccante. Nota gia' documentata: probe_token in memoria -> riavvio container richiede nuovo enrollment token o rotate-credentials dal Server.
+
+Verifica
+- docker compose config: exit=0 sia per docker-compose.yml sia (schema) per podman-compose.yml; build context risolti correttamente a probe/agent e radice repo, sia da radice repo sia da cwd esterno (/tmp) -> cwd-independence confermata.
+- bash -n install.sh / uninstall.sh: OK. Parser PowerShell su install.ps1 / uninstall.ps1: OK.
+- Test funzionale install.sh: run senza .env -> copia da template ed esce 1; run con placeholder CAMBIAMI -> fallisce il check variabili obbligatorie ed esce 1 senza avviare il build. Comportamento corretto.
+
+Output consegnati
+- deploy/probe-package/: docker-compose.yml, podman-compose.yml, .env.probe.example, install.sh, install.ps1, uninstall.sh, uninstall.ps1, INSTALL.md.
+
+================================================
+
+ITERAZIONE 33
+
+Agente: FE
+Data: 2026-07-16
+
+Input ricevuti
+- Richiesta orchestratore: la Sonda ha nuovi dati anagrafici opzionali (location, contact_name, contact_email, contact_phone), esposti dal BE in ProbeCreate/ProbeUpdate/ProbeOut. Aggiungerli alla UI.
+- Vincoli: modificare SOLO server/dashboard; NON toccare il backend; niente CDN; coerenza AdminLTE/Bootstrap; coverage 100% e 0 test falliti.
+
+Lavoro svolto
+- server/dashboard/templates/probes/form.html: aggiunta sezione "Anagrafica" (icona bi-person-vcard, separatore) con i 4 campi opzionali: Posizione (location), Referente (contact_name), Email referente (contact_email, input type=email), Telefono referente (contact_phone). Help chiari, tutti facoltativi. In modifica i campi sono precompilati con probe.location/contact_name/contact_email/contact_phone.
+- server/dashboard/views/probes.py: aggiunti helper _optional (stringa vuota/spazi -> None) e _profile_fields; create_probe e update_probe includono ora i 4 campi anagrafici nel payload. I valori vuoti vengono inviati come null (non stringa vuota) per non far scattare validazioni backend (es. contact_email vuota non genera 422); i valori presenti sono ripuliti dagli spazi.
+- server/dashboard/templates/probes/detail.html: nuovo riquadro "Anagrafica" nella pagina di dettaglio con Posizione, Referente, Email (mailto:), Telefono (tel:) e segnaposto "—" quando assenti.
+- server/dashboard/templates/probes/list.html: aggiunte due colonne opzionali (Posizione, Referente) con fallback "—"; aggiornato colspan della riga vuota (5 -> 7).
+
+File toccati (solo server/dashboard)
+- server/dashboard/views/probes.py
+- server/dashboard/templates/probes/form.html
+- server/dashboard/templates/probes/detail.html
+- server/dashboard/templates/probes/list.html
+- server/dashboard/tests/test_views_crud.py (test aggiornati/aggiunti)
+
+Problemi trovati
+- Nessuno. Attenzione posta a non inviare email vuota come stringa (rischio 422): risolto con _optional -> null.
+
+Decisioni prese
+- Campi anagrafici opzionali normalizzati a null quando vuoti (coerenza con natura opzionale lato BE/DB, evita validazioni indesiderate).
+- Email e telefono nel dettaglio resi come link mailto:/tel: per usabilita'; colonne Posizione/Referente aggiunte alla lista Sonde (utili, non obbligatorie).
+
+Output consegnati
+- Dati anagrafici presenti in: form (creazione con campi vuoti + modifica precompilata), dettaglio (con "—" se assenti), lista; invio al backend confermato in create (POST /probes) e update (PUT /probes/{id}) con null per i campi vuoti.
+- Test (backend mockato): server/dashboard 121 test, 0 falliti; probe/dashboard 40, frontend_common 29, tutti verdi. Coverage app-code 100% (views/probes.py 69/69, tutte le altre views/app.py/sdk.py 100%); le uniche righe non coperte sono helper difensivi pre-esistenti nel conftest di test (non codice applicativo). I nuovi test verificano: rendering campi anagrafici nella form (new vuoti + edit precompilato), inoltro dei 4 campi al backend in create/update, null per campi vuoti, e visualizzazione nel dettaglio con "—" se assenti.
+
+================================================
+
+ITERAZIONE 34
+
+Agente: BE
+Data: 2026-07-16
+
+Input ricevuti
+- Richiesta orchestratore: il DBA ha aggiunto a probes 4 colonne anagrafiche nullable (location, contact_name, contact_email, contact_phone; migrazione 003_probe_registry.sql gia' applicata al DB vivo, presenti anche in deploy/schema.sql). Esporle in modello/schemi/serializer/API. Modificare SOLO server/backend.
+
+Lavoro svolto (SERVER — server/backend)
+- models.py, class Probe: aggiunte location (String(255)), contact_name (String(255)), contact_email (String(255)), contact_phone (String(50)), tutte Mapped[str | None].
+- schemas.py: ProbeOut espone i 4 campi (contact_email come str | None in output, per non far mai fallire la serializzazione su dati legacy). ProbeCreate/ProbeUpdate espongono i 4 campi opzionali; contact_email tipizzato EmailStr | None (validazione formato se valorizzato). Helper _blank_to_none + field_validator(mode="before") su contact_email in Create/Update: una stringa vuota/whitespace e' normalizzata a None (evita 422 su campi lasciati vuoti dal FE) senza rompere l'handler errori. location/contact_name/contact_phone stringhe libere con max_length coerente allo schema DB.
+- routers/probes.py: create_probe persiste i 4 campi dal body; update_probe li aggiorna in modo parziale (solo se != None), logica esistente (enrollment token, audit, commit_or_conflict) invariata.
+- serializers.py, probe_out: include i 4 campi.
+- docs/api/DOCUMENTO_API.md (§1.5 Probe): entita' Probe, POST e PUT aggiornati coi campi anagrafici e nota "(esteso su richiesta utente)"; documentato che contact_email vuota -> null e email non valida -> 422.
+
+Qualita'
+- mypy --strict: pulito su pulse_server (31 file, "no issues found").
+- Test aggiunti (tests/test_probes.py): create con anagrafica -> ProbeOut la riporta; default null se assente; update parziale di contact_* e (secondo update) location/contact_email; contact_email non valida -> 422; contact_email stringa vuota -> normalizzata a null (201).
+- Coverage: server/backend 100% (2944 stmt, 592 branch). Esito: 255 test passati, 0 falliti.
+
+File toccati
+- server/backend/pulse_server/models.py
+- server/backend/pulse_server/schemas.py
+- server/backend/pulse_server/serializers.py
+- server/backend/pulse_server/routers/probes.py
+- server/backend/tests/test_probes.py
+- docs/api/DOCUMENTO_API.md (§1.5)
+
+Decisioni prese
+- contact_email: EmailStr | None in input (validazione formato) con normalizzazione della stringa vuota a null via validator mode="before" per non generare 422 su form vuoti; str | None in output (ProbeOut) per robustezza su eventuali dati legacy.
+
+Output consegnati
+- I 4 campi anagrafici della Sonda sono esposti end-to-end (model/schema/serializer/API) e documentati; nessuna modifica a probe/frontend.
+
+================================================

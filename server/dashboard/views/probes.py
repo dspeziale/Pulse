@@ -21,6 +21,27 @@ def _tags(raw: str) -> list:
     return [t.strip() for t in raw.split(",") if t.strip()]
 
 
+def _optional(raw: str):
+    """Normalizza un campo anagrafico opzionale.
+
+    Stringa vuota/spazi -> None (null) così da NON far scattare le validazioni
+    del backend sui campi opzionali (es. contact_email vuota non deve dare 422).
+    Il valore, se presente, viene inviato ripulito dagli spazi.
+    """
+    value = (raw or "").strip()
+    return value or None
+
+
+def _profile_fields() -> dict:
+    """Campi anagrafici opzionali della Sonda (location + referente)."""
+    return {
+        "location": _optional(request.form.get("location", "")),
+        "contact_name": _optional(request.form.get("contact_name", "")),
+        "contact_email": _optional(request.form.get("contact_email", "")),
+        "contact_phone": _optional(request.form.get("contact_phone", "")),
+    }
+
+
 # -- P-09 elenco / selettore ---------------------------------------------------
 @bp.route("/probes")
 @permission_required("probes.read")
@@ -48,6 +69,7 @@ def create_probe():
         "query_endpoint": request.form.get("query_endpoint", ""),
         "tags": _tags(request.form.get("tags", "")),
         "enabled": request.form.get("enabled") == "on",
+        **_profile_fields(),
     }
     result = api_post("/probes", json=payload)
     flash("Probe creata. Copiare subito il token di enrollment.", "success")
@@ -102,6 +124,7 @@ def update_probe(probe_id: str):
         "query_endpoint": request.form.get("query_endpoint", ""),
         "tags": _tags(request.form.get("tags", "")),
         "enabled": request.form.get("enabled") == "on",
+        **_profile_fields(),
     }
     api_put(f"/probes/{probe_id}", json=payload)
     flash("Probe aggiornata.", "success")

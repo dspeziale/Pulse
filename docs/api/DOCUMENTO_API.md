@@ -163,20 +163,22 @@ Formato corpo errore:
 ### GET /api/v1/probes
 - **Permesso**: `probes.read`. **Query**: `page, page_size, q, status`.
 - **Response 200**: `{ "items": [Probe], "total": int }`
-  - `Probe`: `{ "id": string, "name": string, "description": string, "query_endpoint": string, "tags": [string], "enabled": bool, "status": "online|offline|pending", "last_seen_at": string|null, "version": string|null, "systems_count": int, "created_at": string }`
+  - `Probe`: `{ "id": string, "name": string, "description": string, "query_endpoint": string, "tags": [string], "location": string|null, "contact_name": string|null, "contact_email": string|null, "contact_phone": string|null, "enabled": bool, "status": "online|offline|pending", "last_seen_at": string|null, "version": string|null, "systems_count": int, "created_at": string }`
+  - `location`, `contact_name`, `contact_email`, `contact_phone` (esteso su richiesta utente): dati anagrafici opzionali della Sonda (sede/posizione, referente e contatti).
 - **Errori**: 401, 403.
 
 ### POST /api/v1/probes
 - **Descrizione**: registra una Probe; genera token di enrollment. **Permesso**: `probes.create`.
-- **Request**: `{ "name": string, "description": string, "query_endpoint": string, "tags": [string], "enabled": bool }`
+- **Request**: `{ "name": string, "description": string, "query_endpoint": string, "tags": [string], "location"?: string, "contact_name"?: string, "contact_email"?: string, "contact_phone"?: string, "enabled": bool }`
+  - Campi anagrafici (esteso su richiesta utente) tutti opzionali. `contact_email`, se valorizzato, deve essere un'email valida (una stringa vuota viene normalizzata a `null`); gli altri sono stringhe libere.
 - **Response 201**: `{ "probe": Probe, "enrollment_token": string, "enrollment_expires_at": string }`
-- **Errori**: 409 (nome duplicato), 422, 401, 403.
+- **Errori**: 409 (nome duplicato), 422 (es. `contact_email` non valida), 401, 403.
 
 ### GET /api/v1/probes/{id}
 - **Permesso**: `probes.read`. **Response 200**: `Probe`. **Errori**: 404, 401, 403.
 
 ### PUT /api/v1/probes/{id}
-- **Permesso**: `probes.update`. **Request**: `{ "name"?, "description"?, "query_endpoint"?, "tags"?, "enabled"? }`
+- **Permesso**: `probes.update`. **Request**: `{ "name"?, "description"?, "query_endpoint"?, "tags"?, "location"?, "contact_name"?, "contact_email"?, "contact_phone"?, "enabled"? }` (campi anagrafici esteso su richiesta utente; update parziale, `contact_email` validata se valorizzata).
 - **Response 200**: `Probe`. **Errori**: 409, 422, 404, 401, 403.
 
 ### DELETE /api/v1/probes/{id}

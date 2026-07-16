@@ -68,6 +68,10 @@ def create_probe(
         description=body.description,
         query_endpoint=body.query_endpoint,
         tags=body.tags,
+        location=body.location,
+        contact_name=body.contact_name,
+        contact_email=body.contact_email,
+        contact_phone=body.contact_phone,
         enabled=body.enabled,
         status="pending",
     )
@@ -122,6 +126,14 @@ def update_probe(
         probe.query_endpoint = body.query_endpoint
     if body.tags is not None:
         probe.tags = body.tags
+    if body.location is not None:
+        probe.location = body.location
+    if body.contact_name is not None:
+        probe.contact_name = body.contact_name
+    if body.contact_email is not None:
+        probe.contact_email = body.contact_email
+    if body.contact_phone is not None:
+        probe.contact_phone = body.contact_phone
     if body.enabled is not None:
         probe.enabled = body.enabled
     write_audit(

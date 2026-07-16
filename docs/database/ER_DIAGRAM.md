@@ -103,6 +103,10 @@ erDiagram
         timestamptz last_sync_at
         text last_error
         varchar config_version
+        varchar location
+        varchar contact_name
+        varchar contact_email
+        varchar contact_phone
         timestamptz created_at
         timestamptz updated_at
     }

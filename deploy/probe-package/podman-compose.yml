@@ -1,0 +1,121 @@
+# =============================================================================
+# Pulse - PACCHETTO DI INSTALLAZIONE SONDA (Podman Compose)
+# File: deploy/probe-package/podman-compose.yml
+#
+# Struttura IDENTICA al docker-compose.yml del pacchetto. Avvio:
+#   podman-compose -f deploy/probe-package/podman-compose.yml --env-file deploy/probe-package/.env up -d --build
+#
+# BUILD CONTEXT: come per docker-compose.yml, i context sono relativi alla
+#   cartella di QUESTO file (deploy/probe-package/):
+#     - probe-agent     -> ../../probe/agent
+#     - probe-dashboard -> ../..  (radice repo)
+#
+# DIFFERENZE / NOTE Podman (documentate):
+#  - Podman NON e' installato nell'ambiente di sviluppo: questo file e' prodotto
+#    e validato solo staticamente (schema identico al docker-compose gia'
+#    validato con `docker compose config`).
+#  - podman-compose potrebbe IGNORARE `depends_on.condition: service_healthy`
+#    (dipende dalla versione): in tal caso attendere manualmente che OpenSearch
+#    sia 'healthy' prima che probe-agent riesca a interrogarlo. Lo script
+#    install.sh attende comunque l'health di probe-agent via HTTP.
+#  - Podman ROOTLESS: le porte <1024 richiedono privilegi; qui usiamo porte
+#    di default >1024 (8444, 5001), quindi nessun problema.
+#  - OpenSearch richiede vm.max_map_count elevato e memlock: in rootless questo
+#    puo' fallire. Vedi INSTALL.md (sezione Troubleshooting > OpenSearch/Podman).
+#  - SELinux: se i volumi non sono accessibili, aggiungere il suffisso :Z ai
+#    bind mount. Qui usiamo un volume gestito (pulse_osdata), di norma senza
+#    problemi SELinux.
+#  - Il campo top-level `name:` e' supportato da podman-compose recenti; se la
+#    versione lo rifiuta, rimuoverlo (i nomi di rete/volume restano espliciti).
+# =============================================================================
+
+name: pulse-probe
+
+services:
+  opensearch:
+    image: opensearchproject/opensearch:2.17.1
+    container_name: pulse-opensearch
+    restart: unless-stopped
+    environment:
+      discovery.type: single-node
+      bootstrap.memory_lock: "true"
+      OPENSEARCH_JAVA_OPTS: "-Xms512m -Xmx512m"
+      DISABLE_SECURITY_PLUGIN: "true"
+      OPENSEARCH_INITIAL_ADMIN_PASSWORD: ${OPENSEARCH_ADMIN_PASSWORD:-Pulse_OS_Admin1!}
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    volumes:
+      - pulse_osdata:/usr/share/opensearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:9200/_cluster/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+    networks: [pulse]
+
+  probe-agent:
+    build:
+      context: ../../probe/agent
+      dockerfile: Dockerfile
+    image: pulse-probe-agent:latest
+    container_name: pulse-probe-agent
+    restart: unless-stopped
+    depends_on:
+      opensearch:
+        condition: service_healthy
+    environment:
+      PULSE_PROBE_API_PORT: ${PULSE_PROBE_API_PORT:-8444}
+      PULSE_PROBE_SERVER_BASE_URL: ${PULSE_PROBE_SERVER_BASE_URL:-https://server-backend:9443}
+      PULSE_PROBE_ENROLLMENT_TOKEN: ${PULSE_PROBE_ENROLLMENT_TOKEN:-}
+      PULSE_PROBE_PROBE_TOKEN: ${PULSE_PROBE_PROBE_TOKEN:-}
+      PULSE_PROBE_SERVER_QUERY_TOKEN: ${PULSE_PROBE_SERVER_QUERY_TOKEN:-server-to-probe-token}
+      PULSE_PROBE_OPENSEARCH_URL: http://opensearch:9200
+      PULSE_PROBE_HTTP_VERIFY: ${PULSE_PROBE_HTTP_VERIFY:-false}
+      PULSE_PROBE_LOG_LEVEL: ${PULSE_PROBE_LOG_LEVEL:-info}
+    ports:
+      - "${PULSE_PROBE_API_PORT:-8444}:${PULSE_PROBE_API_PORT:-8444}"
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import os,urllib.request,sys; p=os.environ.get('PULSE_PROBE_API_PORT','8444'); sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:'+p+'/api/v1/health',timeout=3).status==200 else 1)\""]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    networks: [pulse]
+
+  probe-dashboard:
+    build:
+      context: ../..
+      dockerfile: probe/dashboard/Dockerfile
+    image: pulse-probe-dashboard:latest
+    container_name: pulse-probe-dashboard
+    restart: unless-stopped
+    depends_on:
+      - probe-agent
+    environment:
+      PULSE_PROBE_DASH_PORT: ${PULSE_PROBE_DASH_PORT:-5001}
+      PULSE_PROBE_API_BASE: http://probe-agent:${PULSE_PROBE_API_PORT:-8444}/api/v1
+      PULSE_PROBE_AGENT_TOKEN: ${PULSE_PROBE_SERVER_QUERY_TOKEN:-server-to-probe-token}
+      PULSE_PROBE_DASH_USER: ${PULSE_PROBE_DASH_USER:-probe}
+      PULSE_PROBE_DASH_PASSWORD: ${PULSE_PROBE_DASH_PASSWORD:-probe}
+      PULSE_PROBE_SECRET_KEY: ${PULSE_PROBE_SECRET_KEY:-dev-probe-secret}
+      PULSE_PROBE_SESSION_COOKIE_NAME: ${PULSE_PROBE_SESSION_COOKIE_NAME:-pulse_probe_session}
+      PULSE_PROBE_SESSION_COOKIE_SECURE: ${PULSE_PROBE_SESSION_COOKIE_SECURE:-false}
+      PULSE_HTTP_TIMEOUT: ${PULSE_HTTP_TIMEOUT:-10}
+      PULSE_VERIFY_TLS: ${PULSE_VERIFY_TLS:-false}
+    ports:
+      - "${PULSE_PROBE_DASH_PORT:-5001}:${PULSE_PROBE_DASH_PORT:-5001}"
+    networks: [pulse]
+
+volumes:
+  pulse_osdata:
+    name: pulse_osdata
+
+networks:
+  pulse:
+    name: pulse-probe-net

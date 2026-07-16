@@ -111,6 +111,11 @@ class Probe(Base):
     description: Mapped[str | None] = mapped_column(String(255))
     query_endpoint: Mapped[str | None] = mapped_column(String(255))
     tags: Mapped[list[Any]] = mapped_column(JSONB, nullable=False, server_default=text("'[]'::jsonb"))
+    # Dati anagrafici opzionali della Sonda (esteso su richiesta utente, migrazione 003).
+    location: Mapped[str | None] = mapped_column(String(255))
+    contact_name: Mapped[str | None] = mapped_column(String(255))
+    contact_email: Mapped[str | None] = mapped_column(String(255))
+    contact_phone: Mapped[str | None] = mapped_column(String(50))
     enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("true"))
     status: Mapped[str] = mapped_column(String(20), nullable=False, server_default=text("'pending'"))
     token_hash: Mapped[str | None] = mapped_column(String(255))

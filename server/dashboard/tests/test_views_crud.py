@@ -112,29 +112,103 @@ def test_probes_list_and_create(client, login, fake):
                                  "enrollment_expires_at": "2026-07-16T00:00:00Z"})
     r = client.post("/probes/new", data={"name": "p", "description": "d",
                                          "query_endpoint": "http://x",
-                                         "tags": "a, b", "enabled": "on"})
+                                         "tags": "a, b", "enabled": "on",
+                                         "location": " Milano DC1 ",
+                                         "contact_name": "Mario Rossi",
+                                         "contact_email": "mario@example.com",
+                                         "contact_phone": "+39 02 1"})
     assert r.status_code == 200
     assert b"TOK" in r.data
+    # I campi anagrafici sono inoltrati al backend (ripuliti dagli spazi).
+    sent = fake.sent[("POST", "/probes")]
+    assert sent["location"] == "Milano DC1"
+    assert sent["contact_name"] == "Mario Rossi"
+    assert sent["contact_email"] == "mario@example.com"
+    assert sent["contact_phone"] == "+39 02 1"
+
+
+def test_probes_create_omits_empty_profile(client, login, fake):
+    """Campi anagrafici vuoti -> null (non stringa vuota) per evitare 422."""
+    login(["probes.create"])
+    fake.set("POST", "/probes", {"probe": {"id": "1"}, "enrollment_token": "T",
+                                 "enrollment_expires_at": "x"})
+    client.post("/probes/new", data={"name": "p", "contact_email": "  "})
+    sent = fake.sent[("POST", "/probes")]
+    assert sent["contact_email"] is None
+    assert sent["location"] is None
+    assert sent["contact_name"] is None
+    assert sent["contact_phone"] is None
 
 
 def test_probes_detail_edit_update_delete_rotate(client, login, fake):
     login(["probes.read", "probes.update", "probes.delete", "probes.rotate_key"])
-    fake.set("GET", "/probes/1", {"id": "1", "name": "p"})
+    fake.set("GET", "/probes/1", {"id": "1", "name": "p",
+                                  "location": "Milano DC1",
+                                  "contact_name": "Mario Rossi",
+                                  "contact_email": "mario@example.com",
+                                  "contact_phone": "+39 02 1"})
     fake.set("GET", "/probes/1/status", {"status": "online"})
     fake.set("GET", "/dashboard/probe/1", {"systems": [], "generated_at": "x"})
     fake.set("GET", "/probes/1/heartbeats", {"items": []})
-    assert client.get("/probes/1").status_code == 200
-    assert client.get("/probes/1/edit").status_code == 200
+    detail = client.get("/probes/1")
+    assert detail.status_code == 200
+    # Il dettaglio mostra l'anagrafica.
+    body = detail.get_data(as_text=True)
+    assert "Anagrafica" in body
+    assert "Milano DC1" in body
+    assert "Mario Rossi" in body
+    assert "mario@example.com" in body
+    assert "+39 02 1" in body
+    # La form di modifica precompila i campi anagrafici.
+    edit = client.get("/probes/1/edit")
+    assert edit.status_code == 200
+    edit_body = edit.get_data(as_text=True)
+    assert 'name="location"' in edit_body
+    assert 'name="contact_name"' in edit_body
+    assert 'name="contact_email"' in edit_body
+    assert 'name="contact_phone"' in edit_body
+    assert 'value="Milano DC1"' in edit_body
+    assert 'value="Mario Rossi"' in edit_body
     fake.set("PUT", "/probes/1", {"id": "1"})
-    assert client.post("/probes/1/edit", data={"name": "p2", "description": "",
-                                               "query_endpoint": "", "tags": "",
-                                               "enabled": ""}).status_code == 302
+    assert client.post("/probes/1/edit",
+                       data={"name": "p2", "description": "",
+                             "query_endpoint": "", "tags": "", "enabled": "",
+                             "location": "Roma", "contact_name": "Anna",
+                             "contact_email": "anna@example.com",
+                             "contact_phone": "111"}).status_code == 302
+    # Update inoltra i campi anagrafici al backend.
+    put_sent = fake.sent[("PUT", "/probes/1")]
+    assert put_sent["location"] == "Roma"
+    assert put_sent["contact_name"] == "Anna"
+    assert put_sent["contact_email"] == "anna@example.com"
+    assert put_sent["contact_phone"] == "111"
     fake.set("DELETE", "/probes/1", None)
     assert client.post("/probes/1/delete").status_code == 302
     fake.set("POST", "/probes/1/rotate-credentials",
              {"enrollment_token": "NEW", "enrollment_expires_at": "x"})
     r = client.post("/probes/1/rotate")
     assert b"NEW" in r.data
+
+
+def test_probes_detail_profile_placeholder(client, login, fake):
+    """Anagrafica assente -> segnaposto '—' nel dettaglio."""
+    login(["probes.read"])
+    fake.set("GET", "/probes/1", {"id": "1", "name": "p"})
+    fake.set("GET", "/probes/1/status", {"status": "online"})
+    fake.set("GET", "/dashboard/probe/1", {"systems": [], "generated_at": "x"})
+    fake.set("GET", "/probes/1/heartbeats", {"items": []})
+    body = client.get("/probes/1").get_data(as_text=True)
+    assert "Anagrafica" in body
+    assert "—" in body  # posizione/referente/email/telefono assenti
+
+
+def test_probes_new_form_has_empty_profile_fields(client, login, fake):
+    """La form di creazione espone i campi anagrafici (vuoti)."""
+    login(["probes.create"])
+    body = client.get("/probes/new").get_data(as_text=True)
+    for field in ("location", "contact_name", "contact_email", "contact_phone"):
+        assert ('name="%s"' % field) in body
+    assert 'type="email"' in body  # email referente
 
 
 # -- P-10 Sistemi -------------------------------------------------------------
