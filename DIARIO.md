@@ -725,3 +725,39 @@ Output consegnati
 - Esito: 228 test passati (0 falliti), coverage server/backend 100% (statement+branch, systems.py incluso), mypy --strict pulito.
 
 ================================================
+
+ITERAZIONE 19
+
+Agente: BE
+Data: 2026-07-16
+
+Input ricevuti
+- Bug confermato a runtime: la tabella discovered_checks non veniva mai popolata (0 righe con 174 heartbeat); il modello e GET /api/v1/systems/{id}/checks leggono soltanto, e il gestore rollup salvava solo il payload grezzo -> "Check scoperti" in UI sempre vuoto.
+- Fix richiesto su entrambi i backend di mia proprieta' (server/backend + probe/agent), contratti/response invariati (popolamento interno), tutto in un'unica transazione, coverage 100% su entrambi, mypy --strict pulito, 0 test falliti.
+
+Lavoro svolto
+- PROBE (probe/agent/pulse_probe/poller.py, build_rollup): ogni voce di `checks` ora include anche `check_name` (da d.get('check_name')); struttura per check = {check_id, check_name, status}. Invariati window/generated_at/systems e le metriche.
+- SERVER (routers/probe_comm.py, probe_rollup): dopo il salvataggio di ProbeRollup (mantenuto, non sostituito) viene invocato il nuovo helper `_sync_discovered_checks(session, probe_id, systems)`:
+  - per ogni sistema del rollup, cerca il MonitoredSystem con system_id == s.system_id AND probe_id == probe.id; se non registrato per la Probe, salta;
+  - per ogni check con check_id valorizzato esegue un UPSERT (PostgreSQL insert().on_conflict_do_update sul vincolo uq_discovered_checks) su DiscoveredCheck: system_id = id del MonitoredSystem, probe_id, check_id, check_name, last_status, last_seen_at = now(UTC); su conflitto aggiorna probe_id/last_status/last_seen_at e check_name solo se fornito (altrimenti conserva quello esistente);
+  - check senza check_id (assente o vuoto) saltati; tutto nella stessa transazione (unico commit del rollup).
+
+File toccati
+- probe/agent/pulse_probe/poller.py (check_name nel rollup).
+- probe/agent/tests/test_poller.py (asserzioni check_name in build_rollup).
+- server/backend/pulse_server/routers/probe_comm.py (import DiscoveredCheck/pg_insert/uuid, helper _sync_discovered_checks, integrazione in probe_rollup).
+- server/backend/tests/test_probe_comm.py (nuovi test discovered_checks).
+
+Problemi trovati
+- Nessuno di bloccante. Attenzione preservazione check_name: su rollup successivo senza check_name l'UPSERT conserva il valore precedente (COALESCE logico implementato lato Python evitando dipendenze extra), verificato da test.
+
+Decisioni prese
+- UPSERT nativo PostgreSQL (on_conflict_do_update sul constraint uq_discovered_checks) per efficienza e coerenza col vincolo UNIQUE (system_id, check_id), coerente con lo stile del progetto (dialetto postgresql gia' usato per JSONB/UUID).
+- check_name aggiornato solo se presente nel payload, altrimenti conservato (evita di azzerare nomi gia' noti quando un rollup lo omette).
+
+Output consegnati
+- discovered_checks ora popolata/aggiornata ad ogni rollup; check_name propagato dalla Probe al Server fino alla UI (GET /systems/{id}/checks lo restituisce).
+- Test aggiunti: rollup crea i check corretti (con check_name); secondo rollup aggiorna last_status/last_seen senza duplicati e conserva check_name; sistema non registrato -> nessuna riga; check senza check_id -> saltato; build_rollup della Probe include check_name.
+- Esito: server/backend 232 test passati, coverage 100% (probe_comm incluso); probe/agent 72 test passati, coverage 100% (poller incluso); mypy --strict pulito su entrambi; 0 test falliti. Contratti API invariati.
+
+================================================
