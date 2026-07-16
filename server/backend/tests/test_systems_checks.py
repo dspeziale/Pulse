@@ -55,6 +55,154 @@ def test_system_crud_with_windows_and_thresholds(client, auth_headers) -> None:
     assert deleted.status_code == 204
 
 
+def _make_tcp_system(client, headers, pid, **over):
+    body = {
+        "system_id": over.get("system_id", "tcp-1"),
+        "system_name": over.get("system_name", "TCP System 1"),
+        "kind": "tcp",
+        "tcp_host": over.get("tcp_host", "db.local"),
+        "tcp_port": over.get("tcp_port", 5432),
+        "probe_id": pid,
+        "poll_interval_seconds": 30,
+        "timeout_seconds": 5,
+        "enabled": True,
+    }
+    for k in ("tcp_host", "tcp_port", "heartbeat_url"):
+        if k in over:
+            body[k] = over[k]
+    return client.post("/api/v1/systems", headers=headers, json=body)
+
+
+def test_create_tcp_system_ok(client, auth_headers) -> None:
+    pid = _make_probe(client, auth_headers, name="probe-tcp-ok")
+    r = _make_tcp_system(client, auth_headers, pid, system_id="tcp-ok")
+    assert r.status_code == 201, r.text
+    data = r.json()
+    assert data["kind"] == "tcp"
+    assert data["tcp_host"] == "db.local"
+    assert data["tcp_port"] == 5432
+    assert data["heartbeat_url"] is None
+    # rilettura: i campi tcp sono serializzati
+    got = client.get(f"/api/v1/systems/{data['id']}", headers=auth_headers).json()
+    assert got["kind"] == "tcp" and got["tcp_port"] == 5432
+
+
+def test_create_http_system_has_kind_default(client, auth_headers) -> None:
+    pid = _make_probe(client, auth_headers, name="probe-http-default")
+    r = _make_system(client, auth_headers, pid, system_id="http-default")
+    assert r.status_code == 201
+    assert r.json()["kind"] == "http"
+    assert r.json()["tcp_host"] is None and r.json()["tcp_port"] is None
+
+
+def test_create_tcp_without_host_422(client, auth_headers) -> None:
+    pid = _make_probe(client, auth_headers, name="probe-tcp-nohost")
+    r = client.post(
+        "/api/v1/systems",
+        headers=auth_headers,
+        json={
+            "system_id": "tcp-nohost", "system_name": "x", "kind": "tcp",
+            "tcp_port": 443, "probe_id": pid,
+            "poll_interval_seconds": 30, "timeout_seconds": 5,
+        },
+    )
+    assert r.status_code == 422
+
+
+def test_create_tcp_without_port_422(client, auth_headers) -> None:
+    pid = _make_probe(client, auth_headers, name="probe-tcp-noport")
+    r = client.post(
+        "/api/v1/systems",
+        headers=auth_headers,
+        json={
+            "system_id": "tcp-noport", "system_name": "x", "kind": "tcp",
+            "tcp_host": "h.local", "probe_id": pid,
+            "poll_interval_seconds": 30, "timeout_seconds": 5,
+        },
+    )
+    assert r.status_code == 422
+
+
+def test_create_http_without_url_422(client, auth_headers) -> None:
+    pid = _make_probe(client, auth_headers, name="probe-http-nourl")
+    r = client.post(
+        "/api/v1/systems",
+        headers=auth_headers,
+        json={
+            "system_id": "http-nourl", "system_name": "x", "kind": "http",
+            "probe_id": pid, "poll_interval_seconds": 30, "timeout_seconds": 5,
+        },
+    )
+    assert r.status_code == 422
+
+
+def test_create_tcp_port_out_of_range_422(client, auth_headers) -> None:
+    pid = _make_probe(client, auth_headers, name="probe-tcp-badport")
+    r = _make_tcp_system(client, auth_headers, pid, system_id="tcp-badport", tcp_port=70000)
+    assert r.status_code == 422
+
+
+def test_create_http_invalid_url_422(client, auth_headers) -> None:
+    pid = _make_probe(client, auth_headers, name="probe-http-badurl")
+    r = _make_system(client, auth_headers, pid, system_id="http-badurl")
+    # override heartbeat_url con schema non http
+    r = client.post(
+        "/api/v1/systems",
+        headers=auth_headers,
+        json={
+            "system_id": "http-badurl2", "system_name": "x", "kind": "http",
+            "heartbeat_url": "ftp://nope", "probe_id": pid,
+            "poll_interval_seconds": 30, "timeout_seconds": 5,
+        },
+    )
+    assert r.status_code == 422
+
+
+def test_update_system_to_tcp_ok(client, auth_headers) -> None:
+    pid = _make_probe(client, auth_headers, name="probe-upd-tcp")
+    sid = _make_system(client, auth_headers, pid, system_id="upd-to-tcp").json()["id"]
+    r = client.put(
+        f"/api/v1/systems/{sid}",
+        headers=auth_headers,
+        json={"kind": "tcp", "tcp_host": "svc.local", "tcp_port": 8080},
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["kind"] == "tcp" and r.json()["tcp_port"] == 8080
+
+
+def test_update_to_tcp_without_port_422(client, auth_headers) -> None:
+    pid = _make_probe(client, auth_headers, name="probe-upd-tcp-bad")
+    sid = _make_system(client, auth_headers, pid, system_id="upd-tcp-bad").json()["id"]
+    r = client.put(
+        f"/api/v1/systems/{sid}",
+        headers=auth_headers,
+        json={"kind": "tcp", "tcp_host": "svc.local"},
+    )
+    assert r.status_code == 422
+
+
+def test_update_tcp_port_out_of_range_422(client, auth_headers) -> None:
+    pid = _make_probe(client, auth_headers, name="probe-upd-badport")
+    sid = _make_system(client, auth_headers, pid, system_id="upd-badport").json()["id"]
+    r = client.put(f"/api/v1/systems/{sid}", headers=auth_headers, json={"tcp_port": 0})
+    assert r.status_code == 422
+
+
+def test_update_heartbeat_url_valid_and_invalid(client, auth_headers) -> None:
+    pid = _make_probe(client, auth_headers, name="probe-upd-url")
+    sid = _make_system(client, auth_headers, pid, system_id="upd-url").json()["id"]
+    ok = client.put(
+        f"/api/v1/systems/{sid}",
+        headers=auth_headers,
+        json={"heartbeat_url": "https://new.local/api/heartbeat"},
+    )
+    assert ok.status_code == 200 and ok.json()["heartbeat_url"].endswith("/api/heartbeat")
+    bad = client.put(
+        f"/api/v1/systems/{sid}", headers=auth_headers, json={"heartbeat_url": "ftp://nope"}
+    )
+    assert bad.status_code == 422
+
+
 def test_system_duplicate_id_conflict(client, auth_headers) -> None:
     pid = _make_probe(client, auth_headers, name="probe-dupsys")
     _make_system(client, auth_headers, pid, system_id="dup-sys")

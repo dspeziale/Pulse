@@ -2,6 +2,7 @@
 {% from "_macros.html" import status_badge %}
 {% block title %}Grafici / Analisi — Pulse Server{% endblock %}
 {% block head_extra %}<script src="{{ url_for('static', filename='pulse-charts.js') }}"></script>{% endblock %}
+{% block body_extra %}<script src="{{ url_for('static', filename='js/pulse-systems.js') }}"></script>{% endblock %}
 {% block content %}
 <h1 class="h3 mb-1"><i class="bi bi-graph-up me-2"></i>Grafici / Analisi (P-05)</h1>
 <p class="text-body-secondary">Andamento del tempo di risposta e uptime per un sistema, sulla finestra temporale scelta.</p>
@@ -12,7 +13,11 @@
     <form method="get" class="row g-3 align-items-end">
       <div class="col-md-4">
         <label class="form-label" for="probe_id">Sonda</label>
-        <select class="form-select" id="probe_id" name="probe_id" required>
+        <select class="form-select" id="probe_id" name="probe_id" required
+                data-probe-source="{{ url_for('systems.systems_by_probe') }}"
+                data-systems-target="#system-options"
+                data-systems-mode="datalist"
+                data-systems-init>
           <option value="">— seleziona —</option>
           {% for p in probes['items'] %}
             <option value="{{ p.id }}" {% if p.id==probe_id %}selected{% endif %}>{{ p.name }}</option>
@@ -21,7 +26,9 @@
       </div>
       <div class="col-md-3">
         <label class="form-label" for="system_id">System ID</label>
-        <input class="form-control" id="system_id" name="system_id" value="{{ system_id }}" placeholder="es. crm-prod" required>
+        <input class="form-control" id="system_id" name="system_id" value="{{ system_id }}" placeholder="es. crm-prod" list="system-options" required>
+        <datalist id="system-options"></datalist>
+        <div class="form-text">I sistemi della Sonda scelta compaiono come suggerimenti.</div>
       </div>
       <div class="col-md-2">
         <label class="form-label" for="from">Da (ISO)</label>

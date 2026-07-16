@@ -11,7 +11,7 @@ import uuid
 from typing import Any, Literal
 from urllib.parse import urlparse
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, model_validator
 from pydantic_core import PydanticCustomError
 
 
@@ -238,11 +238,60 @@ class MaintenanceWindowOut(_Model):
     note: str | None = None
 
 
+# Tipo di controllo di un sistema monitorato (esteso su richiesta utente).
+SystemKind = Literal["http", "tcp"]
+
+
+def _require_http_url(value: str) -> None:
+    """Valida che `value` sia un URL http/https con host (solleva altrimenti)."""
+    parsed = urlparse(value)
+    if parsed.scheme not in ("http", "https") or not parsed.netloc:
+        raise PydanticCustomError(
+            "value_error", "heartbeat_url deve essere un URL http/https valido."
+        )
+
+
+def _validate_system_kind(
+    kind: str,
+    heartbeat_url: str | None,
+    tcp_host: str | None,
+    tcp_port: int | None,
+) -> None:
+    """Valida la coerenza dei campi in base a `kind` (esteso su richiesta utente).
+
+    - `http`: `heartbeat_url` obbligatorio (e valido).
+    - `tcp` : `tcp_host` e `tcp_port` (1..65535) obbligatori.
+    Solleva PydanticCustomError (mappato a 422 dal handler) in caso di incoerenza.
+    """
+    if tcp_port is not None and not (1 <= tcp_port <= 65535):
+        raise PydanticCustomError(
+            "value_error", "tcp_port deve essere compreso tra 1 e 65535."
+        )
+    if kind == "http":
+        if not heartbeat_url:
+            raise PydanticCustomError(
+                "value_error", "heartbeat_url e' obbligatorio per kind='http'."
+            )
+        _require_http_url(heartbeat_url)
+    else:  # kind == "tcp"
+        if not tcp_host:
+            raise PydanticCustomError(
+                "value_error", "tcp_host e' obbligatorio per kind='tcp'."
+            )
+        if tcp_port is None:
+            raise PydanticCustomError(
+                "value_error", "tcp_port e' obbligatorio per kind='tcp'."
+            )
+
+
 class SystemOut(_Model):
     id: str
     system_id: str
     system_name: str
-    heartbeat_url: str
+    kind: SystemKind
+    heartbeat_url: str | None
+    tcp_host: str | None
+    tcp_port: int | None
     probe_id: str
     poll_interval_seconds: int
     timeout_seconds: int
@@ -260,7 +309,10 @@ class SystemList(_Model):
 class SystemCreate(_Model):
     system_id: str = Field(min_length=1, max_length=100)
     system_name: str = Field(min_length=1, max_length=255)
-    heartbeat_url: str = Field(min_length=1, max_length=500)
+    kind: SystemKind = "http"
+    heartbeat_url: str | None = Field(default=None, max_length=500)
+    tcp_host: str | None = Field(default=None, max_length=255)
+    tcp_port: int | None = None
     probe_id: str
     poll_interval_seconds: int = Field(gt=0)
     timeout_seconds: int = Field(gt=0)
@@ -268,10 +320,18 @@ class SystemCreate(_Model):
     thresholds: Thresholds | None = None
     maintenance_windows: list[MaintenanceWindowIn] | None = None
 
+    @model_validator(mode="after")
+    def _check_kind(self) -> "SystemCreate":
+        _validate_system_kind(self.kind, self.heartbeat_url, self.tcp_host, self.tcp_port)
+        return self
+
 
 class SystemUpdate(_Model):
     system_name: str | None = None
-    heartbeat_url: str | None = None
+    kind: SystemKind | None = None
+    heartbeat_url: str | None = Field(default=None, max_length=500)
+    tcp_host: str | None = Field(default=None, max_length=255)
+    tcp_port: int | None = None
     probe_id: str | None = None
     poll_interval_seconds: int | None = Field(default=None, gt=0)
     timeout_seconds: int | None = Field(default=None, gt=0)
@@ -279,25 +339,44 @@ class SystemUpdate(_Model):
     thresholds: Thresholds | None = None
     maintenance_windows: list[MaintenanceWindowIn] | None = None
 
+    @model_validator(mode="after")
+    def _check_kind(self) -> "SystemUpdate":
+        """Valida la coerenza risultante quando i campi rilevanti sono forniti.
+
+        Update parziale: se `kind` e' fornito, i campi obbligatori del nuovo tipo
+        devono essere presenti nella stessa richiesta. `tcp_port` (se fornito) e'
+        sempre validato nel range 1..65535.
+        """
+        if self.tcp_port is not None and not (1 <= self.tcp_port <= 65535):
+            raise PydanticCustomError(
+                "value_error", "tcp_port deve essere compreso tra 1 e 65535."
+            )
+        if self.kind is not None:
+            _validate_system_kind(
+                self.kind, self.heartbeat_url, self.tcp_host, self.tcp_port
+            )
+        elif self.heartbeat_url is not None:
+            _require_http_url(self.heartbeat_url)
+        return self
+
 
 class SystemTestRequest(_Model):
-    """Richiesta di test dell'endpoint heartbeat (aggiunta su richiesta utente).
+    """Richiesta di test di un sistema (aggiunta/estesa su richiesta utente).
 
-    Non persiste nulla: esegue una GET diagnostica verso `heartbeat_url`.
+    Non persiste nulla. Per `kind='http'` esegue una GET diagnostica verso
+    `heartbeat_url`; per `kind='tcp'` apre una connessione TCP a `tcp_host:tcp_port`.
     """
 
-    heartbeat_url: str = Field(min_length=1, max_length=500)
+    kind: SystemKind = "http"
+    heartbeat_url: str | None = Field(default=None, max_length=500)
+    tcp_host: str | None = Field(default=None, max_length=255)
+    tcp_port: int | None = None
     timeout_seconds: int = Field(default=5, ge=1, le=60)
 
-    @field_validator("heartbeat_url")
-    @classmethod
-    def _validate_http_url(cls, value: str) -> str:
-        parsed = urlparse(value)
-        if parsed.scheme not in ("http", "https") or not parsed.netloc:
-            raise PydanticCustomError(
-                "value_error", "heartbeat_url deve essere un URL http/https valido."
-            )
-        return value
+    @model_validator(mode="after")
+    def _check_kind(self) -> "SystemTestRequest":
+        _validate_system_kind(self.kind, self.heartbeat_url, self.tcp_host, self.tcp_port)
+        return self
 
 
 class SystemTestDocument(_Model):
@@ -455,7 +534,10 @@ class ProbeRegisterResponse(_Model):
 class ProbeConfigSystem(_Model):
     system_id: str
     system_name: str
-    heartbeat_url: str
+    kind: SystemKind = "http"
+    heartbeat_url: str | None = None
+    tcp_host: str | None = None
+    tcp_port: int | None = None
     poll_interval_seconds: int
     timeout_seconds: int
     enabled: bool

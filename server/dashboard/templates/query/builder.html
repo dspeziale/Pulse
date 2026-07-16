@@ -15,13 +15,16 @@
         <div class="row g-3">
           <div class="col-md-12">
             <label class="form-label" for="probe_id">Sonda</label>
-            <select class="form-select" id="probe_id" name="probe_id" required>
+            <select class="form-select" id="probe_id" name="probe_id" required
+                    data-probe-source="{{ url_for('systems.systems_by_probe') }}"
+                    data-systems-target="#probe-systems-list"
+                    data-systems-mode="list">
               <option value="">— seleziona una Sonda —</option>
               {% for p in probes['items'] %}
                 <option value="{{ p.id }}" {% if p.id==probe_id %}selected{% endif %}>{{ p.name }}</option>
               {% endfor %}
             </select>
-            <div class="form-text">La query viene eseguita sui dati locali (OpenSearch) della Sonda selezionata.</div>
+            <div class="form-text">La query viene eseguita sui dati locali (OpenSearch) della Sonda selezionata. I sistemi disponibili si aggiornano automaticamente a destra al cambio di Sonda.</div>
           </div>
           <div class="col-md-6">
             <label class="form-label" for="from">Da (ISO-8601)</label>
@@ -66,16 +69,18 @@
 ]</pre>
       </div>
     </div>
-    {% if systems and systems['items'] %}
     <div class="card mt-3">
       <div class="card-header"><i class="bi bi-hdd-stack me-1"></i>Sistemi della Sonda</div>
       <div class="card-body small">
-        <ul class="list-unstyled mb-0">
-          {% for s in systems['items'] %}<li><code>{{ s.system_id }}</code> — {{ s.system_name }}</li>{% endfor %}
+        <ul class="list-unstyled mb-0" id="probe-systems-list" data-systems-empty="Seleziona una Sonda per elencarne i sistemi.">
+          {% if systems and systems['items'] %}
+            {% for s in systems['items'] %}<li><code>{{ s.system_id }}</code> — {{ s.system_name }}</li>{% endfor %}
+          {% else %}
+            <li class="text-body-secondary">Seleziona una Sonda per elencarne i sistemi.</li>
+          {% endif %}
         </ul>
       </div>
     </div>
-    {% endif %}
   </div>
 </div>
 </form>
@@ -110,3 +115,4 @@
 </div>
 {% endif %}
 {% endblock %}
+{% block body_extra %}<script src="{{ url_for('static', filename='js/pulse-systems.js') }}"></script>{% endblock %}

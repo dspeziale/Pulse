@@ -227,3 +227,81 @@ def test_build_test_client_is_httpx() -> None:
     c = systems_router._build_test_client(5.0)
     assert isinstance(c, httpx.Client)
     c.close()
+
+
+# ------------------------------- TCP (esteso su richiesta utente) -----------
+
+
+class _FakeSock:
+    def __enter__(self) -> "_FakeSock":
+        return self
+
+    def __exit__(self, *_a: object) -> bool:
+        return False
+
+
+def _patch_tcp(monkeypatch, ok: bool) -> None:
+    def _conn(_addr, timeout=None):  # type: ignore[no-untyped-def]
+        if not ok:
+            raise OSError("connection refused")
+        return _FakeSock()
+
+    monkeypatch.setattr(systems_router.socket, "create_connection", _conn)
+
+
+def test_tcp_reachable_true(client, auth_headers, monkeypatch) -> None:
+    _patch_tcp(monkeypatch, ok=True)
+    r = client.post(
+        "/api/v1/systems/test",
+        headers=auth_headers,
+        json={"kind": "tcp", "tcp_host": "db.local", "tcp_port": 5432, "timeout_seconds": 3},
+    )
+    assert r.status_code == 200, r.text
+    data = r.json()
+    assert data["reachable"] is True
+    assert data["http_status"] is None
+    assert data["valid_schema"] is True
+    assert data["checks_count"] == 1
+    assert data["error"] is None
+    assert data["documents"][0]["check_id"] == "tcp"
+    assert data["documents"][0]["status"] == "ok"
+    assert isinstance(data["response_ms"], int)
+
+
+def test_tcp_reachable_false(client, auth_headers, monkeypatch) -> None:
+    _patch_tcp(monkeypatch, ok=False)
+    r = client.post(
+        "/api/v1/systems/test",
+        headers=auth_headers,
+        json={"kind": "tcp", "tcp_host": "db.local", "tcp_port": 5432},
+    )
+    assert r.status_code == 200
+    data = r.json()
+    assert data["reachable"] is False
+    assert data["valid_schema"] is False
+    assert data["checks_count"] == 1
+    assert data["documents"][0]["status"] == "down"
+    assert data["error"] is not None
+
+
+def test_tcp_missing_host_422(client, auth_headers) -> None:
+    r = client.post(
+        "/api/v1/systems/test", headers=auth_headers, json={"kind": "tcp", "tcp_port": 5432}
+    )
+    assert r.status_code == 422
+
+
+def test_tcp_missing_port_422(client, auth_headers) -> None:
+    r = client.post(
+        "/api/v1/systems/test", headers=auth_headers, json={"kind": "tcp", "tcp_host": "db.local"}
+    )
+    assert r.status_code == 422
+
+
+def test_tcp_port_out_of_range_422(client, auth_headers) -> None:
+    r = client.post(
+        "/api/v1/systems/test",
+        headers=auth_headers,
+        json={"kind": "tcp", "tcp_host": "db.local", "tcp_port": 70000},
+    )
+    assert r.status_code == 422

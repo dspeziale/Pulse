@@ -76,6 +76,40 @@ def build_documents(
     return docs
 
 
+def tcp_document(
+    *,
+    system_id: str,
+    system_name: str,
+    probe_id: str | None,
+    reachable: bool,
+    response_ms: int | None,
+    message: str,
+) -> dict[str, Any]:
+    """Documento canonico per un controllo di connettivita' TCP (check_id='tcp').
+
+    status='ok' se la connessione riesce, 'down' altrimenti. Include i campi
+    aggiunti dalla Probe (§4.3): probe_id, ingested_at, reachable, latency_ms.
+    """
+    ts = _now_iso()
+    return {
+        "@timestamp": ts,
+        "system_id": system_id,
+        "system_name": system_name,
+        "check_id": "tcp",
+        "check_name": "Connettivita' TCP",
+        "status": "ok" if reachable else "down",
+        "status_raw": None,
+        "response_ms": response_ms,
+        "message": message,
+        "details": None,
+        "probe_id": probe_id,
+        "reachable": reachable,
+        "http_status": None,
+        "latency_ms": response_ms,
+        "ingested_at": ts,
+    }
+
+
 def unreachable_document(
     *,
     system_id: str,

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import datetime as dt
 import logging
+import socket
 import time
 from typing import Any
 
@@ -23,10 +24,64 @@ def _now_iso() -> str:
     return dt.datetime.now(dt.timezone.utc).isoformat()
 
 
+def _open_tcp_connection(host: str, port: int, timeout: float) -> None:
+    """Apre e chiude subito una connessione TCP verso host:port (isolabile nei test).
+
+    Solleva OSError (inclusi timeout/ConnectionError) se la connessione fallisce.
+    """
+    with socket.create_connection((host, port), timeout=timeout):
+        pass
+
+
+def poll_tcp_system(system: dict[str, Any], probe_id: str | None) -> list[dict[str, Any]]:
+    """Controlla la connettivita' TCP di un sistema (kind='tcp').
+
+    Apre una connessione a `tcp_host:tcp_port` col timeout del sistema, misura il
+    tempo di connessione e ritorna UN documento canonico check_id='tcp'.
+    """
+    system_id = system["system_id"]
+    system_name = system.get("system_name", system_id)
+    host = str(system.get("tcp_host") or "")
+    port = int(system.get("tcp_port") or 0)
+    timeout = float(system.get("timeout_seconds", 5))
+    started = time.monotonic()
+    try:
+        _open_tcp_connection(host, port, timeout)
+    except OSError as exc:
+        elapsed = int((time.monotonic() - started) * 1000)
+        return [
+            canonical.tcp_document(
+                system_id=system_id,
+                system_name=system_name,
+                probe_id=probe_id,
+                reachable=False,
+                response_ms=elapsed,
+                message=f"Connessione TCP fallita verso {host}:{port}: {exc}",
+            )
+        ]
+    elapsed = int((time.monotonic() - started) * 1000)
+    return [
+        canonical.tcp_document(
+            system_id=system_id,
+            system_name=system_name,
+            probe_id=probe_id,
+            reachable=True,
+            response_ms=elapsed,
+            message=f"Connessione TCP riuscita verso {host}:{port}.",
+        )
+    ]
+
+
 def poll_system(
     client: httpx.Client, system: dict[str, Any], probe_id: str | None
 ) -> list[dict[str, Any]]:
-    """Interroga GET /api/heartbeat di un sistema e ritorna i documenti canonici."""
+    """Interroga un sistema e ritorna i documenti canonici.
+
+    Per kind='tcp' esegue un controllo di connettivita' TCP; per kind='http'
+    (default) esegue la GET /api/heartbeat.
+    """
+    if system.get("kind") == "tcp":
+        return poll_tcp_system(system, probe_id)
     url = system["heartbeat_url"]
     timeout = float(system.get("timeout_seconds", 5))
     started = time.monotonic()

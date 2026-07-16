@@ -192,11 +192,19 @@ CREATE INDEX IF NOT EXISTS idx_enrollment_tokens_expires ON enrollment_tokens (e
 -- =============================================================================
 
 -- 3.8 monitored_systems
+-- Supporta due tipi di controllo (kind):
+--   'http' -> heartbeat HTTP/HTTPS su heartbeat_url (obbligatorio)
+--   'tcp'  -> connettivita' TCP su tcp_host:tcp_port (entrambi obbligatori)
 CREATE TABLE IF NOT EXISTS monitored_systems (
     id                    uuid         PRIMARY KEY DEFAULT gen_random_uuid(),
     system_id             varchar(100) NOT NULL UNIQUE,
     system_name           varchar(255) NOT NULL,
-    heartbeat_url         varchar(500) NOT NULL,
+    kind                  varchar(10)  NOT NULL DEFAULT 'http'
+                          CHECK (kind IN ('http','tcp')),
+    -- NULLABLE: obbligatorio solo per kind='http' (vincolo chk_monitored_systems_kind).
+    heartbeat_url         varchar(500),
+    tcp_host              varchar(255),
+    tcp_port              integer      CHECK (tcp_port IS NULL OR (tcp_port BETWEEN 1 AND 65535)),
     -- 1 sistema -> 1 probe; RESTRICT: DELETE probe -> 409 se ha sistemi assegnati.
     probe_id              uuid         NOT NULL REFERENCES probes (id) ON UPDATE CASCADE ON DELETE RESTRICT,
     poll_interval_seconds integer      NOT NULL CHECK (poll_interval_seconds > 0),
@@ -205,7 +213,13 @@ CREATE TABLE IF NOT EXISTS monitored_systems (
     response_ms_warn      integer      CHECK (response_ms_warn  >= 0),
     response_ms_error     integer      CHECK (response_ms_error >= 0),
     created_at            timestamptz  NOT NULL DEFAULT now(),
-    updated_at            timestamptz  NOT NULL DEFAULT now()
+    updated_at            timestamptz  NOT NULL DEFAULT now(),
+    -- Coerenza dei campi in base al tipo di controllo.
+    CONSTRAINT chk_monitored_systems_kind CHECK (
+        (kind = 'http' AND heartbeat_url IS NOT NULL)
+        OR
+        (kind = 'tcp'  AND tcp_host IS NOT NULL AND tcp_port IS NOT NULL)
+    )
 );
 -- 1 probe -> N sistemi: filtro GET /systems?probe_id e pull config Probe.
 CREATE INDEX IF NOT EXISTS idx_monitored_systems_probe   ON monitored_systems (probe_id);

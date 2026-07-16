@@ -164,6 +164,126 @@ def test_systems_full_cycle(client, login, fake):
     assert client.post("/systems/1/delete").status_code == 302
 
 
+# -- P-10 Auto-popolamento sistemi per Sonda (proxy) --------------------------
+def test_systems_by_probe_returns_items(client, login, fake):
+    login(["systems.read"])
+    fake.set("GET", "/systems", {"items": [
+        {"id": "1", "system_id": "s1", "system_name": "S1", "extra": "ignored"},
+        {"id": "2", "system_id": "s2", "system_name": "S2"},
+    ]})
+    r = client.get("/systems-by-probe?probe_id=p1")
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body["items"] == [
+        {"id": "1", "system_id": "s1", "system_name": "S1"},
+        {"id": "2", "system_id": "s2", "system_name": "S2"},
+    ]
+    # il filtro probe_id è propagato al backend
+    assert fake.params[("GET", "/systems")] == {"probe_id": "p1"}
+
+
+def test_systems_by_probe_empty_without_probe(client, login, fake):
+    login(["systems.read"])
+    r = client.get("/systems-by-probe")
+    assert r.status_code == 200
+    assert r.get_json() == {"items": []}
+    # senza probe_id non chiama il backend
+    assert ("GET", "/systems") not in fake.calls
+
+
+def test_systems_by_probe_forbidden(client, login):
+    login(["dashboard.read"])
+    assert client.get("/systems-by-probe?probe_id=p1").status_code == 403
+
+
+def test_systems_by_probe_non_dict_backend(client, login, fake):
+    login(["systems.read"])
+    fake.set("GET", "/systems", ["unexpected"])
+    r = client.get("/systems-by-probe?probe_id=p1")
+    assert r.status_code == 200
+    assert r.get_json() == {"items": []}
+
+
+# -- P-10 Form HTTP/TCP: rendering condizionale e invio campi ------------------
+def test_systems_form_has_kind_and_tcp_fields(client, login, fake):
+    login(["systems.create"])
+    fake.set("GET", "/probes", {"items": []})
+    r = client.get("/systems/new")
+    assert r.status_code == 200
+    assert b'id="kind"' in r.data
+    assert b'name="tcp_host"' in r.data
+    assert b'name="tcp_port"' in r.data
+    assert b"test-tcp-btn" in r.data
+    assert b'data-kind="http"' in r.data and b'data-kind="tcp"' in r.data
+
+
+def test_systems_edit_tcp_system_preselects_kind(client, login, fake):
+    login(["systems.update"])
+    fake.set("GET", "/systems/1", {"id": "1", "system_name": "S", "kind": "tcp",
+                                   "tcp_host": "db", "tcp_port": 5432,
+                                   "thresholds": {}})
+    fake.set("GET", "/probes", {"items": []})
+    r = client.get("/systems/1/edit")
+    assert r.status_code == 200
+    assert b'value="tcp" selected' in r.data
+    assert b"5432" in r.data
+
+
+def test_systems_create_http_payload(client, login, fake):
+    login(["systems.create"])
+    fake.set("POST", "/systems", {"id": "1"})
+    r = client.post("/systems/new", data={
+        "system_id": "s1", "system_name": "S", "kind": "http",
+        "heartbeat_url": "http://x", "tcp_host": "ignored", "tcp_port": "999",
+        "probe_id": "p1", "poll_interval_seconds": "30", "timeout_seconds": "5",
+        "enabled": "on"})
+    assert r.status_code == 302
+    sent = fake.sent[("POST", "/systems")]
+    assert sent["kind"] == "http"
+    assert sent["heartbeat_url"] == "http://x"
+    # i campi TCP non vengono propagati per il tipo http
+    assert sent["tcp_host"] is None and sent["tcp_port"] is None
+
+
+def test_systems_create_tcp_payload(client, login, fake):
+    login(["systems.create"])
+    fake.set("POST", "/systems", {"id": "1"})
+    r = client.post("/systems/new", data={
+        "system_id": "s1", "system_name": "S", "kind": "tcp",
+        "heartbeat_url": "http://ignored", "tcp_host": "db.local",
+        "tcp_port": "5432", "probe_id": "p1", "poll_interval_seconds": "30",
+        "enabled": "on"})
+    assert r.status_code == 302
+    sent = fake.sent[("POST", "/systems")]
+    assert sent["kind"] == "tcp"
+    assert sent["tcp_host"] == "db.local" and sent["tcp_port"] == 5432
+    # l'URL heartbeat non viene propagato per il tipo tcp
+    assert sent["heartbeat_url"] is None
+
+
+def test_systems_update_tcp_payload(client, login, fake):
+    login(["systems.update"])
+    fake.set("PUT", "/systems/1", {"id": "1"})
+    r = client.post("/systems/1/edit", data={
+        "system_id": "s1", "system_name": "S2", "kind": "tcp",
+        "tcp_host": "10.0.0.1", "tcp_port": "6379", "probe_id": "p1",
+        "poll_interval_seconds": "60", "timeout_seconds": "5"})
+    assert r.status_code == 302
+    sent = fake.sent[("PUT", "/systems/1")]
+    assert sent["kind"] == "tcp" and sent["tcp_host"] == "10.0.0.1"
+    assert sent["tcp_port"] == 6379
+
+
+def test_systems_create_invalid_kind_defaults_http(client, login, fake):
+    login(["systems.create"])
+    fake.set("POST", "/systems", {"id": "1"})
+    r = client.post("/systems/new", data={
+        "system_id": "s1", "system_name": "S", "kind": "weird",
+        "heartbeat_url": "http://x", "probe_id": "p1"})
+    assert r.status_code == 302
+    assert fake.sent[("POST", "/systems")]["kind"] == "http"
+
+
 # -- P-10 Test endpoint heartbeat (pre-salvataggio) ---------------------------
 def test_systems_new_form_has_test_button(client, login, fake):
     login(["systems.create"])
@@ -221,6 +341,40 @@ def test_test_heartbeat_missing_url(client, login, fake):
     r = client.post("/systems/test-heartbeat", json={"heartbeat_url": "  "})
     assert r.status_code == 422
     assert r.get_json()["ok"] is False
+
+
+def test_test_tcp_reachable(client, login, fake):
+    login(["systems.create"])
+    fake.set("POST", "/systems/test", {"reachable": True, "response_ms": 12,
+                                       "error": None})
+    r = client.post("/systems/test-heartbeat",
+                    json={"kind": "tcp", "tcp_host": "db", "tcp_port": 5432,
+                          "timeout_seconds": 3})
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body["ok"] is True and body["result"]["reachable"] is True
+    sent = fake.sent[("POST", "/systems/test")]
+    assert sent == {"kind": "tcp", "tcp_host": "db", "tcp_port": 5432,
+                    "timeout_seconds": 3}
+
+
+def test_test_tcp_missing_host_or_port(client, login, fake):
+    login(["systems.update"])
+    r = client.post("/systems/test-heartbeat",
+                    json={"kind": "tcp", "tcp_host": "db"})
+    assert r.status_code == 422
+    assert "host e porta" in r.get_json()["error"]
+
+
+def test_test_http_sends_kind(client, login, fake):
+    login(["systems.create"])
+    fake.set("POST", "/systems/test", {"reachable": True, "valid_schema": True,
+                                       "response_ms": 5, "checks_count": 0,
+                                       "documents": []})
+    r = client.post("/systems/test-heartbeat",
+                    json={"kind": "http", "heartbeat_url": "http://x"})
+    assert r.status_code == 200
+    assert fake.sent[("POST", "/systems/test")]["kind"] == "http"
 
 
 def test_test_heartbeat_backend_error(client, login, fake):

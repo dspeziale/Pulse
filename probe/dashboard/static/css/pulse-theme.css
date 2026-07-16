@@ -79,22 +79,36 @@ table {
 /* -- Shell AdminLTE: rifiniture -------------------------------------------- */
 .brand-link .brand-text { font-weight: 700; letter-spacing: 0.02em; }
 .app-header .navbar-nav .nav-link { cursor: pointer; }
-.sidebar-brand { border-bottom: 1px solid rgba(255, 255, 255, 0.12); }
+/* Bordo brand: usa il colore di bordo del tema (adatta chiaro/scuro). */
+.sidebar-brand { border-bottom: 1px solid var(--bs-border-color-translucent, rgba(0, 0, 0, 0.1)); }
 .app-content { padding-top: 1rem; padding-bottom: 1rem; }
 .content-header h1 { font-size: 1.6rem; margin: 0; }
 
+/* La sidebar segue il tema globale (data-bs-theme su <html>): AdminLTE fornisce
+   gia' le variabili --lte-sidebar-* per chiaro e scuro, quindi qui NON forziamo
+   colori fissi (nessun override dark hard-coded). */
+
+/* -- Sidebar compatta: voci di menu piu' dense ----------------------------- */
+/* Riduce il padding verticale delle voci e lo spazio tra una voce e l'altra,
+   mantenendo un'area cliccabile ragionevole e la leggibilita'. */
+.sidebar-menu .nav-item > .nav-link {
+  padding-top: 0.3rem;
+  padding-bottom: 0.3rem;
+  margin-bottom: 0.05rem;
+}
+
 /* Intestazioni di sezione della sidebar. */
 .sidebar-menu .nav-header {
-  padding: 0.85rem 1rem 0.35rem;
+  padding: 0.6rem 1rem 0.25rem;
   font-size: 0.72rem;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   opacity: 0.65;
 }
-/* Voce di menu attiva (pagina corrente). */
+/* Voce di menu attiva (pagina corrente): lo sfondo evidenziato arriva dalle
+   variabili tema-aware di AdminLTE; qui aggiungiamo solo l'enfasi del testo. */
 .sidebar-menu .nav-link.active {
-  background-color: rgba(255, 255, 255, 0.12);
   font-weight: 700;
 }
 .sidebar-menu .nav-link.active .nav-icon { opacity: 1; }

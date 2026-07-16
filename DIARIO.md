@@ -761,3 +761,179 @@ Output consegnati
 - Esito: server/backend 232 test passati, coverage 100% (probe_comm incluso); probe/agent 72 test passati, coverage 100% (poller incluso); mypy --strict pulito su entrambi; 0 test falliti. Contratti API invariati.
 
 ================================================
+
+ITERAZIONE 20
+
+Agente: DBA
+Data: 2026-07-16
+
+Input ricevuti
+- Nuovo requisito utente: oltre ai sistemi monitorati via HTTP heartbeat, poter configurare sistemi di tipo "connettivita TCP" (host/ip + porta).
+- Vincolo: modificare SOLO artefatti DBA (deploy/schema.sql, migrazioni, docs/database), nessun codice applicativo.
+
+Lavoro svolto
+- Esteso monitored_systems in deploy/schema.sql (installazioni pulite): aggiunte colonne kind, tcp_host, tcp_port; heartbeat_url reso NULLABLE; aggiunti CHECK su kind, su range tcp_port (1-65535) e CHECK di coerenza per tipo.
+- Creata cartella deploy/migrations e migrazione deploy/migrations/002_tcp_checks.sql per DB esistenti: ADD COLUMN IF NOT EXISTS, ALTER COLUMN heartbeat_url DROP NOT NULL, vincoli CHECK aggiunti in blocchi DO idempotenti (verifica pg_constraint). Transazione BEGIN/COMMIT.
+- Aggiornati docs/database/SCHEMA_FISICO.md (sezione 3.8 con kind/tcp_host/tcp_port, nullabilita heartbeat_url e CHECK di coerenza) ed ER_DIAGRAM.md (entita monitored_systems con i nuovi campi).
+- VALIDAZIONE sul DB vivo (container pulse-postgres, user pulse, db pulse):
+  * migrazione applicata con successo (exit 0); RI-esecuzione idempotente (solo NOTICE di skip, exit 0).
+  * colonne risultanti: kind NOT NULL, tcp_host/tcp_port nullable, heartbeat_url ora nullable; 3 CHECK presenti.
+  * TEST CHECK: INSERT kind=tcp con host+porta validi -> OK; kind=tcp senza host/porta -> RIFIUTATO (chk_monitored_systems_kind); porta 70000 -> RIFIUTATO (chk_monitored_systems_tcp_port); kind=http senza heartbeat_url -> RIFIUTATO. Righe di prova (e probe di test) eliminate.
+  * schema.sql pulito ri-validato su container fresco Postgres 16: stesso stato finale della migrazione (convergenza clean-install/migrazione).
+
+File creati
+- deploy/migrations/002_tcp_checks.sql (nuovo)
+- Modificati: deploy/schema.sql, docs/database/SCHEMA_FISICO.md, docs/database/ER_DIAGRAM.md
+
+Problemi trovati
+- Nessuno. I dati HTTP preesistenti restano validi grazie al DEFAULT kind=http.
+- Nota: i CHECK inline di kind-values e tcp_port nel clean schema sono anonimi, mentre nella migrazione hanno nomi espliciti (chk_monitored_systems_kind_values, chk_monitored_systems_tcp_port); semantica identica, il CHECK di coerenza chk_monitored_systems_kind ha lo stesso nome in entrambi.
+
+Decisioni prese
+- Migrazione idempotente via ADD COLUMN IF NOT EXISTS + blocchi DO su pg_constraint (PostgreSQL non supporta ADD CONSTRAINT IF NOT EXISTS).
+- DEFAULT kind=http per retrocompatibilita dei sistemi esistenti.
+
+Output consegnati
+- Schema esteso per controlli TCP (clean + migrazione), documentazione aggiornata, validazione su DB vivo superata (idempotenza + CHECK). Pronto per il BE che dovra esporre kind/tcp_host/tcp_port nelle API/modelli.
+
+================================================
+
+ITERAZIONE 21
+
+Agente: FE
+Data: 2026-07-16
+
+Input ricevuti
+- Richiesta utente (solo frontend, entrambe le dashboard Server e Probe): 1) sidebar theme-aware, cioe' chiara col tema chiaro (default) e scura col tema scuro, invece di restare fissa scura; 2) menu di sinistra piu' compatto (meno padding verticale tra le voci) mantenendo leggibilita' e area cliccabile.
+- Vincoli: niente CDN, mantenere font PT Sans Narrow, i toggle tema/dimensione, le sezioni nav-header e le voci/permessi invariati; coerenza tra le due dashboard.
+
+Lavoro svolto
+- SIDEBAR THEME-AWARE: rimosso l'override fisso data-bs-theme="dark" dall'elemento <aside class="app-sidebar ..."> in server/dashboard/templates/base.html e probe/dashboard/templates/base.html. AdminLTE 4 definisce gia' le variabili --lte-sidebar-* per tema chiaro (.app-sidebar: testo #343a40, hover/active su rgba nero) e scuro ([data-bs-theme=dark] .app-sidebar: testo #c2c7d0, hover/active su rgba bianco). Togliendo l'override, la sidebar eredita data-bs-theme dal <html> gestito dal toggle esistente e i colori restano leggibili in entrambi i temi.
+- CONTRASTO (pulse-theme.css, condiviso/identico tra le due dashboard): il bordo .sidebar-brand passava da rgba(255,255,255,0.12) fisso (invisibile su sfondo chiaro) a var(--bs-border-color-translucent) tema-aware; la regola .sidebar-menu .nav-link.active non forza piu' background-color: rgba(255,255,255,0.12) (era invisibile in chiaro e comunque scavalcato dalla specificita' di AdminLTE): ora lo sfondo della voce attiva arriva dalle variabili tema-aware di AdminLTE, mentre la regola locale mantiene solo font-weight:700 e icona a piena opacita'.
+- MENU COMPATTO (pulse-theme.css): aggiunta regola .sidebar-menu .nav-item > .nav-link con padding verticale 0.3rem (da default Bootstrap 0.5rem) e margin-bottom 0.05rem (da 0.2rem AdminLTE); ridotto il padding delle intestazioni .nav-header (da 0.85rem 1rem 0.35rem a 0.6rem 1rem 0.25rem) per una lista piu' densa mantenendo area cliccabile e leggibilita'.
+- Sincronizzato pulse-theme.css tra server/dashboard e probe/dashboard (file identici, verificato con diff).
+
+File toccati
+- server/dashboard/templates/base.html (rimosso data-bs-theme="dark" dall'aside)
+- probe/dashboard/templates/base.html (rimosso data-bs-theme="dark" dall'aside)
+- server/dashboard/static/css/pulse-theme.css (bordo brand tema-aware, active senza bg fisso, sidebar compatta)
+- probe/dashboard/static/css/pulse-theme.css (identico al precedente)
+
+Problemi trovati
+- Nessuno. Nessun test referenzia i selettori sidebar/nav-link/data-bs-theme, quindi il cambio markup/CSS non ha rotto asserzioni.
+
+Decisioni prese
+- Nessun colore dark hard-coded: si sfruttano le variabili --lte-sidebar-* di AdminLTE gia' predisposte per entrambi i temi, evitando duplicazione e garantendo coerenza col toggle esistente.
+- Sfondo voce attiva delegato ad AdminLTE (tema-aware) invece del rgba bianco fisso; in pulse-theme.css resta solo l'enfasi tipografica.
+
+Output consegnati
+- Sidebar coerente col tema globale: chiara di default, scura col tema scuro; menu piu' compatto su entrambe le dashboard.
+- Smoke: /login 200; nessun data-bs-theme="dark" residuo nell'HTML; pagine protette autenticate renderizzate senza errori (coperte dai test di view).
+- Esito test: frontend_common 29 passati (cov 100%), server/dashboard 60 passati (codice app cov 100%), probe/dashboard 28 passati (codice app cov 100%); 0 test falliti. Le uniche righe non coperte sono negli helper tests/conftest.py (infrastruttura di test, preesistente).
+
+================================================
+
+
+ITERAZIONE 22
+
+Agente: FE
+Data: 2026-07-16
+
+Input ricevuti
+- Richiesta utente (solo server/dashboard, eventualmente frontend_common; vietato toccare backend/probe e la sidebar/tema aggiornati nell'iterazione precedente): 1) in tutte le form con selettore Sonda + selettore Sistema/i, auto-popolare via AJAX i soli sistemi della Sonda scelta al cambio di Sonda; aggiungere una rotta proxy GET /systems-by-probe protetta da systems.read che inoltra a GET /systems?probe_id=... col token di sessione. 2) Estendere la form Sistema al nuovo contratto BE kind=http|tcp (heartbeat_url per http; tcp_host+tcp_port per tcp), con campi dinamici, test TCP analogo al test HTTP, e mostrare tipo+target in lista/dettaglio.
+- Vincoli: niente CDN, coerenza AdminLTE/Bootstrap, coverage 100% (frontend_common + server/dashboard + probe/dashboard) con backend mockato, smoke su systems/new e systems/{id}/edit.
+
+Lavoro svolto
+- ROTTA PROXY: aggiunta GET /systems-by-probe in server/dashboard/views/systems.py (permission_required("systems.read")). Delega a api_get("/systems", params={"probe_id": ...}) col token di sessione e ritorna {"items": [{id, system_id, system_name}, ...]}. Senza probe_id ritorna {"items": []} senza chiamare il backend; risposta backend non-dict gestita come lista vuota.
+- JS RIUTILIZZABILE (locale, nessun CDN): nuovo server/dashboard/static/js/pulse-systems.js. Si auto-aggancia a ogni <select data-probe-source=...> e, al change, ripopola il target (data-systems-target) in tre modalita': "select" (option), "datalist" (suggerimenti per input), "list" (elenco <li>). Popolamento iniziale opt-in via data-systems-init. Fallback: se il JS e' disabilitato resta valido il rendering server-side esistente (nessun target toccato finche' non cambia la Sonda).
+- AUTO-POPOLAMENTO applicato a:
+  * query/builder.html (P-04): il <select> Sonda ora aggiorna in AJAX la card "Sistemi della Sonda" (modalita' "list"); la card e' sempre renderizzata con contenitore stabile #probe-systems-list. Il comportamento server-side esistente (ricarica con ?probe_id) resta come fallback.
+  * query/charts.html (P-05): il <select> Sonda popola un <datalist id="system-options"> collegato all'input System ID (modalita' "datalist", additiva e non distruttiva: l'input resta a testo libero); data-systems-init popola i suggerimenti anche se una Sonda e' gia' selezionata al caricamento.
+  * NON applicato a systems/form.html (la form CREA il sistema, non seleziona sistemi esistenti: il <select> Sonda assegna la Sonda al nuovo sistema), a workflows/form.html (lo scope Sonda/sistemi e' editato come JSON in textarea, nessun selettore dedicato: da contratto non si inventa un selettore), a notifications/form.html (nessuna relazione Sonda->sistemi) e ad alarms/list.html (filtro senza selettore Sonda). Rationale documentato: pattern applicato solo dove esiste gia' una relazione probe->sistemi via selettori/lista.
+- FORM SISTEMA HTTP/TCP (server/dashboard/templates/systems/form.html + views/systems.py):
+  * Aggiunto selettore "Tipo di controllo" (kind: HTTP heartbeat | Connettivita' TCP) con help chiaro.
+  * Campi dinamici via JS locale: blocco .kind-fields[data-kind=http] (URL heartbeat + pulsante "Testa endpoint" esistente) e blocco .kind-fields[data-kind=tcp] (Host/IP, Porta 1-65535 + pulsante "Testa connessione"). Il JS mostra il solo blocco pertinente, disabilita gli input dell'altro (non inviati, non bloccano la validazione HTML5) e sincronizza l'attributo required; required iniziale reso anche lato server per correttezza no-JS sul tipo corrente.
+  * _build_payload ora invia kind + i soli campi pertinenti: per http heartbeat_url valorizzato e tcp_host/tcp_port=None; per tcp tcp_host/tcp_port valorizzati e heartbeat_url=None (evita di far scattare i CHECK di coerenza kind del DB/BE). kind normalizzato a http|tcp (default http; valori ignoti -> http).
+  * Rotta di test estesa: /systems/test-heartbeat ora e' kind-aware. Invia al backend POST /systems/test il payload { kind, heartbeat_url? | tcp_host?+tcp_port?, timeout_seconds }. Per tcp richiede host+porta (422 altrimenti); per http richiede URL (422 altrimenti). Retrocompatibile: payload senza kind -> http. Esito TCP mostrato inline (reachable, response_ms, eventuale errore); il rendering HTTP (schema/documenti) resta invariato e viene omesso per il TCP.
+- LISTA/DETTAGLIO SISTEMI: systems/list.html mostra una colonna "Tipo" (badge HTTP/TCP) e "Endpoint / Target" (URL per http, host:porta per tcp); systems/detail.html mostra "Tipo di controllo" e, in base al tipo, "URL heartbeat" oppure "Host / Porta". Retrocompatibile con sistemi senza kind (default http).
+- TEST (backend mockato): esteso tests/conftest.py FakeApiClient per catturare json inviato (self.sent) e params (self.params). Aggiunti in test_views_crud.py: proxy /systems-by-probe (items, vuoto senza probe_id, forbidden, backend non-dict); rendering condizionale form (kind + campi tcp + pulsante test-tcp; edit di sistema tcp preseleziona kind e mostra porta); invio corretto dei campi (create http/tcp, update tcp, kind ignoto->http); test TCP (reachable con payload atteso, host/porta mancanti 422, http include kind). Aggiunti in test_views_more.py: wiring auto-popolamento su query builder (data-probe-source, target, pulse-systems.js) e datalist su charts.
+
+File toccati
+- server/dashboard/views/systems.py (rotta proxy systems_by_probe; _normalized_kind; _build_payload http/tcp; test_heartbeat kind-aware)
+- server/dashboard/static/js/pulse-systems.js (NUOVO, JS riutilizzabile auto-popolamento)
+- server/dashboard/templates/systems/form.html (selettore kind, blocchi http/tcp, JS toggle + test kind-aware)
+- server/dashboard/templates/systems/list.html (colonne Tipo + Endpoint/Target, colspan)
+- server/dashboard/templates/systems/detail.html (Tipo di controllo + target per tipo)
+- server/dashboard/templates/query/builder.html (select Sonda con data-attributes, card sistemi sempre presente #probe-systems-list, include pulse-systems.js)
+- server/dashboard/templates/query/charts.html (select Sonda con data-attributes, datalist system-options, include pulse-systems.js)
+- server/dashboard/tests/conftest.py (cattura json/params nel FakeApiClient)
+- server/dashboard/tests/test_views_crud.py (test proxy, form http/tcp, invio campi, test TCP)
+- server/dashboard/tests/test_views_more.py (test wiring auto-popolamento builder/charts)
+
+Problemi trovati
+- Nessuno. Backend/probe e sidebar/tema NON toccati (evitato conflitto con l'iterazione precedente).
+
+Decisioni prese
+- Auto-popolamento applicato solo dove esiste gia' una relazione probe->sistemi via selettori/lista (builder, charts); non introdotti nuovi selettori dove lo scope e' JSON (workflows) o dove la form crea il sistema stesso (systems/form).
+- Charts: scelto <datalist> invece di <select> per non rompere l'input a testo libero e la ricarica server-side (miglioria additiva, fallback intatto).
+- Campi del tipo non attivo inviati come None (non omessi) per coerenza esplicita col CHECK del BE/DB e per azzerare eventuali valori residui in modifica quando si cambia tipo.
+- Rotta di test unica estesa (retrocompatibile) invece di una seconda rotta, per riutilizzare gestione errori/permessi esistente.
+
+Output consegnati
+- Rotta proxy GET /systems-by-probe (systems.read) + JS locale riutilizzabile per l'auto-popolamento dei sistemi al cambio di Sonda, applicato a query/builder (lista) e query/charts (datalist).
+- Form Sistema con tipo di controllo HTTP heartbeat / Connettivita' TCP: campi dinamici, invio dei soli campi pertinenti, test TCP inline analogo all'HTTP; tipo e target mostrati in lista e dettaglio.
+- Smoke: systems/new e systems/{id}/edit rendono 200 (coperti da test dedicati); query builder e charts rendono con il wiring AJAX.
+- Esito test: frontend_common 29 passati (cov 100%), server/dashboard 75 passati (codice app cov 100%, incl. views/systems.py 104/104), probe/dashboard 28 passati (codice app cov 100%); 0 test falliti. Le uniche righe non coperte sono negli helper tests/conftest.py (infrastruttura di test, preesistente).
+
+================================================
+
+ITERAZIONE 23
+
+Agente: BE
+Data: 2026-07-16
+
+Input ricevuti
+- Nuovo requisito utente: i sistemi monitorati possono essere di tipo HTTP (heartbeat, esistente) o TCP (connettivita' verso host:porta). Il DBA ha gia' esteso lo schema (colonne kind, tcp_host, tcp_port; heartbeat_url nullable; CHECK di coerenza chk_monitored_systems_kind) e applicato la migrazione 002_tcp_checks.sql al DB vivo. Adeguare server/backend E probe/agent, senza toccare il frontend (che lavora in parallelo, ITERAZIONE 22).
+- Riferimenti letti: docs/database/SCHEMA_FISICO.md (§3.8), deploy/migrations/002_tcp_checks.sql, deploy/schema.sql (monitored_systems), docs/api/DOCUMENTO_API.md (§1.6, §1.9).
+- Contratto condiviso col FE: kind "http"|"tcp" (default "http"); heartbeat_url obbligatorio se http; tcp_host + tcp_port (1..65535) obbligatori se tcp.
+
+Lavoro svolto (SERVER — server/backend)
+- models.py MonitoredSystem: aggiunte kind (str, server_default 'http'), tcp_host (str|None), tcp_port (int|None); heartbeat_url reso Mapped[str|None] (nullable), coerente con lo schema DBA.
+- schemas.py: SystemKind = Literal["http","tcp"]. Helper _validate_system_kind (+ _require_http_url) che solleva PydanticCustomError (mappato 422 dall'handler). SystemOut espone kind/heartbeat_url|None/tcp_host/tcp_port. SystemCreate (default kind="http") e SystemUpdate validano la coerenza via model_validator(mode="after"): http -> heartbeat_url valido richiesto; tcp -> tcp_host + tcp_port(1..65535) richiesti. SystemUpdate (parziale): se kind fornito valida i campi del nuovo tipo; tcp_port se fornito sempre in range; heartbeat_url se fornito sempre URL http/https. SystemTestRequest esteso (kind + tcp_host/tcp_port, heartbeat_url opzionale) con stessa validazione. ProbeConfigSystem espone kind/tcp_host/tcp_port (heartbeat_url opzionale).
+- routers/systems.py: create/update persistono kind/tcp_host/tcp_port (bump config_version invariato). Endpoint POST /systems/test esteso: branch kind=="tcp" -> _test_tcp che apre una connessione via _open_tcp_connection (socket.create_connection, isolabile), misura response_ms e restituisce un documento sintetico check_id="tcp" (status ok/down), reachable true/false, valid_schema=reachable, error valorizzato se irraggiungibile; kind=="http" invariato. Codici 401/403/422 mantenuti.
+- serializers.system_out: include kind/tcp_host/tcp_port.
+- routers/probe_comm.py get_config: include kind/tcp_host/tcp_port per ogni sistema.
+
+Lavoro svolto (PROBE — probe/agent)
+- config/stato: la Probe riceve kind/tcp_host/tcp_port dentro i dict di state.systems (get_config esteso); nessuna trasformazione necessaria, propagati com'e'.
+- canonical.py: nuova tcp_document(...) che costruisce il documento canonico check_id="tcp", check_name="Connettivita' TCP", status ok/down + campi Probe (probe_id, ingested_at, reachable, latency_ms).
+- poller.py: _open_tcp_connection (socket, isolabile) e poll_tcp_system; poll_system fa branch su kind=="tcp" (nessuna GET HTTP, connessione TCP col timeout del sistema, response_ms = tempo di connessione). detect_events/rollup funzionano invariati: il check "tcp" compare tra i checks del rollup -> discovered_checks lato Server.
+
+Qualita'
+- mypy --strict: pulito su entrambi i pacchetti (pulse_server 31 file, pulse_probe 12 file, "no issues found").
+- Test aggiunti: server (create tcp ok; tcp senza host/porta -> 422; http senza url -> 422; porta fuori range -> 422; http url invalido -> 422; update a tcp ok/senza porta 422/porta fuori range 422; update heartbeat_url valido/invalido; serializzazione campi tcp; get_config include kind/tcp_host/tcp_port; /systems/test tcp reachable true/false con socket mockato + 422 host/porta mancanti/porta fuori range). probe (poll tcp ok/down con socket mockato; tcp nel ciclo completo -> rollup con check "tcp").
+- Coverage: server/backend 100% (2902 stmt, 580 branch), probe/agent 100% (588 stmt, 126 branch). Esito: server 249 test passati, probe 75 test passati, 0 falliti.
+
+File toccati
+- server/backend/pulse_server/models.py
+- server/backend/pulse_server/schemas.py
+- server/backend/pulse_server/serializers.py
+- server/backend/pulse_server/routers/systems.py
+- server/backend/pulse_server/routers/probe_comm.py
+- server/backend/tests/test_systems_checks.py
+- server/backend/tests/test_systems_test_endpoint.py
+- server/backend/tests/test_probe_comm.py
+- probe/agent/pulse_probe/canonical.py
+- probe/agent/pulse_probe/poller.py
+- probe/agent/tests/test_poller.py
+- docs/api/DOCUMENTO_API.md (§1.6 System/POST/PUT/POST /systems/test, §1.9 GET /probe/config)
+
+Decisioni prese
+- Validazione cross-field via PydanticCustomError in model_validator(mode="after") (come gia' fatto altrove) per restare 422 e non rompere l'handler.
+- /systems/test TCP: schema di risposta riusato (nessun nuovo campo), documento sintetico singolo check_id="tcp"; scelta documentata in DOCUMENTO_API.md.
+- Update parziale: i campi tcp/url si aggiornano solo se forniti (None = invariato), coerente col resto di SystemUpdate; la coerenza finale e' anche protetta dal CHECK DB.
+
+Output consegnati
+- Backend e Probe supportano sistemi TCP end-to-end (model/schema/serializer/config/test/poller), FE-compatibile col contratto condiviso; documentazione API aggiornata con nota "(esteso su richiesta utente)".
+
+================================================

@@ -121,7 +121,10 @@ def get_config(
             schemas.ProbeConfigSystem(
                 system_id=s.system_id,
                 system_name=s.system_name,
+                kind=s.kind,  # type: ignore[arg-type]
                 heartbeat_url=s.heartbeat_url,
+                tcp_host=s.tcp_host,
+                tcp_port=s.tcp_port,
                 poll_interval_seconds=s.poll_interval_seconds,
                 timeout_seconds=s.timeout_seconds,
                 enabled=s.enabled,

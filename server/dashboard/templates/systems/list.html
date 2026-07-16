@@ -44,14 +44,16 @@
   <div class="table-responsive">
     <table class="table table-hover align-middle mb-0">
       <thead>
-        <tr><th>System ID</th><th>Nome</th><th>URL heartbeat</th><th>Sonda</th><th>Abilitato</th><th class="text-end">Azioni</th></tr>
+        <tr><th>System ID</th><th>Nome</th><th>Tipo</th><th>Endpoint / Target</th><th>Sonda</th><th>Abilitato</th><th class="text-end">Azioni</th></tr>
       </thead>
       <tbody>
       {% for s in data['items'] %}
       <tr>
         <td><a class="fw-semibold text-decoration-none" href="{{ url_for('systems.detail', system_id=s.id) }}">{{ s.system_id }}</a></td>
         <td>{{ s.system_name }}</td>
-        <td class="text-body-secondary text-truncate" style="max-width:22rem">{{ s.heartbeat_url }}</td>
+        {% set skind = s.kind or 'http' %}
+        <td><span class="badge {{ 'b-unknown' if skind == 'tcp' else 'b-ok' }}">{{ 'TCP' if skind == 'tcp' else 'HTTP' }}</span></td>
+        <td class="text-body-secondary text-truncate" style="max-width:22rem">{% if skind == 'tcp' %}{{ s.tcp_host }}:{{ s.tcp_port }}{% else %}{{ s.heartbeat_url }}{% endif %}</td>
         <td>{{ s.probe_id }}</td>
         <td>{{ bool_badge(s.enabled) }}</td>
         <td class="text-end">
@@ -60,7 +62,7 @@
         </td>
       </tr>
       {% else %}
-      <tr><td colspan="6" class="text-center text-body-secondary py-5">
+      <tr><td colspan="7" class="text-center text-body-secondary py-5">
         <i class="bi bi-inbox fs-2 d-block mb-2"></i>
         Nessun sistema monitorato.
         {% if can('systems.create') %}<div class="mt-2"><a class="btn btn-sm btn-primary" href="{{ url_for('systems.new_system') }}"><i class="bi bi-plus-lg me-1"></i>Aggiungi il primo sistema</a></div>{% endif %}

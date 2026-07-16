@@ -88,7 +88,10 @@ def system_out(session: Session, system: MonitoredSystem) -> schemas.SystemOut:
         id=str(system.id),
         system_id=system.system_id,
         system_name=system.system_name,
+        kind=system.kind,  # type: ignore[arg-type]
         heartbeat_url=system.heartbeat_url,
+        tcp_host=system.tcp_host,
+        tcp_port=system.tcp_port,
         probe_id=str(system.probe_id),
         poll_interval_seconds=system.poll_interval_seconds,
         timeout_seconds=system.timeout_seconds,

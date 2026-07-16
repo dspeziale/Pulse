@@ -62,6 +62,42 @@ def test_full_probe_lifecycle(client, auth_headers) -> None:
     assert status.json()["status"] == "online"
 
 
+def test_config_includes_kind_and_tcp_fields(client, auth_headers) -> None:
+    """get_config espone kind/tcp_host/tcp_port (oltre a heartbeat_url) per sistema."""
+    pid, token = _create_probe(client, auth_headers, name="probe-cfg-tcp")
+    probe_token = _enroll(client, token).json()["probe_token"]
+    ph = {"Authorization": f"Bearer {probe_token}"}
+    # sistema HTTP
+    client.post(
+        "/api/v1/systems",
+        headers=auth_headers,
+        json={
+            "system_id": "cfg-http", "system_name": "H", "kind": "http",
+            "heartbeat_url": "https://h.local/api/heartbeat", "probe_id": pid,
+            "poll_interval_seconds": 30, "timeout_seconds": 5,
+        },
+    )
+    # sistema TCP
+    client.post(
+        "/api/v1/systems",
+        headers=auth_headers,
+        json={
+            "system_id": "cfg-tcp", "system_name": "T", "kind": "tcp",
+            "tcp_host": "svc.local", "tcp_port": 6379, "probe_id": pid,
+            "poll_interval_seconds": 30, "timeout_seconds": 5,
+        },
+    )
+    cfg = client.get("/api/v1/probe/config", headers=ph)
+    assert cfg.status_code == 200
+    by_id = {s["system_id"]: s for s in cfg.json()["systems"]}
+    assert by_id["cfg-http"]["kind"] == "http"
+    assert by_id["cfg-http"]["heartbeat_url"].endswith("/api/heartbeat")
+    tcp = by_id["cfg-tcp"]
+    assert tcp["kind"] == "tcp"
+    assert tcp["tcp_host"] == "svc.local"
+    assert tcp["tcp_port"] == 6379
+
+
 def test_register_invalid_token(client) -> None:
     r = _enroll(client, "totally-invalid-token")
     assert r.status_code == 401

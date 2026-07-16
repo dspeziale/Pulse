@@ -123,6 +123,19 @@ PK `id`. UNIQUE `system_id` (coincide con `system_id` heartbeat). FK
 `poll_interval_seconds > 0`, `timeout_seconds > 0`, soglie `>= 0`. Trigger
 `updated_at`. Indici su `probe_id` (filtro + pull config Probe) e `enabled`.
 
+**Tipo di controllo (`kind`)** — un sistema puo' essere monitorato in due modi:
+- `kind varchar(10) NOT NULL DEFAULT 'http'` con CHECK `kind IN ('http','tcp')`.
+  Il default `'http'` garantisce che i sistemi preesistenti restino validi.
+- `kind='http'`: controllo via heartbeat HTTP/HTTPS su `heartbeat_url`.
+- `kind='tcp'`: controllo di connettivita' TCP su `tcp_host varchar(255)` +
+  `tcp_port integer` (CHECK `tcp_port IS NULL OR tcp_port BETWEEN 1 AND 65535`).
+- `heartbeat_url varchar(500)` e' **NULLABLE**: obbligatorio solo per `http`.
+- CHECK di coerenza `chk_monitored_systems_kind`:
+  `(kind='http' AND heartbeat_url IS NOT NULL) OR (kind='tcp' AND tcp_host IS NOT NULL AND tcp_port IS NOT NULL)`.
+
+Su installazioni pulite lo stato e' prodotto da `deploy/schema.sql`; sui DB gia'
+esistenti dalla migrazione `deploy/migrations/002_tcp_checks.sql` (idempotente).
+
 ### 3.9 maintenance_windows
 PK `id`. FK `system_id`→monitored_systems `ON DELETE CASCADE`, `probe_id`→probes
 `ON DELETE CASCADE`, `created_by`→users `ON DELETE SET NULL`. CHECK

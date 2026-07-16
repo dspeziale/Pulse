@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import datetime as dt
+import socket
 import time
 import uuid
 from typing import Any
@@ -116,7 +117,10 @@ def create_system(
     system = MonitoredSystem(
         system_id=body.system_id,
         system_name=body.system_name,
+        kind=body.kind,
         heartbeat_url=body.heartbeat_url,
+        tcp_host=body.tcp_host,
+        tcp_port=body.tcp_port,
         probe_id=probe.id,
         poll_interval_seconds=body.poll_interval_seconds,
         timeout_seconds=body.timeout_seconds,
@@ -171,8 +175,14 @@ def update_system(
         system.probe_id = _require_probe(session, body.probe_id).id
     if body.system_name is not None:
         system.system_name = body.system_name
+    if body.kind is not None:
+        system.kind = body.kind
     if body.heartbeat_url is not None:
         system.heartbeat_url = body.heartbeat_url
+    if body.tcp_host is not None:
+        system.tcp_host = body.tcp_host
+    if body.tcp_port is not None:
+        system.tcp_port = body.tcp_port
     if body.poll_interval_seconds is not None:
         system.poll_interval_seconds = body.poll_interval_seconds
     if body.timeout_seconds is not None:
@@ -238,6 +248,68 @@ def _build_test_client(timeout_seconds: float) -> httpx.Client:
     return httpx.Client(timeout=timeout_seconds)
 
 
+def _open_tcp_connection(host: str, port: int, timeout: float) -> None:
+    """Apre e chiude subito una connessione TCP verso host:port (isolabile nei test).
+
+    Solleva OSError (inclusi socket.timeout/ConnectionError) se la connessione non
+    riesce entro il timeout.
+    """
+    with socket.create_connection((host, port), timeout=timeout):
+        pass
+
+
+def _test_tcp(body: schemas.SystemTestRequest) -> schemas.SystemTestResponse:
+    """Test di connettivita' TCP (esteso su richiesta utente).
+
+    Apre una connessione a `tcp_host:tcp_port` col timeout indicato, misura il
+    tempo di connessione e ritorna un singolo documento sintetico check_id='tcp'.
+    L'irraggiungibilita' NON e' un errore HTTP: ritorna 200 con reachable=false.
+    """
+    # host/port garantiti non-None dalla validazione dello schema (kind='tcp').
+    assert body.tcp_host is not None and body.tcp_port is not None
+    host, port = body.tcp_host, body.tcp_port
+    start = time.perf_counter()
+    try:
+        _open_tcp_connection(host, port, float(body.timeout_seconds))
+    except OSError as exc:
+        elapsed = int((time.perf_counter() - start) * 1000)
+        doc = schemas.SystemTestDocument(
+            system_id=host,
+            check_id="tcp",
+            check_name="Connettivita' TCP",
+            status="down",
+            response_ms=elapsed,
+            message=f"Connessione TCP fallita verso {host}:{port}: {exc}",
+        )
+        return schemas.SystemTestResponse(
+            reachable=False,
+            http_status=None,
+            response_ms=elapsed,
+            valid_schema=False,
+            checks_count=1,
+            documents=[doc],
+            error=f"Connessione TCP fallita verso {host}:{port}: {exc}",
+        )
+    elapsed = int((time.perf_counter() - start) * 1000)
+    doc = schemas.SystemTestDocument(
+        system_id=host,
+        check_id="tcp",
+        check_name="Connettivita' TCP",
+        status="ok",
+        response_ms=elapsed,
+        message=f"Connessione TCP riuscita verso {host}:{port}.",
+    )
+    return schemas.SystemTestResponse(
+        reachable=True,
+        http_status=None,
+        response_ms=elapsed,
+        valid_schema=True,
+        checks_count=1,
+        documents=[doc],
+        error=None,
+    )
+
+
 def _parse_canonical(payload: Any) -> tuple[bool, list[schemas.SystemTestDocument], int]:
     """Interpreta `payload` come schema canonico Pulse (oggetto singolo o array).
 
@@ -278,11 +350,13 @@ def _parse_canonical(payload: Any) -> tuple[bool, list[schemas.SystemTestDocumen
 @router.post(
     "/test",
     response_model=schemas.SystemTestResponse,
-    summary="Testa un endpoint heartbeat (aggiunta su richiesta utente)",
+    summary="Testa un sistema HTTP o TCP (aggiunta/estesa su richiesta utente)",
     description=(
-        "Esegue una GET diagnostica verso `heartbeat_url` senza persistere nulla "
-        "ne' creare il sistema. Misura il tempo di risposta e prova a interpretare "
-        "la risposta come schema canonico Pulse (oggetto singolo o array). "
+        "Testa un sistema senza persistere nulla ne' crearlo. Per `kind='http'` "
+        "esegue una GET diagnostica verso `heartbeat_url`, misura il tempo di "
+        "risposta e prova a interpretare la risposta come schema canonico Pulse "
+        "(oggetto singolo o array). Per `kind='tcp'` apre una connessione TCP a "
+        "`tcp_host:tcp_port` e restituisce un documento sintetico check_id='tcp'. "
         "L'irraggiungibilita' del target NON e' un errore HTTP: ritorna 200 con "
         "`reachable=false` ed `error` valorizzato. Permesso: `systems.create` "
         "OPPURE `systems.update`."
@@ -292,6 +366,10 @@ def test_system_endpoint(
     body: schemas.SystemTestRequest,
     _: CurrentUser = Depends(require_any_permission("systems.create", "systems.update")),
 ) -> schemas.SystemTestResponse:
+    if body.kind == "tcp":
+        return _test_tcp(body)
+    # kind == 'http': heartbeat_url garantito non-None dalla validazione.
+    assert body.heartbeat_url is not None
     start = time.perf_counter()
     try:
         with _build_test_client(float(body.timeout_seconds)) as client:

@@ -199,28 +199,31 @@ Formato corpo errore:
 ### GET /api/v1/systems
 - **Permesso**: `systems.read`. **Query**: `page, page_size, q, probe_id, enabled`.
 - **Response 200**: `{ "items": [System], "total": int }`
-  - `System`: `{ "id": string, "system_id": string, "system_name": string, "heartbeat_url": string, "probe_id": string, "poll_interval_seconds": int, "timeout_seconds": int, "enabled": bool, "thresholds": { "response_ms_warn": int|null, "response_ms_error": int|null }, "maintenance_windows": [ { "start": string, "end": string, "note": string } ], "created_at": string }`
+  - `System`: `{ "id": string, "system_id": string, "system_name": string, "kind": "http"|"tcp", "heartbeat_url": string|null, "tcp_host": string|null, "tcp_port": int|null, "probe_id": string, "poll_interval_seconds": int, "timeout_seconds": int, "enabled": bool, "thresholds": { "response_ms_warn": int|null, "response_ms_error": int|null }, "maintenance_windows": [ { "start": string, "end": string, "note": string } ], "created_at": string }`
+  - `kind` (esteso su richiesta utente): `"http"` = controllo heartbeat HTTP/HTTPS su `heartbeat_url`; `"tcp"` = controllo di connettivita' TCP su `tcp_host:tcp_port`. Per `kind="http"` valorizzato `heartbeat_url` (e `tcp_*` null); per `kind="tcp"` valorizzati `tcp_host`/`tcp_port` (e `heartbeat_url` puo' essere null).
 - **Errori**: 401, 403.
 
 ### POST /api/v1/systems
 - **Permesso**: `systems.create`.
-- **Request**: `{ "system_id": string, "system_name": string, "heartbeat_url": string, "probe_id": string, "poll_interval_seconds": int, "timeout_seconds": int, "enabled": bool, "thresholds"?: {...}, "maintenance_windows"?: [...] }`
-- **Response 201**: `System`. **Errori**: 409 (`system_id` duplicato), 422 (URL/intervallo invalidi, probe inesistente), 401, 403.
+- **Request**: `{ "system_id": string, "system_name": string, "kind"?: "http"|"tcp" (default "http"), "heartbeat_url"?: string, "tcp_host"?: string, "tcp_port"?: int (1..65535), "probe_id": string, "poll_interval_seconds": int, "timeout_seconds": int, "enabled": bool, "thresholds"?: {...}, "maintenance_windows"?: [...] }`
+  - Coerenza per `kind` (esteso su richiesta utente): se `kind="http"` → `heartbeat_url` **obbligatorio** (URL http/https valido); se `kind="tcp"` → `tcp_host` e `tcp_port` (1..65535) **obbligatori**. In caso contrario 422.
+- **Response 201**: `System`. **Errori**: 409 (`system_id` duplicato), 422 (URL/host/porta incoerenti col `kind`, intervallo manutenzione invalido, probe inesistente), 401, 403.
 
 ### POST /api/v1/systems/test
-- **Descrizione**: testa un endpoint heartbeat prima di creare/modificare un sistema (aggiunta su richiesta utente). Esegue una GET diagnostica verso `heartbeat_url`, misura il tempo di risposta e prova a interpretare la risposta come schema canonico Pulse (oggetto singolo o array). **Non persiste nulla e non crea il sistema.**
+- **Descrizione**: testa un sistema prima di crearlo/modificarlo (aggiunta/estesa su richiesta utente). Per `kind="http"` esegue una GET diagnostica verso `heartbeat_url`, misura il tempo di risposta e prova a interpretare la risposta come schema canonico Pulse (oggetto singolo o array). Per `kind="tcp"` apre una connessione TCP a `tcp_host:tcp_port` col timeout indicato e misura il tempo di connessione. **Non persiste nulla e non crea il sistema.**
 - **Permesso**: `systems.create` **OPPURE** `systems.update`.
-- **Request**: `{ "heartbeat_url": string (URL http/https), "timeout_seconds"?: int (default 5, range 1..60) }`
+- **Request**: `{ "kind"?: "http"|"tcp" (default "http"), "heartbeat_url"?: string (URL http/https, obbligatorio se kind="http"), "tcp_host"?: string (obbligatorio se kind="tcp"), "tcp_port"?: int (1..65535, obbligatorio se kind="tcp"), "timeout_seconds"?: int (default 5, range 1..60) }`
 - **Response 200**: `{ "reachable": bool, "http_status": int|null, "response_ms": int, "valid_schema": bool, "checks_count": int, "documents": [ { "system_id": string, "system_name": string|null, "check_id": string, "check_name": string|null, "status": string, "response_ms": number|null, "message": string|null } ], "error": string|null }`
-  - `reachable=true` anche con risposta 4xx/5xx del target (vedi `http_status`). `documents` limitato a 20 elementi; `checks_count` conteggia tutti i documenti trovati; `valid_schema=true` solo se la risposta e' JSON conforme (campi essenziali: `system_id`, `check_id`, `status`).
-  - L'irraggiungibilita' del target **non** e' un errore HTTP dell'endpoint: ritorna 200 con `reachable=false` ed `error` valorizzato.
-- **Errori**: 422 (URL mancante/non http-https, `timeout_seconds` fuori range), 401, 403.
+  - **HTTP**: `reachable=true` anche con risposta 4xx/5xx del target (vedi `http_status`). `documents` limitato a 20 elementi; `checks_count` conteggia tutti i documenti trovati; `valid_schema=true` solo se la risposta e' JSON conforme (campi essenziali: `system_id`, `check_id`, `status`).
+  - **TCP** (esteso su richiesta utente): `http_status=null`; se la connessione riesce → `reachable=true`, `valid_schema=true`, `checks_count=1`, `documents=[{ check_id:"tcp", check_name:"Connettivita' TCP", status:"ok", response_ms, message }]`, `error=null`; se fallisce → `reachable=false`, `valid_schema=false`, `documents=[{ ..., status:"down", message }]` ed `error` valorizzato. `response_ms` = tempo di connessione in ms.
+  - L'irraggiungibilita' del target **non** e' un errore HTTP dell'endpoint: ritorna 200 con `reachable=false` ed `error` valorizzato (sia HTTP che TCP).
+- **Errori**: 422 (campi incoerenti col `kind`: URL mancante/non http-https per http, host/porta mancanti o porta fuori 1..65535 per tcp; `timeout_seconds` fuori range), 401, 403.
 
 ### GET /api/v1/systems/{id}
 - **Permesso**: `systems.read`. **Response 200**: `System`. **Errori**: 404, 401, 403.
 
 ### PUT /api/v1/systems/{id}
-- **Permesso**: `systems.update`. **Request**: campi di `System` modificabili. **Response 200**: `System`. **Errori**: 409, 422, 404, 401, 403.
+- **Permesso**: `systems.update`. **Request**: campi di `System` modificabili (inclusi `kind`, `heartbeat_url`, `tcp_host`, `tcp_port` — esteso su richiesta utente). Update parziale: se `kind` e' fornito, i campi obbligatori del nuovo tipo devono essere presenti nella stessa richiesta; `tcp_port` (se fornito) sempre validato in 1..65535; `heartbeat_url` (se fornito) sempre validato come URL http/https. **Response 200**: `System`. **Errori**: 409, 422, 404, 401, 403.
 
 ### DELETE /api/v1/systems/{id}
 - **Permesso**: `systems.delete`. **Response 204** (dati storici restano su OpenSearch). **Errori**: 404, 401, 403.
@@ -283,7 +286,8 @@ Formato corpo errore:
 
 ### GET /api/v1/probe/config
 - **Descrizione**: la Probe scarica la propria configurazione (sistemi assegnati + parametri). **Auth**: probe_token.
-- **Response 200**: `{ "probe_id": string, "poll_defaults": {...}, "systems": [ { "system_id": string, "system_name": string, "heartbeat_url": string, "poll_interval_seconds": int, "timeout_seconds": int, "enabled": bool, "thresholds": {...} } ], "config_version": string }`
+- **Response 200**: `{ "probe_id": string, "poll_defaults": {...}, "systems": [ { "system_id": string, "system_name": string, "kind": "http"|"tcp", "heartbeat_url": string|null, "tcp_host": string|null, "tcp_port": int|null, "poll_interval_seconds": int, "timeout_seconds": int, "enabled": bool, "thresholds": {...} } ], "config_version": string }`
+  - `kind`/`tcp_host`/`tcp_port` (esteso su richiesta utente) indicano alla Probe come interrogare il sistema: heartbeat HTTP su `heartbeat_url` (`kind="http"`) oppure connettivita' TCP su `tcp_host:tcp_port` (`kind="tcp"`).
 - **Errori**: 401, 403 (probe disabilitata/revocata).
 
 ### POST /api/v1/probe/heartbeat

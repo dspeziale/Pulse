@@ -49,6 +49,71 @@ def test_poll_system_non_json() -> None:
     assert docs[0]["status"] == "down" and "non JSON" in docs[0]["message"]
 
 
+TCP_SYSTEM = {
+    "system_id": "cache", "system_name": "Cache", "kind": "tcp",
+    "tcp_host": "cache.local", "tcp_port": 6379,
+    "poll_interval_seconds": 30, "timeout_seconds": 3, "enabled": True,
+}
+
+
+class _FakeSock:
+    def __enter__(self) -> "_FakeSock":
+        return self
+
+    def __exit__(self, *_a: object) -> bool:
+        return False
+
+
+def _patch_tcp(monkeypatch, ok: bool) -> None:
+    def _conn(_addr, timeout=None):  # type: ignore[no-untyped-def]
+        if not ok:
+            raise OSError("connection refused")
+        return _FakeSock()
+
+    monkeypatch.setattr(poller.socket, "create_connection", _conn)
+
+
+def test_poll_tcp_system_ok(monkeypatch) -> None:
+    _patch_tcp(monkeypatch, ok=True)
+    docs = poller.poll_system(_client(lambda r: httpx.Response(200)), TCP_SYSTEM, "p1")
+    assert len(docs) == 1
+    doc = docs[0]
+    assert doc["check_id"] == "tcp"
+    assert doc["check_name"] == "Connettivita' TCP"
+    assert doc["status"] == "ok"
+    assert doc["reachable"] is True
+    assert doc["probe_id"] == "p1"
+    assert isinstance(doc["response_ms"], int)
+    assert "ingested_at" in doc
+
+
+def test_poll_tcp_system_down(monkeypatch) -> None:
+    _patch_tcp(monkeypatch, ok=False)
+    docs = poller.poll_system(_client(lambda r: httpx.Response(200)), TCP_SYSTEM, "p1")
+    assert docs[0]["status"] == "down"
+    assert docs[0]["reachable"] is False
+    assert "fallita" in docs[0]["message"]
+
+
+def test_poll_tcp_in_full_cycle(monkeypatch) -> None:
+    _patch_tcp(monkeypatch, ok=True)
+    server = _FakeServer()
+    state = RuntimeState(
+        settings=Settings(opensearch_url=None, poller_enabled=False),
+        store=InMemoryStore(),
+        server=server,
+        probe_token="tok",
+        probe_id="p1",
+        systems=[TCP_SYSTEM],
+    )
+    summary = poller.poll_once(state, _client(lambda r: httpx.Response(200)))
+    assert summary["polled"] == 1
+    # il check 'tcp' compare nel rollup (-> discovered_checks lato Server)
+    rollup = server.rollups[-1]
+    checks = rollup["systems"][0]["checks"]
+    assert any(c["check_id"] == "tcp" for c in checks)
+
+
 def test_detect_events_transitions() -> None:
     last: dict[tuple[str, str], str] = {}
     # primo giro: nessun prev -> nessun status_changed, ma imposta stato

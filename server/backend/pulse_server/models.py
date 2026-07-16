@@ -143,7 +143,13 @@ class MonitoredSystem(Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=_UUID_DEFAULT)
     system_id: Mapped[str] = mapped_column(String(100), nullable=False, unique=True)
     system_name: Mapped[str] = mapped_column(String(255), nullable=False)
-    heartbeat_url: Mapped[str] = mapped_column(String(500), nullable=False)
+    # Tipo di controllo: 'http' (heartbeat HTTP su heartbeat_url) o 'tcp'
+    # (connettivita' TCP su tcp_host:tcp_port). Vincoli di coerenza lato DB.
+    kind: Mapped[str] = mapped_column(String(10), nullable=False, server_default=text("'http'"))
+    # NULLABLE: obbligatorio solo per kind='http' (chk_monitored_systems_kind).
+    heartbeat_url: Mapped[str | None] = mapped_column(String(500))
+    tcp_host: Mapped[str | None] = mapped_column(String(255))
+    tcp_port: Mapped[int | None] = mapped_column(Integer)
     probe_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("probes.id", ondelete="RESTRICT"), nullable=False
     )

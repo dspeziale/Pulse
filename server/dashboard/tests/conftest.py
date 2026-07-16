@@ -43,29 +43,35 @@ class FakeApiClient:
     def __init__(self):
         self.responses: dict = {}
         self.calls: list = []
+        self.sent: dict = {}
+        self.params: dict = {}
 
     def set(self, method: str, path: str, value):
         self.responses[(method.upper(), path)] = value
         return self
 
-    def _do(self, method, path):
+    def _do(self, method, path, json=None, params=None):
         self.calls.append((method, path))
+        if json is not None:
+            self.sent[(method, path)] = json
+        if params is not None:
+            self.params[(method, path)] = params
         val = self.responses.get((method, path), _Blank())
         if isinstance(val, Exception):
             raise val
         return val
 
     def get(self, path, token=None, params=None):
-        return self._do("GET", path)
+        return self._do("GET", path, params=params)
 
     def post(self, path, token=None, json=None):
-        return self._do("POST", path)
+        return self._do("POST", path, json=json)
 
     def put(self, path, token=None, json=None):
-        return self._do("PUT", path)
+        return self._do("PUT", path, json=json)
 
     def delete(self, path, token=None, json=None):
-        return self._do("DELETE", path)
+        return self._do("DELETE", path, json=json)
 
 
 @pytest.fixture

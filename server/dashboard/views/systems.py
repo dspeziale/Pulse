@@ -22,11 +22,18 @@ def _int_or_none(raw: str):
     return int(raw) if raw else None
 
 
+def _normalized_kind(raw: str) -> str:
+    """Normalizza il tipo di controllo a "http" o "tcp" (default http)."""
+    kind = (raw or "").strip().lower()
+    return kind if kind in ("http", "tcp") else "http"
+
+
 def _build_payload() -> dict:
-    return {
+    kind = _normalized_kind(request.form.get("kind", ""))
+    payload = {
         "system_id": request.form.get("system_id", ""),
         "system_name": request.form.get("system_name", ""),
-        "heartbeat_url": request.form.get("heartbeat_url", ""),
+        "kind": kind,
         "probe_id": request.form.get("probe_id", ""),
         "poll_interval_seconds": _int_or_none(
             request.form.get("poll_interval_seconds", "")),
@@ -39,6 +46,17 @@ def _build_payload() -> dict:
                 request.form.get("response_ms_error", "")),
         },
     }
+    # Invia solo i campi pertinenti al tipo; gli altri a None per non far
+    # scattare i CHECK di coerenza del backend/DB (kind vs campi target).
+    if kind == "tcp":
+        payload["heartbeat_url"] = None
+        payload["tcp_host"] = request.form.get("tcp_host", "").strip()
+        payload["tcp_port"] = _int_or_none(request.form.get("tcp_port", ""))
+    else:
+        payload["heartbeat_url"] = request.form.get("heartbeat_url", "").strip()
+        payload["tcp_host"] = None
+        payload["tcp_port"] = None
+    return payload
 
 
 @bp.route("/systems")
@@ -50,22 +68,60 @@ def list_systems():
     return render_template("systems/list.html", data=data, probes=probes)
 
 
+@bp.route("/systems-by-probe", methods=["GET"])
+@permission_required("systems.read")
+def systems_by_probe():
+    """Proxy JSON: elenca i sistemi appartenenti a una Sonda.
+
+    Alimenta l'auto-popolamento AJAX dei selettori di Sistema quando l'utente
+    cambia la Sonda. Delega al backend GET /systems?probe_id=... col token di
+    sessione. Senza ``probe_id`` restituisce una lista vuota (nessuna Sonda
+    selezionata). La risposta è la lista minimale [{id, system_id, system_name}].
+    """
+    probe_id = (request.args.get("probe_id") or "").strip()
+    if not probe_id:
+        return jsonify({"items": []}), 200
+    data = api_get("/systems", params={"probe_id": probe_id})
+    items = data.get("items", []) if isinstance(data, dict) else []
+    out = [
+        {
+            "id": s.get("id"),
+            "system_id": s.get("system_id"),
+            "system_name": s.get("system_name"),
+        }
+        for s in items
+    ]
+    return jsonify({"items": out}), 200
+
+
 @bp.route("/systems/test-heartbeat", methods=["POST"])
 @permission_required("systems.create", "systems.update")
 def test_heartbeat():
-    """Testa l'endpoint heartbeat prima del salvataggio.
+    """Testa la raggiungibilità del target prima del salvataggio.
 
-    Consuma il valore corrente del campo URL (creazione o modifica), delega al
-    backend POST /systems/test col token di sessione e restituisce l'esito come
-    JSON al browser. Gli errori del backend diventano messaggi comprensibili;
-    l'irraggiungibilità del target NON è un errore (200 con reachable=false).
+    Consuma i valori correnti del form (HTTP heartbeat oppure connettività TCP),
+    delega al backend POST /systems/test col token di sessione e restituisce
+    l'esito come JSON al browser. Gli errori del backend diventano messaggi
+    comprensibili; l'irraggiungibilità del target NON è un errore (200 con
+    reachable=false).
     """
     payload = request.get_json(silent=True) or request.form
-    heartbeat_url = (payload.get("heartbeat_url") or "").strip()
-    if not heartbeat_url:
-        return jsonify({"ok": False,
-                        "error": "Inserisci un URL heartbeat da testare."}), 422
-    body: dict = {"heartbeat_url": heartbeat_url}
+    kind = _normalized_kind(payload.get("kind", ""))
+    body: dict = {"kind": kind}
+    if kind == "tcp":
+        tcp_host = (payload.get("tcp_host") or "").strip()
+        tcp_port = _int_or_none(str(payload.get("tcp_port") or ""))
+        if not tcp_host or tcp_port is None:
+            return jsonify({"ok": False,
+                            "error": "Inserisci host e porta TCP da testare."}), 422
+        body["tcp_host"] = tcp_host
+        body["tcp_port"] = tcp_port
+    else:
+        heartbeat_url = (payload.get("heartbeat_url") or "").strip()
+        if not heartbeat_url:
+            return jsonify({"ok": False,
+                            "error": "Inserisci un URL heartbeat da testare."}), 422
+        body["heartbeat_url"] = heartbeat_url
     timeout = _int_or_none(str(payload.get("timeout_seconds") or ""))
     if timeout is not None:
         body["timeout_seconds"] = timeout

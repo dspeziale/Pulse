@@ -23,17 +23,53 @@
             <input class="form-control" id="system_name" name="system_name" value="{{ system.system_name if system else '' }}" placeholder="es. CRM Produzione" required>
             <div class="form-text">Nome descrittivo mostrato nelle liste e nelle notifiche.</div>
           </div>
-          <div class="col-12">
+          {% set current_kind = (system.kind or 'http') if system else 'http' %}
+          <div class="col-md-6">
+            <label class="form-label" for="kind">Tipo di controllo</label>
+            <select class="form-select" id="kind" name="kind">
+              <option value="http" {% if current_kind != 'tcp' %}selected{% endif %}>HTTP heartbeat</option>
+              <option value="tcp" {% if current_kind == 'tcp' %}selected{% endif %}>Connettività TCP</option>
+            </select>
+            <div class="form-text"><strong>HTTP heartbeat</strong>: la Sonda interroga un endpoint HTTP e valuta la risposta e lo schema. <strong>Connettività TCP</strong>: la Sonda verifica solo che una porta TCP (host:porta) sia aperta.</div>
+          </div>
+
+          {# ---- Campi HTTP ---- #}
+          <div class="col-12 kind-fields" data-kind="http">
             <label class="form-label" for="heartbeat_url">URL heartbeat</label>
             <div class="input-group">
-              <input class="form-control" id="heartbeat_url" name="heartbeat_url" type="url" value="{{ system.heartbeat_url if system else '' }}" placeholder="http://mio-sistema:9000/api/heartbeat" required>
+              <input class="form-control" id="heartbeat_url" name="heartbeat_url" type="url" value="{{ system.heartbeat_url if system else '' }}" placeholder="http://mio-sistema:9000/api/heartbeat" {% if current_kind != 'tcp' %}required{% endif %}>
               <button class="btn btn-outline-primary" type="button" id="test-heartbeat-btn" data-url="{{ url_for('systems.test_heartbeat') }}">
                 <i class="bi bi-activity me-1"></i>Testa endpoint
               </button>
             </div>
             <div class="form-text">Endpoint GET che la Sonda interrogherà a ogni ciclo di polling. Deve essere un URL valido raggiungibile dalla Sonda (URL invalido → errore 422).</div>
             <div class="form-text"><i class="bi bi-info-circle me-1"></i>Il test viene eseguito <strong>dal Server</strong>, non dalla Sonda: il Server deve poter raggiungere l'URL. Se il sistema è raggiungibile solo dalla Sonda, l'esito qui può differire da quello del polling reale.</div>
-            <div id="test-heartbeat-result" class="mt-2" hidden></div>
+          </div>
+
+          {# ---- Campi TCP ---- #}
+          <div class="col-12 kind-fields" data-kind="tcp">
+            <div class="row g-3">
+              <div class="col-md-8">
+                <label class="form-label" for="tcp_host">Host / IP</label>
+                <input class="form-control" id="tcp_host" name="tcp_host" value="{{ system.tcp_host if system else '' }}" placeholder="es. db.interno.local oppure 10.0.0.5" {% if current_kind == 'tcp' %}required{% endif %}>
+                <div class="form-text">Nome host o indirizzo IP verso cui aprire la connessione TCP.</div>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label" for="tcp_port">Porta</label>
+                <div class="input-group">
+                  <input class="form-control" id="tcp_port" name="tcp_port" type="number" min="1" max="65535" value="{{ system.tcp_port if system else '' }}" placeholder="es. 5432" {% if current_kind == 'tcp' %}required{% endif %}>
+                  <button class="btn btn-outline-primary" type="button" id="test-tcp-btn" data-url="{{ url_for('systems.test_heartbeat') }}">
+                    <i class="bi bi-plug me-1"></i>Testa connessione
+                  </button>
+                </div>
+                <div class="form-text">Porta TCP (1–65535) da verificare.</div>
+              </div>
+            </div>
+            <div class="form-text mt-2"><i class="bi bi-info-circle me-1"></i>Il test apre una connessione TCP <strong>dal Server</strong>: verifica solo che la porta sia raggiungibile e aperta, senza interpretare il protocollo applicativo.</div>
+          </div>
+
+          <div class="col-12">
+            <div id="test-heartbeat-result" class="mt-1" hidden></div>
           </div>
           <div class="col-md-6">
             <label class="form-label" for="probe_id">Sonda assegnata</label>
@@ -127,12 +163,42 @@
   render();
 })();
 
+// Mostra dinamicamente i soli campi pertinenti al tipo di controllo scelto e
+// abilita/rende obbligatori solo quelli attivi (gli altri sono disabilitati:
+// non vengono inviati né bloccano la validazione HTML5).
 (function () {
-  var btn = document.getElementById('test-heartbeat-btn');
+  var kindSel = document.getElementById('kind');
+  var blocks = Array.prototype.slice.call(document.querySelectorAll('.kind-fields'));
+  if (!kindSel || !blocks.length) { return; }
+  var required = { heartbeat_url: true, tcp_host: true, tcp_port: true };
+  function apply() {
+    var kind = kindSel.value;
+    blocks.forEach(function (blk) {
+      var match = blk.getAttribute('data-kind') === kind;
+      blk.style.display = match ? '' : 'none';
+      Array.prototype.forEach.call(blk.querySelectorAll('input,select'), function (inp) {
+        inp.disabled = !match;
+        if (required[inp.id]) {
+          if (match) { inp.setAttribute('required', 'required'); }
+          else { inp.removeAttribute('required'); }
+        }
+      });
+    });
+  }
+  kindSel.addEventListener('change', apply);
+  apply();
+})();
+
+(function () {
+  var httpBtn = document.getElementById('test-heartbeat-btn');
+  var tcpBtn = document.getElementById('test-tcp-btn');
+  var kindSel = document.getElementById('kind');
   var urlInput = document.getElementById('heartbeat_url');
+  var hostInput = document.getElementById('tcp_host');
+  var portInput = document.getElementById('tcp_port');
   var box = document.getElementById('test-heartbeat-result');
   var timeoutInput = document.getElementById('timeout_seconds');
-  if (!btn || !urlInput || !box) { return; }
+  if ((!httpBtn && !tcpBtn) || !box) { return; }
 
   function el(tag, cls, text) {
     var n = document.createElement(tag);
@@ -156,7 +222,7 @@
     return a;
   }
 
-  function metaLine(res) {
+  function metaLine(res, kind) {
     var wrap = el('div', 'd-flex flex-wrap gap-2 align-items-center mt-2');
     if (res.http_status !== null && res.http_status !== undefined) {
       wrap.appendChild(badge('b-unknown', 'HTTP ' + res.http_status));
@@ -164,9 +230,12 @@
     if (res.response_ms !== null && res.response_ms !== undefined) {
       wrap.appendChild(badge('b-unknown', res.response_ms + ' ms'));
     }
-    wrap.appendChild(badge(res.valid_schema ? 'b-ok' : 'b-error',
-      res.valid_schema ? 'schema valido' : 'schema non valido'));
-    wrap.appendChild(badge('b-unknown', (res.checks_count || 0) + ' check'));
+    // Schema e conteggio check sono pertinenti solo al controllo HTTP.
+    if (kind !== 'tcp') {
+      wrap.appendChild(badge(res.valid_schema ? 'b-ok' : 'b-error',
+        res.valid_schema ? 'schema valido' : 'schema non valido'));
+      wrap.appendChild(badge('b-unknown', (res.checks_count || 0) + ' check'));
+    }
     return wrap;
   }
 
@@ -197,41 +266,61 @@
     return wrap;
   }
 
-  function renderResult(res) {
+  function renderResult(res, kind) {
     var reachable = !!res.reachable;
-    var okOverall = reachable && !!res.valid_schema;
-    var kind = okOverall ? 'alert-success' : (reachable ? 'alert-warning' : 'alert-danger');
+    var isTcp = kind === 'tcp';
+    var okOverall = reachable && (isTcp || !!res.valid_schema);
+    var cls = okOverall ? 'alert-success' : (reachable ? 'alert-warning' : 'alert-danger');
     var icon = okOverall ? 'bi bi-check-circle me-1'
       : (reachable ? 'bi bi-exclamation-triangle me-1' : 'bi bi-x-circle me-1');
-    var headText = okOverall
-      ? 'Endpoint raggiungibile e schema valido.'
-      : (reachable ? 'Endpoint raggiungibile ma la risposta non è valida.'
-                   : 'Endpoint non raggiungibile.');
+    var headText;
+    if (isTcp) {
+      headText = reachable ? 'Porta TCP raggiungibile (connessione riuscita).'
+                           : 'Porta TCP non raggiungibile.';
+    } else {
+      headText = okOverall
+        ? 'Endpoint raggiungibile e schema valido.'
+        : (reachable ? 'Endpoint raggiungibile ma la risposta non è valida.'
+                     : 'Endpoint non raggiungibile.');
+    }
     var container = el('div');
-    container.appendChild(alertBox(kind, icon, headText));
-    container.appendChild(metaLine(res));
+    container.appendChild(alertBox(cls, icon, headText));
+    container.appendChild(metaLine(res, kind));
     if (res.error) {
       container.appendChild(el('div', 'form-text text-danger mt-2', res.error));
     }
-    if (res.documents && res.documents.length) {
+    if (!isTcp && res.documents && res.documents.length) {
       container.appendChild(docsTable(res.documents));
     }
     show(container);
   }
 
-  btn.addEventListener('click', function () {
-    var url = (urlInput.value || '').trim();
-    if (!url) {
-      show(alertBox('alert-warning', 'bi bi-exclamation-triangle me-1',
-        'Inserisci un URL heartbeat da testare.'));
-      return;
+  function runTest(btn, kind) {
+    var payload = { kind: kind };
+    if (kind === 'tcp') {
+      var host = (hostInput && hostInput.value || '').trim();
+      var port = (portInput && portInput.value || '').trim();
+      if (!host || !port) {
+        show(alertBox('alert-warning', 'bi bi-exclamation-triangle me-1',
+          'Inserisci host e porta TCP da testare.'));
+        return;
+      }
+      payload.tcp_host = host;
+      payload.tcp_port = parseInt(port, 10);
+    } else {
+      var url = (urlInput && urlInput.value || '').trim();
+      if (!url) {
+        show(alertBox('alert-warning', 'bi bi-exclamation-triangle me-1',
+          'Inserisci un URL heartbeat da testare.'));
+        return;
+      }
+      payload.heartbeat_url = url;
     }
-    btn.disabled = true;
-    show(alertBox('alert-info', 'bi bi-hourglass-split me-1', 'Test in corso…'));
-    var payload = { heartbeat_url: url };
     if (timeoutInput && timeoutInput.value) {
       payload.timeout_seconds = parseInt(timeoutInput.value, 10);
     }
+    btn.disabled = true;
+    show(alertBox('alert-info', 'bi bi-hourglass-split me-1', 'Test in corso…'));
     fetch(btn.getAttribute('data-url'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -240,7 +329,7 @@
       return r.json().then(function (data) { return { status: r.status, data: data }; });
     }).then(function (out) {
       if (out.data && out.data.ok) {
-        renderResult(out.data.result || {});
+        renderResult(out.data.result || {}, kind);
       } else {
         var msg = (out.data && out.data.error) || ('Errore (HTTP ' + out.status + ').');
         show(alertBox('alert-danger', 'bi bi-x-circle me-1', msg));
@@ -251,7 +340,14 @@
     }).finally(function () {
       btn.disabled = false;
     });
-  });
+  }
+
+  if (httpBtn) {
+    httpBtn.addEventListener('click', function () { runTest(httpBtn, 'http'); });
+  }
+  if (tcpBtn) {
+    tcpBtn.addEventListener('click', function () { runTest(tcpBtn, 'tcp'); });
+  }
 })();
 </script>
 {% endblock %}

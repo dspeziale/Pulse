@@ -120,7 +120,10 @@ erDiagram
         uuid id PK
         varchar system_id UK
         varchar system_name
+        varchar kind
         varchar heartbeat_url
+        varchar tcp_host
+        int tcp_port
         uuid probe_id FK
         int poll_interval_seconds
         int timeout_seconds

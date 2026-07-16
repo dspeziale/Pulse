@@ -18,6 +18,26 @@ def test_query_builder_get_no_selection(client, login, fake):
     assert client.get("/query").status_code == 200
 
 
+def test_query_builder_has_autopopulate_wiring(client, login, fake):
+    login(["heartbeats.query"])
+    fake.set("GET", "/probes", {"items": []})
+    html = client.get("/query").data
+    assert b"data-probe-source" in html
+    assert b'data-systems-target="#probe-systems-list"' in html
+    assert b'id="probe-systems-list"' in html
+    assert b"js/pulse-systems.js" in html
+
+
+def test_charts_has_autopopulate_datalist(client, login, fake):
+    login(["heartbeats.read"])
+    fake.set("GET", "/probes", {"items": []})
+    html = client.get("/charts").data
+    assert b'data-systems-mode="datalist"' in html
+    assert b'id="system-options"' in html
+    assert b'list="system-options"' in html
+    assert b"js/pulse-systems.js" in html
+
+
 def test_query_run_success(client, login, fake):
     login(["heartbeats.query"])
     fake.set("POST", "/probes/p1/query", {"items": [], "aggregations": {}, "total": 0})
