@@ -121,3 +121,68 @@ def test_checks_endpoints_with_seeded_check(client, auth_headers, db_session) ->
     glob = client.get(f"/api/v1/checks?system_id={sid_business}&probe_id={pid}", headers=auth_headers)
     assert glob.status_code == 200 and glob.json()["total"] >= 1
     assert glob.json()["items"][0]["system_id"] == sid_business
+
+
+# --- config_version bump della Probe su create/update/delete (re-sync) --------
+
+import uuid as _uuid  # noqa: E402
+
+from pulse_server.models import Probe  # noqa: E402
+
+
+def _probe_cfg_version(db_session, pid: str) -> str | None:
+    probe = db_session.get(Probe, _uuid.UUID(pid))
+    db_session.refresh(probe)
+    return probe.config_version
+
+
+def _set_cfg_version(db_session, pid: str, value: str) -> None:
+    probe = db_session.get(Probe, _uuid.UUID(pid))
+    probe.config_version = value
+    db_session.flush()
+
+
+def test_create_system_bumps_probe_config_version(client, auth_headers, db_session) -> None:
+    pid = _make_probe(client, auth_headers, name="p-bump-create")
+    _set_cfg_version(db_session, pid, "SENTINEL-0")
+    r = _make_system(client, auth_headers, pid, system_id="bump-create-sys")
+    assert r.status_code == 201
+    assert _probe_cfg_version(db_session, pid) not in (None, "SENTINEL-0")
+
+
+def test_update_system_bumps_probe_config_version(client, auth_headers, db_session) -> None:
+    pid = _make_probe(client, auth_headers, name="p-bump-upd")
+    sid = _make_system(client, auth_headers, pid, system_id="bump-upd-sys").json()["id"]
+    _set_cfg_version(db_session, pid, "SENTINEL-1")
+    r = client.put(f"/api/v1/systems/{sid}", headers=auth_headers, json={"enabled": False})
+    assert r.status_code == 200
+    assert _probe_cfg_version(db_session, pid) != "SENTINEL-1"
+
+
+def test_reassign_system_bumps_both_probes(client, auth_headers, db_session) -> None:
+    pid1 = _make_probe(client, auth_headers, name="p-bump-src")
+    pid2 = _make_probe(client, auth_headers, name="p-bump-dst")
+    sid = _make_system(client, auth_headers, pid1, system_id="bump-move-sys").json()["id"]
+    _set_cfg_version(db_session, pid1, "SENTINEL-SRC")
+    _set_cfg_version(db_session, pid2, "SENTINEL-DST")
+    r = client.put(f"/api/v1/systems/{sid}", headers=auth_headers, json={"probe_id": pid2})
+    assert r.status_code == 200 and r.json()["probe_id"] == pid2
+    # entrambe le Probe (vecchia e nuova) devono essere state bumpate
+    assert _probe_cfg_version(db_session, pid1) != "SENTINEL-SRC"
+    assert _probe_cfg_version(db_session, pid2) != "SENTINEL-DST"
+
+
+def test_delete_system_bumps_probe_config_version(client, auth_headers, db_session) -> None:
+    pid = _make_probe(client, auth_headers, name="p-bump-del")
+    sid = _make_system(client, auth_headers, pid, system_id="bump-del-sys").json()["id"]
+    _set_cfg_version(db_session, pid, "SENTINEL-DEL")
+    r = client.delete(f"/api/v1/systems/{sid}", headers=auth_headers)
+    assert r.status_code == 204
+    assert _probe_cfg_version(db_session, pid) != "SENTINEL-DEL"
+
+
+def test_bump_config_version_unknown_probe_is_noop(db_session) -> None:
+    """Il bump su una Probe inesistente non solleva errori (ramo difensivo)."""
+    from pulse_server.routers.systems import _bump_probe_config_version
+
+    _bump_probe_config_version(db_session, _uuid.uuid4())  # nessuna eccezione

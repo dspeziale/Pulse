@@ -692,3 +692,36 @@ Output consegnati
 - Smoke: le form systems/new e systems/{id}/edit renderizzano senza errori Jinja col nuovo pulsante/area risultato (assertito nei test GET 200). Nessun URL esterno/CDN introdotto.
 
 ================================================
+
+ITERAZIONE 18
+
+Agente: BE
+Data: 2026-07-16
+
+Input ricevuti
+- Bug funzionale confermato a runtime dall'orchestratore: create/update/delete di un Sistema monitorato non aggiornava il config_version della/e Probe interessata/e; la Probe (che fa re-sync solo quando il liveness restituisce un config_version diverso) non rilevava la variazione e restava con 0 sistemi.
+- Vincoli: fix solo su server/backend, contratti API invariati (effetto collaterale interno), bump atomico nella stessa transazione, helper tipizzato riutilizzabile, coverage 100% mantenuta, mypy --strict pulito, 0 test falliti.
+
+Lavoro svolto
+- Aggiunto helper interno tipizzato `_bump_probe_config_version(session, probe_id)` in routers/systems.py: imposta probes.config_version = now(UTC).strftime('%Y%m%d%H%M%S') (stesso formato usato in probe_comm register/config), no-op difensivo se la Probe non esiste; non fa commit (atomicita' col chiamante).
+- create_system: bump della Probe assegnata (body.probe_id) prima del commit.
+- update_system: catturato previous_probe_id prima dell'eventuale riassegnazione; bump della Probe corrente e, se probe_id e' cambiato, bump ANCHE della Probe precedente. Copre implicitamente enable/disable e ogni altra modifica (bump sempre in update).
+- delete_system: catturato owner_probe_id, flush della delete, poi bump della Probe che possedeva il sistema.
+- Tutti i bump avvengono prima del commit/commit_or_conflict esistente (nessun commit aggiuntivo, operazione atomica).
+
+File toccati
+- server/backend/pulse_server/routers/systems.py (import datetime/uuid, helper, integrazione in create/update/delete).
+- server/backend/tests/test_systems_checks.py (nuovi test).
+
+Problemi trovati
+- Il formato timestamp a risoluzione di secondo puo' produrre lo stesso valore per due bump nello stesso secondo: irrilevante per la correttezza (conta che differisca dal config_version gia' sincronizzato dalla Probe) e per i test (che usano valori sentinella deterministici prima dell'operazione). Formato mantenuto come richiesto.
+
+Decisioni prese
+- Helper con guardia `if probe is not None` (difensiva) per robustezza; il ramo None e' coperto da un unit test dedicato per mantenere il 100%.
+
+Output consegnati
+- Fix applicato: bump del config_version su create (Probe assegnata), update (Probe corrente + Probe precedente in caso di riassegnazione), delete (Probe proprietaria). Contratti API invariati.
+- Test aggiunti: create/update/delete bumpano la Probe interessata; riassegnazione bumpa entrambe le Probe; no-op su Probe inesistente. Verifica su Postgres reale via TestClient.
+- Esito: 228 test passati (0 falliti), coverage server/backend 100% (statement+branch, systems.py incluso), mypy --strict pulito.
+
+================================================

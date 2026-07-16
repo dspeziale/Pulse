@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import datetime as dt
 import time
+import uuid
 from typing import Any
 
 import httpx
@@ -33,6 +35,19 @@ def _require_probe(session: SessionDep, probe_id: str) -> Probe:
     if probe is None:
         raise errors.unprocessable("Probe inesistente.")
     return probe
+
+
+def _bump_probe_config_version(session: SessionDep, probe_id: uuid.UUID) -> None:
+    """Aggiorna `config_version` della Probe indicata a un nuovo timestamp.
+
+    Segnala alla Probe (che confronta il config_version restituito dal liveness)
+    che la propria configurazione e' cambiata e va ri-scaricata (create/update/
+    delete di un sistema monitorato assegnato). Non fa commit: lo fa il chiamante,
+    nella stessa transazione dell'operazione (atomicita').
+    """
+    probe = session.get(Probe, probe_id)
+    if probe is not None:
+        probe.config_version = dt.datetime.now(dt.timezone.utc).strftime("%Y%m%d%H%M%S")
 
 
 def _replace_windows(session: SessionDep, system: MonitoredSystem, windows: list[schemas.MaintenanceWindowIn]) -> None:
@@ -113,6 +128,8 @@ def create_system(
     flush_or_conflict(session, message="system_id gia' esistente.")
     if body.maintenance_windows:
         _replace_windows(session, system, body.maintenance_windows)
+    # La config della Probe assegnata e' cambiata: segnala il re-sync.
+    _bump_probe_config_version(session, probe.id)
     write_audit(
         session,
         actor_type="user",
@@ -149,6 +166,7 @@ def update_system(
     system = session.get(MonitoredSystem, parse_uuid(system_id, what="system_id"))
     if system is None:
         raise errors.not_found("Sistema inesistente.")
+    previous_probe_id = system.probe_id
     if body.probe_id is not None:
         system.probe_id = _require_probe(session, body.probe_id).id
     if body.system_name is not None:
@@ -166,6 +184,11 @@ def update_system(
         system.response_ms_error = body.thresholds.response_ms_error
     if body.maintenance_windows is not None:
         _replace_windows(session, system, body.maintenance_windows)
+    # La config e' cambiata: bump della Probe corrente e, in caso di
+    # riassegnazione, anche di quella precedente (che perde il sistema).
+    _bump_probe_config_version(session, system.probe_id)
+    if system.probe_id != previous_probe_id:
+        _bump_probe_config_version(session, previous_probe_id)
     write_audit(
         session,
         actor_type="user",
@@ -191,7 +214,11 @@ def delete_system(
     system = session.get(MonitoredSystem, parse_uuid(system_id, what="system_id"))
     if system is None:
         raise errors.not_found("Sistema inesistente.")
+    owner_probe_id = system.probe_id
     session.delete(system)
+    session.flush()
+    # La Probe che possedeva il sistema deve ri-scaricare la config.
+    _bump_probe_config_version(session, owner_probe_id)
     write_audit(
         session,
         actor_type="user",
