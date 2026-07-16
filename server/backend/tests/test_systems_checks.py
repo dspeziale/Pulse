@@ -203,6 +203,44 @@ def test_update_heartbeat_url_valid_and_invalid(client, auth_headers) -> None:
     assert bad.status_code == 422
 
 
+def test_list_systems_filter_by_kind(client, auth_headers) -> None:
+    pid = _make_probe(client, auth_headers, name="probe-kind-filter")
+    _make_system(client, auth_headers, pid, system_id="kf-http")
+    _make_tcp_system(client, auth_headers, pid, system_id="kf-tcp")
+
+    http_only = client.get(f"/api/v1/systems?probe_id={pid}&kind=http", headers=auth_headers)
+    assert http_only.status_code == 200
+    kinds = {i["kind"] for i in http_only.json()["items"]}
+    assert kinds == {"http"}
+    assert any(i["system_id"] == "kf-http" for i in http_only.json()["items"])
+
+    tcp_only = client.get(f"/api/v1/systems?probe_id={pid}&kind=tcp", headers=auth_headers)
+    assert tcp_only.status_code == 200
+    tcp_kinds = {i["kind"] for i in tcp_only.json()["items"]}
+    assert tcp_kinds == {"tcp"}
+    assert any(i["system_id"] == "kf-tcp" for i in tcp_only.json()["items"])
+
+    # senza filtro kind: entrambi presenti
+    both = client.get(f"/api/v1/systems?probe_id={pid}", headers=auth_headers)
+    assert both.json()["total"] >= 2
+
+
+def test_list_systems_kind_combined_with_other_probe(client, auth_headers) -> None:
+    pid1 = _make_probe(client, auth_headers, name="probe-kind-p1")
+    pid2 = _make_probe(client, auth_headers, name="probe-kind-p2")
+    _make_tcp_system(client, auth_headers, pid1, system_id="kc-tcp-p1")
+    _make_tcp_system(client, auth_headers, pid2, system_id="kc-tcp-p2")
+    r = client.get(f"/api/v1/systems?kind=tcp&probe_id={pid1}", headers=auth_headers)
+    assert r.status_code == 200
+    ids = {i["system_id"] for i in r.json()["items"]}
+    assert ids == {"kc-tcp-p1"}
+
+
+def test_list_systems_invalid_kind_422(client, auth_headers) -> None:
+    r = client.get("/api/v1/systems?kind=ftp", headers=auth_headers)
+    assert r.status_code == 422
+
+
 def test_system_duplicate_id_conflict(client, auth_headers) -> None:
     pid = _make_probe(client, auth_headers, name="probe-dupsys")
     _make_system(client, auth_headers, pid, system_id="dup-sys")

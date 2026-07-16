@@ -23,7 +23,7 @@
             <input class="form-control" id="system_name" name="system_name" value="{{ system.system_name if system else '' }}" placeholder="es. CRM Produzione" required>
             <div class="form-text">Nome descrittivo mostrato nelle liste e nelle notifiche.</div>
           </div>
-          {% set current_kind = (system.kind or 'http') if system else 'http' %}
+          {% set current_kind = (system.kind or 'http') if system else (initial_kind | default('http')) %}
           <div class="col-md-6">
             <label class="form-label" for="kind">Tipo di controllo</label>
             <select class="form-select" id="kind" name="kind">

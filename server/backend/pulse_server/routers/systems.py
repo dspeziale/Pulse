@@ -77,11 +77,17 @@ def list_systems(
     q: str | None = None,
     probe_id: str | None = None,
     enabled: bool | None = None,
+    kind: str | None = None,
     _: CurrentUser = Depends(require_permission("systems.read")),
 ) -> schemas.SystemList:
     page, page_size = clamp_pagination(page, page_size)
     stmt = select(MonitoredSystem)
     count_stmt = select(func.count(MonitoredSystem.id))
+    if kind is not None:
+        if kind not in ("http", "tcp"):
+            raise errors.unprocessable("kind deve essere 'http' o 'tcp'.")
+        stmt = stmt.where(MonitoredSystem.kind == kind)
+        count_stmt = count_stmt.where(MonitoredSystem.kind == kind)
     if probe_id is not None:
         pid = parse_uuid(probe_id, what="probe_id")
         stmt = stmt.where(MonitoredSystem.probe_id == pid)

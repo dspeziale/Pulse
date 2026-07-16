@@ -199,7 +199,8 @@ Formato corpo errore:
 ## 1.6 Area: Sistemi monitorati
 
 ### GET /api/v1/systems
-- **Permesso**: `systems.read`. **Query**: `page, page_size, q, probe_id, enabled`.
+- **Permesso**: `systems.read`. **Query**: `page, page_size, q, probe_id, enabled, kind`.
+  - `kind` (esteso su richiesta utente): filtra per tipo di controllo, valori ammessi `http` | `tcp` (utile per separare Applicazioni=http e Connettivita'=tcp nella UI); combinabile con gli altri filtri. Un valore diverso da `http`/`tcp` restituisce 422.
 - **Response 200**: `{ "items": [System], "total": int }`
   - `System`: `{ "id": string, "system_id": string, "system_name": string, "kind": "http"|"tcp", "heartbeat_url": string|null, "tcp_host": string|null, "tcp_port": int|null, "probe_id": string, "poll_interval_seconds": int, "timeout_seconds": int, "enabled": bool, "thresholds": { "response_ms_warn": int|null, "response_ms_error": int|null }, "maintenance_windows": [ { "start": string, "end": string, "note": string } ], "created_at": string }`
   - `kind` (esteso su richiesta utente): `"http"` = controllo heartbeat HTTP/HTTPS su `heartbeat_url`; `"tcp"` = controllo di connettivita' TCP su `tcp_host:tcp_port`. Per `kind="http"` valorizzato `heartbeat_url` (e `tcp_*` null); per `kind="tcp"` valorizzati `tcp_host`/`tcp_port` (e `heartbeat_url` puo' essere null).

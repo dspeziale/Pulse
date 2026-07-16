@@ -63,13 +63,20 @@ def _build_payload() -> dict:
 @bp.route("/systems")
 @permission_required("systems.read")
 def list_systems():
-    params = {**page_args(), **query_args("q", "probe_id", "enabled")}
+    # Il tipo di sistema pilota le due TAB: "Applicazioni" (http, default) e
+    # "Connettività" (tcp). Il filtro effettivo lo applica il backend.
+    kind = _normalized_kind(request.args.get("kind", ""))
+    params = {**page_args(), **query_args("q", "probe_id", "enabled"),
+              "kind": kind}
     data = api_get("/systems", params=params)
     probes = api_get("/probes")
+    # I filtri (kind incluso, page escluso) alimentano i link di paginazione,
+    # così la navigazione tra pagine conserva la TAB attiva e gli altri filtri.
     filters = {k: v for k, v in params.items() if k != "page"}
     page, page_size = paging()
     return render_template("systems/list.html", data=data, probes=probes,
-                           filters=filters, page=page, page_size=page_size)
+                           filters=filters, page=page, page_size=page_size,
+                           kind=kind)
 
 
 @bp.route("/systems-by-probe", methods=["GET"])
@@ -148,7 +155,10 @@ def test_heartbeat():
 @permission_required("systems.create")
 def new_system():
     probes = api_get("/probes")
-    return render_template("systems/form.html", system=None, probes=probes)
+    # Preselezione del tipo coerente con la TAB da cui si arriva (?kind=tcp).
+    initial_kind = _normalized_kind(request.args.get("kind", ""))
+    return render_template("systems/form.html", system=None, probes=probes,
+                           initial_kind=initial_kind)
 
 
 @bp.route("/systems/new", methods=["POST"])

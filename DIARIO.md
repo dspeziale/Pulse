@@ -1328,3 +1328,68 @@ Output consegnati
 - I 4 campi anagrafici della Sonda sono esposti end-to-end (model/schema/serializer/API) e documentati; nessuna modifica a probe/frontend.
 
 ================================================
+
+ITERAZIONE 35
+
+Agente: FE
+Data: 2026-07-16
+
+Input ricevuti
+- Richiesta orchestratore: nella sezione Sistemi dividere in due TAB — "Applicazioni" (kind=http) e "Connettività" (kind=tcp). Il backend (in parallelo) aggiunge il filtro GET /systems?kind=http|tcp.
+- Vincoli: modificare SOLO server/dashboard; niente CDN; coerenza AdminLTE/Bootstrap; coverage 100% e 0 test falliti.
+
+Lavoro svolto
+- server/dashboard/views/systems.py (list_systems): legge kind da request.args, lo normalizza a {http,tcp} con fallback 'http' (riuso di _normalized_kind gia' presente), lo aggiunge ai params di api_get('/systems') (oltre a page/page_size e ai filtri q/probe_id/enabled) e lo passa al template. Il kind entra in `filters` (usati dai link di paginazione), quindi la navigazione tra pagine conserva la TAB attiva e gli altri filtri.
+- server/dashboard/views/systems.py (new_system): legge un kind iniziale opzionale da querystring (?kind=), normalizzato, e lo passa al template come initial_kind per preselezionare il tipo nella form.
+- server/dashboard/templates/systems/list.html: aggiunta barra a TAB (nav-tabs Bootstrap/AdminLTE) con "Applicazioni" (link kind=http, icona bi-globe) e "Connettività" (link kind=tcp, icona bi-hdd-network); la TAB attiva e' evidenziata (class active + aria-current) in base al kind corrente. La tabella mostra i sistemi del tipo selezionato (filtro applicato dal backend); la colonna "Endpoint / Target" resta URL per http e host:porta per tcp. Aggiunto hidden input kind nel form dei filtri GET (il filtro resta dentro la TAB) e stato vuoto contestuale al tipo. La paginazione conserva il kind (via filters).
+- server/dashboard/templates/systems/form.html: current_kind per un nuovo sistema ora rispetta initial_kind (default 'http'); in modifica resta system.kind. Nessuna modifica alla logica di submit/validazione esistente.
+
+Scelta sul pulsante "Nuovo sistema"
+- Il pulsante NON e' stato lasciato generico: punta a systems.new_system?kind=<attivo>. Ho verificato che la form supporta il preselezionamento del tipo e ho aggiunto in modo minimale il supporto al kind iniziale via querystring (view new_system + current_kind nella form), senza rompere la form esistente (edit invariato, default http quando il parametro manca). Anche il link "Aggiungi il primo sistema" nello stato vuoto porta il kind attivo.
+
+File toccati (solo server/dashboard)
+- server/dashboard/views/systems.py
+- server/dashboard/templates/systems/list.html
+- server/dashboard/templates/systems/form.html
+- server/dashboard/tests/test_views_crud.py (test aggiornati/aggiunti)
+
+Problemi trovati
+- Nessuno. Il form dei filtri GET avrebbe resettato il kind: risolto con hidden input kind.
+
+Decisioni prese
+- kind sempre inviato al backend (default http) per lasciare a esso il filtro effettivo, come da contratto.
+- Conteggio per tab: omesso (la lista/proxy corrente restituisce solo il totale del tipo attivo; ricavare entrambi i conteggi avrebbe richiesto una seconda chiamata non necessaria — facoltativo da requisito).
+
+Output consegnati
+- Due TAB "Applicazioni" (http, default) e "Connettività" (tcp); kind letto/normalizzato dalla view, inoltrato al backend e conservato in paginazione, filtri e pulsante Nuovo.
+- Test (backend mockato): server/dashboard 126 test, 0 falliti; probe/dashboard 40, frontend_common 29, tutti verdi. Coverage app-code 100% (views/systems.py 108/108; tutte le altre views/app.py/sdk.py 100%); le uniche righe non coperte sono helper difensivi pre-esistenti nel conftest di test. Nuovi test: default http; ?kind=tcp attiva la seconda tab; view chiama il backend col kind giusto; kind invalido -> fallback http; paginazione conserva kind; form Nuovo preseleziona il tipo dalla tab.
+- Verifica reale (app Flask + FakeApiClient): l'HTML servito su /systems contiene nav-tabs e le due voci; senza kind il backend riceve kind=http e la tab Applicazioni e' attiva; con ?kind=tcp il backend riceve kind=tcp e la tab Connettività e' attiva; i link di paginazione conservano kind=tcp.
+
+================================================
+
+ITERAZIONE 36
+
+Agente: BE
+Data: 2026-07-16
+
+Input ricevuti
+- Richiesta orchestratore: separare i Sistemi per tipo nella UI (Applicazioni=http, Connettivita'=tcp). Aggiungere il filtro `kind` all'endpoint lista sistemi. Modificare SOLO server/backend.
+
+Lavoro svolto (SERVER — server/backend)
+- routers/systems.py, list_systems (GET /api/v1/systems): aggiunto parametro query `kind: str | None = None`. Se valorizzato deve essere 'http' o 'tcp' (altrimenti 422 via errors.unprocessable, coerente con lo stile esistente); quando presente filtra sia stmt che count_stmt con MonitoredSystem.kind == kind. Combinabile con q/probe_id/enabled (il filtro kind e' applicato per primo, gli altri restano invariati).
+- docs/api/DOCUMENTO_API.md (GET /systems): documentato il nuovo parametro kind (valori http|tcp) con nota "(esteso su richiesta utente)" e il 422 su valore non ammesso.
+
+Qualita'
+- mypy --strict: pulito su pulse_server (31 file, "no issues found").
+- Test aggiunti (tests/test_systems_checks.py): ?kind=http ritorna solo http; ?kind=tcp solo tcp; kind combinato con probe_id (isola il sistema della probe giusta); kind non valido ('ftp') -> 422.
+- Coverage: server/backend 100% (2949 stmt, 596 branch; systems.py 208/72 100%). Esito: 258 test passati, 0 falliti.
+
+File toccati
+- server/backend/pulse_server/routers/systems.py
+- server/backend/tests/test_systems_checks.py
+- docs/api/DOCUMENTO_API.md (GET /systems)
+
+Output consegnati
+- GET /api/v1/systems supporta il filtro kind=http|tcp (422 su valore non ammesso), combinabile con gli altri filtri; documentazione aggiornata. Nessuna modifica a probe/frontend.
+
+================================================

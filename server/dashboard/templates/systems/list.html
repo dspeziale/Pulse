@@ -2,16 +2,34 @@
 {% from "_macros.html" import status_badge, bool_badge, pagination %}
 {% block title %}Sistemi monitorati — Pulse{% endblock %}
 {% block content %}
+{% set active_kind = kind if kind in ('http', 'tcp') else 'http' %}
 <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
   <h1 class="h3 mb-0"><i class="bi bi-hdd-stack me-2"></i>Sistemi monitorati</h1>
   {% if can('systems.create') %}
-  <a class="btn btn-primary" href="{{ url_for('systems.new_system') }}"><i class="bi bi-plus-lg me-1"></i>Nuovo sistema</a>
+  <a class="btn btn-primary" href="{{ url_for('systems.new_system', kind=active_kind) }}"><i class="bi bi-plus-lg me-1"></i>Nuovo sistema</a>
   {% endif %}
 </div>
+
+{# TAB per tipo di sistema: il filtro effettivo lo applica il backend (?kind=). #}
+<ul class="nav nav-tabs mb-3" role="tablist">
+  <li class="nav-item" role="presentation">
+    <a class="nav-link{{ ' active' if active_kind == 'http' }}" href="{{ url_for('systems.list_systems', kind='http') }}"
+       {% if active_kind == 'http' %}aria-current="page"{% endif %}>
+      <i class="bi bi-globe me-1"></i>Applicazioni
+    </a>
+  </li>
+  <li class="nav-item" role="presentation">
+    <a class="nav-link{{ ' active' if active_kind == 'tcp' }}" href="{{ url_for('systems.list_systems', kind='tcp') }}"
+       {% if active_kind == 'tcp' %}aria-current="page"{% endif %}>
+      <i class="bi bi-hdd-network me-1"></i>Connettività
+    </a>
+  </li>
+</ul>
 
 <div class="card mb-3">
   <div class="card-body">
     <form method="get" class="row g-2 align-items-end">
+      <input type="hidden" name="kind" value="{{ active_kind }}">
       <div class="col-sm-5">
         <label class="form-label small text-body-secondary mb-1">Ricerca</label>
         <input name="q" class="form-control" placeholder="ID o nome sistema" value="{{ request.args.get('q','') }}">
@@ -64,8 +82,8 @@
       {% else %}
       <tr><td colspan="7" class="text-center text-body-secondary py-5">
         <i class="bi bi-inbox fs-2 d-block mb-2"></i>
-        Nessun sistema monitorato.
-        {% if can('systems.create') %}<div class="mt-2"><a class="btn btn-sm btn-primary" href="{{ url_for('systems.new_system') }}"><i class="bi bi-plus-lg me-1"></i>Aggiungi il primo sistema</a></div>{% endif %}
+        {% if active_kind == 'tcp' %}Nessun sistema di connettività (TCP).{% else %}Nessuna applicazione (HTTP) monitorata.{% endif %}
+        {% if can('systems.create') %}<div class="mt-2"><a class="btn btn-sm btn-primary" href="{{ url_for('systems.new_system', kind=active_kind) }}"><i class="bi bi-plus-lg me-1"></i>Aggiungi il primo sistema</a></div>{% endif %}
       </td></tr>
       {% endfor %}
       </tbody>
