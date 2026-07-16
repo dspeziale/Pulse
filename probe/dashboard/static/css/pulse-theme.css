@@ -155,3 +155,8 @@ canvas { max-width: 100%; }
 .login-box .card { box-shadow: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.15); }
 .login-logo { text-align: center; font-size: 1.7rem; font-weight: 700; margin-bottom: 0.75rem; }
 .login-logo .accent { color: var(--bs-primary, #0d6efd); }
+
+/* Rimozione degli skip-link di accessibilita' iniettati da AdminLTE 4
+   ("Skip to navigation" / "Skip to content") su richiesta utente. */
+.skip-links,
+.skip-link { display: none !important; }
