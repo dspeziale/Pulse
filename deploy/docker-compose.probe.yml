@@ -68,7 +68,7 @@ services:
       PULSE_PROBE_LOG_LEVEL: ${PULSE_PROBE_LOG_LEVEL:-info}
     ports:
       - "${PULSE_PROBE_API_PORT:-8444}:${PULSE_PROBE_API_PORT:-8444}"
-    networks: [pulse]
+    networks: [pulse, shared]
 
   probe-dashboard:
     build:
@@ -99,3 +99,8 @@ volumes:
 networks:
   pulse:
     name: pulse-probe-net
+  # Rete condivisa Server<->Sonda per enrollment e query drill-down (creata esternamente:
+  #   docker network create pulse-shared)
+  shared:
+    name: pulse-shared
+    external: true

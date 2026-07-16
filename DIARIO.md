@@ -480,3 +480,33 @@ Output consegnati
 - Stack in esecuzione e verificato: backend /health 200, login admin 200 (SuperAdmin/40 permessi), probe-agent /health 200, dashboard Server :5000 e Sonda :5001 rispondono (login 200).
 
 ================================================
+
+ITERAZIONE 12
+
+Agente: ORCHESTRATORE
+Data: 2026-07-16
+
+Input ricevuti
+- Richiesta utente: procedere con l'enrollment end-to-end Server<->Sonda.
+
+Lavoro svolto
+- Creata rete Docker condivisa `pulse-shared` e collegati server-backend e probe-agent (per enrollment e query drill-down).
+- Creata la Probe sul Server via API (POST /probes) ottenendo l'enrollment token monouso.
+- Configurato l'agent (deploy/.env.probe) con enrollment token e URL corretto del Server (http://server-backend:8443) e riavviato.
+- Verificato l'intero flusso: register -> probe_token -> pull config -> liveness.
+
+File creati
+- deploy/.env.probe (NON versionato: contiene segreto; aggiunto a .gitignore)
+- File modificati: deploy/docker-compose.server.yml, deploy/docker-compose.probe.yml (rete `shared`), .gitignore
+
+Problemi trovati
+- Default errato PULSE_PROBE_SERVER_BASE_URL nel compose (https://server-backend:9443) rispetto alla porta reale del backend (http 8443): sovrascritto via .env.probe.
+- Il probe_token non e' persistito dall'agent (solo in memoria): un riavvio del container richiede un nuovo enrollment (token monouso). Da valutare persistenza in futuro (non richiesto dai requisiti).
+
+Decisioni prese
+- Rete condivisa esterna `pulse-shared` come canale Server<->Sonda per l'ambiente locale.
+
+Output consegnati
+- Enrollment end-to-end verificato: Probe "online" sul Server; token monouso (re-register -> 401); identita' assegnata all'agent (probe_id, OpenSearch healthy, poller attivo); drill-down Server->Probe (proxy heartbeats) -> 200.
+
+================================================

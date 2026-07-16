@@ -10,3 +10,5 @@ htmlcov/
 *.egg-info/
 *.log
 .mypy_cache/
+deploy/.env.probe
+deploy/.env.server

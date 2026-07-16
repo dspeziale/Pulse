@@ -60,7 +60,7 @@ services:
       PULSE_LOG_LEVEL: ${PULSE_LOG_LEVEL:-info}
     ports:
       - "${PULSE_API_PORT:-8443}:${PULSE_API_PORT:-8443}"
-    networks: [pulse]
+    networks: [pulse, shared]
 
   server-dashboard:
     build:
@@ -88,3 +88,8 @@ volumes:
 networks:
   pulse:
     name: pulse-server-net
+  # Rete condivisa Server<->Sonda per enrollment e query drill-down (creata esternamente:
+  #   docker network create pulse-shared)
+  shared:
+    name: pulse-shared
+    external: true
