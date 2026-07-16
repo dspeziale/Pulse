@@ -619,3 +619,76 @@ Output consegnati
 - Coverage combinata (.coveragerc radice): 1066 statement, 92 branch, 0 miss -> 100% (config.py e i due app.py inclusi al 100%).
 
 ================================================
+
+ITERAZIONE 17
+
+Agente: FE
+Data: 2026-07-16
+
+Input ricevuti
+- Richiesta: nella form del Sistema monitorato (creazione e modifica) aggiungere un pulsante per testare l'endpoint heartbeat PRIMA del salvataggio, mostrando l'esito inline. Solo frontend (server/dashboard, eventualmente frontend_common); NON toccare il backend.
+- Contratto BE consumato (implementato in parallelo): POST /api/v1/systems/test, auth JWT, permesso systems.create OR systems.update. Request {heartbeat_url, timeout_seconds?}. Response 200 {reachable, http_status, response_ms, valid_schema, checks_count, documents[], error}. L'irraggiungibilità del target NON è errore (200 con reachable=false ed error valorizzato). Errori 422/401/403.
+
+Lavoro svolto
+- Rotta dashboard (server/dashboard/views/systems.py): nuova POST /systems/test-heartbeat protetta da permission_required("systems.create","systems.update"). Legge heartbeat_url (+timeout_seconds opzionale) da JSON o form, valida la presenza dell'URL (422 se mancante), delega al backend POST /systems/test col token di sessione via sdk.api_post e restituisce l'esito come JSON al browser. Gli errori del backend sono catturati e tradotti in JSON comprensibile senza passare dagli error handler HTML globali: ApiAuthError->401, ApiError->status originale col message, ApiUnavailableError->503. Nessuna modifica ai campi del form esistenti né alla logica di salvataggio.
+- Template (server/dashboard/templates/systems/form.html): accanto al campo "URL heartbeat" (input-group) aggiunto il pulsante "Testa endpoint" (btn-outline-primary, icona bi-activity), un help che chiarisce che il test parte DAL SERVER (quindi il Server deve raggiungere l'URL; se il sistema è raggiungibile solo dalla Sonda l'esito può differire) e un'area risultato inline inizialmente nascosta (#test-heartbeat-result). Funziona identico in creazione e modifica: usa il valore corrente del campo URL, senza salvare.
+- JS locale (nessun CDN, nello <script> in fondo alla form): al click invia in fetch l'URL corrente (+timeout) alla rotta del dashboard, mostra stato "Test in corso...", poi renderizza l'esito complessivo con badge (OK verde / raggiungibile ma schema non valido giallo / non raggiungibile rosso), HTTP status, response_ms, validità schema, numero di check e una tabella dei documenti (system_id/check_id/status con badge di stato). Messaggio d'errore mostrato se reachable=false o schema non valido. Costruzione DOM via textContent (no innerHTML su dati di risposta) per evitare XSS. Colori dai token del tema (classi Bootstrap + badge b-ok/b-warn/b-error), coerenti chiaro/scuro.
+
+File modificati
+- server/dashboard/views/systems.py
+- server/dashboard/templates/systems/form.html
+- server/dashboard/tests/test_views_crud.py
+
+Problemi trovati
+- coverage 7.15.2 (ambiente attuale) applica l'omit di [run] del .coveragerc solo in fase di run e non piu in fase di report: il comando documentato "coverage combine && coverage report" include ora i file di test/conftest (10 miss preesistenti: frontend_common/tests test_auth 1, test_http_client 1, e i due conftest 4+4 - NON codice applicativo, presenti anche prima di questa iterazione). Passando esplicitamente --omit="*/tests/*" al report la coverage torna 100% (1087 stmt, 92 branch, 0 miss). NON ho toccato .coveragerc (fuori scope: solo server/dashboard e frontend_common). Segnalo a QA/orchestratore per eventuale allineamento del .coveragerc ([report] omit) alla nuova versione di coverage.
+
+Decisioni prese
+- La rotta restituisce JSON (non un frammento HTML) per un rendering client pulito e per gestire nel browser sia l'esito applicativo (reachable/schema) sia gli errori di trasporto. Gli errori backend sono intercettati nella rotta (non lasciati agli error handler globali che avrebbero fatto redirect/HTML) cosi il fetch riceve sempre JSON con {ok:false,error}.
+- Nessuna dipendenza nuova: fetch nativo, icone bootstrap-icons locali gia presenti, badge di stato riusati dal tema esistente.
+
+Output consegnati
+- Pulsante "Testa endpoint" presente e funzionante sia in systems/new sia in systems/{id}/edit; rotta POST /systems/test-heartbeat operativa; rendering esito (badge/tempi/schema/check/tabella documenti/errore) verificato.
+- Test aggiunti (backend MOCKATO via FakeApiClient/monkeypatch): rendering pulsante in new ed edit, esito reachable=true+schema valido, reachable=false, URL mancante (422), errore backend ApiError (status+message), ApiAuthError (401), ApiUnavailableError (503), e permesso negato (403). Suite server/dashboard: 60 test, 0 falliti (51 preesistenti + 9 nuovi). Per-pacchetto: frontend_common 29, server/dashboard 60, probe/dashboard 28 = 117 test, 0 falliti.
+- Coverage combinata (frontend_common+server/dashboard+probe/dashboard) con omit dei test: 1087 statement, 92 branch, 0 miss -> 100%; server/dashboard/views/systems.py 73/73 100%.
+- Smoke: le form systems/new e systems/{id}/edit renderizzano senza errori Jinja col nuovo pulsante/area risultato (assertito nei test GET 200). Nessun URL esterno/CDN introdotto.
+
+================================================
+
+ITERAZIONE 16
+
+Agente: BE
+Data: 2026-07-16
+
+Input ricevuti
+- Richiesta utente: nella form di creazione/modifica di un Sistema monitorato, un pulsante per "testare" l'endpoint heartbeat. Implementare l'endpoint BACKEND che esegue il test. Solo server/backend/, codice tipizzato, coverage 100%.
+- Contratto (consumato in parallelo dal FE, ITERAZIONE 17): POST /api/v1/systems/test, auth JWT, permesso systems.create OR systems.update. Request {heartbeat_url (http/https), timeout_seconds? default 5 range 1..60}. Response 200 {reachable, http_status, response_ms, valid_schema, checks_count, documents[], error}. Irraggiungibilità del target = 200 con reachable=false ed error valorizzato (NON errore HTTP). Errori 422/401/403.
+
+Lavoro svolto
+- schemas.py: aggiunti SystemTestRequest (heartbeat_url validato http/https via field_validator con PydanticCustomError per errori 422 serializzabili; timeout_seconds int default 5, range 1..60 via Field ge/le), SystemTestDocument (system_id, system_name?, check_id, check_name?, status, response_ms number?, message?) e SystemTestResponse (reachable, http_status int|null, response_ms int, valid_schema, checks_count, documents[], error str|null).
+- deps.py: aggiunti CurrentUser.has_any_permission(*codes) e la dependency-factory require_any_permission(*codes) (logica has_any coerente con require_permission esistente, senza toccarla).
+- routers/systems.py: nuova rotta POST /api/v1/systems/test (tag "systems", summary/description OpenAPI) protetta da require_any_permission("systems.create","systems.update"). Esegue GET via httpx (timeout dato) misurando response_ms con time.perf_counter; interpreta la risposta come schema canonico Pulse (oggetto singolo O array) con _parse_canonical (valida i campi essenziali system_id/check_id/status, tronca documents a 20, conta tutti i check). Nessuna persistenza, nessuna creazione del sistema. Gestiti: connessione fallita/timeout (httpx.HTTPError -> reachable=false), risposta non-JSON (ValueError -> valid_schema=false), payload non oggetto/array, array vuoto, item non-dict, campi mancanti. Client httpx isolato in _build_test_client per i test.
+- docs/api/DOCUMENTO_API.md: aggiunta la voce "POST /api/v1/systems/test" nella §1.6 Sistemi con nota "(aggiunta su richiesta utente)", request/response/errori/permesso, coerente col resto del documento.
+
+File modificati
+- server/backend/pulse_server/schemas.py
+- server/backend/pulse_server/deps.py
+- server/backend/pulse_server/routers/systems.py
+- docs/api/DOCUMENTO_API.md
+File creati
+- server/backend/tests/test_systems_test_endpoint.py
+
+Problemi trovati
+- Un field_validator che solleva ValueError "puro" produce in Pydantic v2 un errors() con ctx contenente l'oggetto eccezione, NON serializzabile: l'handler RequestValidationError esistente andava in 500 (TypeError json). Risolto in modo localizzato sollevando PydanticCustomError (errors() serializzabile) invece di ValueError, senza modificare l'handler condiviso in errors.py.
+
+Decisioni prese
+- L'irraggiungibilità del target è restituita come 200 con reachable=false (coerente col contratto, così il FE mostra l'esito) e non come 5xx dell'endpoint.
+- Validazione dello schema canonico implementata localmente e in modo minimale (nessun import dal pacchetto probe), coerente con i campi della Probe.
+- Client httpx costruito in _build_test_client (module-level) per consentire l'iniezione di httpx.MockTransport nei test senza dipendere da un server reale.
+
+Output consegnati
+- Endpoint implementato secondo contratto; mypy --strict pulito (31 file); pytest 151 test, 0 falliti.
+- Test aggiunti (15) via httpx.MockTransport/monkeypatch: schema valido oggetto singolo, schema valido array (troncato a 20 su 25, checks_count=25), target irraggiungibile (reachable=false), risposta 5xx (reachable=true), risposta non-JSON, schema incompleto (check_id mancante), JSON non oggetto/array, array vuoto, array con item non-dict, 422 URL non valido/mancante, 422 timeout fuori range, 401 senza token, 403 con ruolo Viewer (privo di systems.create/update), costruzione client reale.
+- Coverage server/backend: 2802 statement, 544 branch, 0 miss -> 100% (systems.py 163/56 100%, schemas.py 100%, deps.py 100%).
+- DOCUMENTO_API.md aggiornato (§1.6).
+
+================================================

@@ -9,8 +9,10 @@ from __future__ import annotations
 import datetime as dt
 import uuid
 from typing import Any, Literal
+from urllib.parse import urlparse
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
+from pydantic_core import PydanticCustomError
 
 
 class _Model(BaseModel):
@@ -276,6 +278,50 @@ class SystemUpdate(_Model):
     enabled: bool | None = None
     thresholds: Thresholds | None = None
     maintenance_windows: list[MaintenanceWindowIn] | None = None
+
+
+class SystemTestRequest(_Model):
+    """Richiesta di test dell'endpoint heartbeat (aggiunta su richiesta utente).
+
+    Non persiste nulla: esegue una GET diagnostica verso `heartbeat_url`.
+    """
+
+    heartbeat_url: str = Field(min_length=1, max_length=500)
+    timeout_seconds: int = Field(default=5, ge=1, le=60)
+
+    @field_validator("heartbeat_url")
+    @classmethod
+    def _validate_http_url(cls, value: str) -> str:
+        parsed = urlparse(value)
+        if parsed.scheme not in ("http", "https") or not parsed.netloc:
+            raise PydanticCustomError(
+                "value_error", "heartbeat_url deve essere un URL http/https valido."
+            )
+        return value
+
+
+class SystemTestDocument(_Model):
+    """Documento canonico Pulse estratto dalla risposta del target."""
+
+    system_id: str
+    system_name: str | None = None
+    check_id: str
+    check_name: str | None = None
+    status: str
+    response_ms: float | None = None
+    message: str | None = None
+
+
+class SystemTestResponse(_Model):
+    """Esito del test dell'endpoint heartbeat (aggiunta su richiesta utente)."""
+
+    reachable: bool
+    http_status: int | None
+    response_ms: int
+    valid_schema: bool
+    checks_count: int
+    documents: list[SystemTestDocument]
+    error: str | None
 
 
 class CheckOut(_Model):

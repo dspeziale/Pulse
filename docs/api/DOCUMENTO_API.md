@@ -207,6 +207,15 @@ Formato corpo errore:
 - **Request**: `{ "system_id": string, "system_name": string, "heartbeat_url": string, "probe_id": string, "poll_interval_seconds": int, "timeout_seconds": int, "enabled": bool, "thresholds"?: {...}, "maintenance_windows"?: [...] }`
 - **Response 201**: `System`. **Errori**: 409 (`system_id` duplicato), 422 (URL/intervallo invalidi, probe inesistente), 401, 403.
 
+### POST /api/v1/systems/test
+- **Descrizione**: testa un endpoint heartbeat prima di creare/modificare un sistema (aggiunta su richiesta utente). Esegue una GET diagnostica verso `heartbeat_url`, misura il tempo di risposta e prova a interpretare la risposta come schema canonico Pulse (oggetto singolo o array). **Non persiste nulla e non crea il sistema.**
+- **Permesso**: `systems.create` **OPPURE** `systems.update`.
+- **Request**: `{ "heartbeat_url": string (URL http/https), "timeout_seconds"?: int (default 5, range 1..60) }`
+- **Response 200**: `{ "reachable": bool, "http_status": int|null, "response_ms": int, "valid_schema": bool, "checks_count": int, "documents": [ { "system_id": string, "system_name": string|null, "check_id": string, "check_name": string|null, "status": string, "response_ms": number|null, "message": string|null } ], "error": string|null }`
+  - `reachable=true` anche con risposta 4xx/5xx del target (vedi `http_status`). `documents` limitato a 20 elementi; `checks_count` conteggia tutti i documenti trovati; `valid_schema=true` solo se la risposta e' JSON conforme (campi essenziali: `system_id`, `check_id`, `status`).
+  - L'irraggiungibilita' del target **non** e' un errore HTTP dell'endpoint: ritorna 200 con `reachable=false` ed `error` valorizzato.
+- **Errori**: 422 (URL mancante/non http-https, `timeout_seconds` fuori range), 401, 403.
+
 ### GET /api/v1/systems/{id}
 - **Permesso**: `systems.read`. **Response 200**: `System`. **Errori**: 404, 401, 403.
 

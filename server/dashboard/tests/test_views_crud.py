@@ -162,3 +162,96 @@ def test_systems_full_cycle(client, login, fake):
         "enabled": "", "response_ms_warn": "", "response_ms_error": "900"}).status_code == 302
     fake.set("DELETE", "/systems/1", None)
     assert client.post("/systems/1/delete").status_code == 302
+
+
+# -- P-10 Test endpoint heartbeat (pre-salvataggio) ---------------------------
+def test_systems_new_form_has_test_button(client, login, fake):
+    login(["systems.create"])
+    fake.set("GET", "/probes", {"items": []})
+    r = client.get("/systems/new")
+    assert r.status_code == 200
+    assert b"test-heartbeat-btn" in r.data
+    assert b"Testa endpoint" in r.data
+    assert b"/systems/test-heartbeat" in r.data
+
+
+def test_systems_edit_form_has_test_button(client, login, fake):
+    login(["systems.update"])
+    fake.set("GET", "/systems/1", {"id": "1", "system_name": "S",
+                                   "thresholds": {}})
+    fake.set("GET", "/probes", {"items": []})
+    r = client.get("/systems/1/edit")
+    assert r.status_code == 200
+    assert b"test-heartbeat-btn" in r.data
+
+
+def test_test_heartbeat_reachable_valid(client, login, fake):
+    login(["systems.create"])
+    fake.set("POST", "/systems/test", {
+        "reachable": True, "http_status": 200, "response_ms": 42,
+        "valid_schema": True, "checks_count": 1, "error": None,
+        "documents": [{"system_id": "s1", "system_name": "S", "check_id": "c1",
+                       "check_name": "C", "status": "ok", "response_ms": 42,
+                       "message": None}]})
+    r = client.post("/systems/test-heartbeat",
+                    json={"heartbeat_url": "http://x", "timeout_seconds": 3})
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body["ok"] is True
+    assert body["result"]["reachable"] is True
+    assert ("POST", "/systems/test") in fake.calls
+
+
+def test_test_heartbeat_unreachable(client, login, fake):
+    login(["systems.update"])
+    fake.set("POST", "/systems/test", {
+        "reachable": False, "http_status": None, "response_ms": 0,
+        "valid_schema": False, "checks_count": 0, "documents": [],
+        "error": "Connection refused"})
+    # timeout assente -> ramo senza timeout nel payload; invio via form.
+    r = client.post("/systems/test-heartbeat", data={"heartbeat_url": "http://x"})
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body["ok"] is True
+    assert body["result"]["reachable"] is False
+
+
+def test_test_heartbeat_missing_url(client, login, fake):
+    login(["systems.create"])
+    r = client.post("/systems/test-heartbeat", json={"heartbeat_url": "  "})
+    assert r.status_code == 422
+    assert r.get_json()["ok"] is False
+
+
+def test_test_heartbeat_backend_error(client, login, fake):
+    from conftest import ApiError
+    login(["systems.create"])
+    fake.set("POST", "/systems/test",
+             ApiError(422, "VALIDATION", "URL non valido"))
+    r = client.post("/systems/test-heartbeat", json={"heartbeat_url": "http://x"})
+    assert r.status_code == 422
+    assert r.get_json()["error"] == "URL non valido"
+
+
+def test_test_heartbeat_auth_error(client, login, fake):
+    from conftest import ApiAuthError
+    login(["systems.create"])
+    fake.set("POST", "/systems/test", ApiAuthError(401, "AUTH", "scaduto"))
+    r = client.post("/systems/test-heartbeat", json={"heartbeat_url": "http://x"})
+    assert r.status_code == 401
+    assert r.get_json()["ok"] is False
+
+
+def test_test_heartbeat_backend_unavailable(client, login, fake):
+    from conftest import ApiUnavailableError
+    login(["systems.update"])
+    fake.set("POST", "/systems/test", ApiUnavailableError("timeout"))
+    r = client.post("/systems/test-heartbeat", json={"heartbeat_url": "http://x"})
+    assert r.status_code == 503
+    assert "non raggiungibile" in r.get_json()["error"]
+
+
+def test_test_heartbeat_forbidden(client, login, fake):
+    login(["systems.read"])  # né create né update
+    r = client.post("/systems/test-heartbeat", json={"heartbeat_url": "http://x"})
+    assert r.status_code == 403

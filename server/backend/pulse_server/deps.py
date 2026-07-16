@@ -31,6 +31,10 @@ class CurrentUser:
     def has_permission(self, code: str) -> bool:
         return code in self.permissions
 
+    def has_any_permission(self, *codes: str) -> bool:
+        """True se l'utente possiede almeno uno dei permessi indicati."""
+        return any(code in self.permissions for code in codes)
+
 
 SettingsDep = Annotated[Settings, Depends(get_settings)]
 SessionDep = Annotated[Session, Depends(get_session)]
@@ -87,6 +91,17 @@ def require_permission(code: str) -> Callable[[CurrentUser], CurrentUser]:
     def _dep(user: CurrentUserDep) -> CurrentUser:
         if not user.has_permission(code):
             raise errors.forbidden(f"Permesso richiesto: {code}")
+        return user
+
+    return _dep
+
+
+def require_any_permission(*codes: str) -> Callable[[CurrentUser], CurrentUser]:
+    """Factory di dependency che impone il possesso di ALMENO UNO dei `codes`."""
+
+    def _dep(user: CurrentUserDep) -> CurrentUser:
+        if not user.has_any_permission(*codes):
+            raise errors.forbidden(f"Permesso richiesto (uno tra): {', '.join(codes)}")
         return user
 
     return _dep

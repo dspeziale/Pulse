@@ -5,10 +5,12 @@ GET /systems/{id}/checks, GET /probes (selezione).
 """
 from __future__ import annotations
 
-from flask import (Blueprint, flash, redirect, render_template, request,
-                   url_for)
+from flask import (Blueprint, flash, jsonify, redirect, render_template,
+                   request, url_for)
 
 from pulse_fe_common.auth import permission_required
+from pulse_fe_common.http_client import (ApiAuthError, ApiError,
+                                         ApiUnavailableError)
 
 from sdk import (api_delete, api_get, api_post, api_put, page_args, query_args)
 
@@ -46,6 +48,40 @@ def list_systems():
     data = api_get("/systems", params=params)
     probes = api_get("/probes")
     return render_template("systems/list.html", data=data, probes=probes)
+
+
+@bp.route("/systems/test-heartbeat", methods=["POST"])
+@permission_required("systems.create", "systems.update")
+def test_heartbeat():
+    """Testa l'endpoint heartbeat prima del salvataggio.
+
+    Consuma il valore corrente del campo URL (creazione o modifica), delega al
+    backend POST /systems/test col token di sessione e restituisce l'esito come
+    JSON al browser. Gli errori del backend diventano messaggi comprensibili;
+    l'irraggiungibilità del target NON è un errore (200 con reachable=false).
+    """
+    payload = request.get_json(silent=True) or request.form
+    heartbeat_url = (payload.get("heartbeat_url") or "").strip()
+    if not heartbeat_url:
+        return jsonify({"ok": False,
+                        "error": "Inserisci un URL heartbeat da testare."}), 422
+    body: dict = {"heartbeat_url": heartbeat_url}
+    timeout = _int_or_none(str(payload.get("timeout_seconds") or ""))
+    if timeout is not None:
+        body["timeout_seconds"] = timeout
+    try:
+        result = api_post("/systems/test", json=body)
+    except ApiAuthError:
+        return jsonify({"ok": False,
+                        "error": "Sessione scaduta: effettua di nuovo "
+                                 "l'accesso ed esegui di nuovo il test."}), 401
+    except ApiError as exc:
+        return jsonify({"ok": False, "error": exc.message}), exc.status_code
+    except ApiUnavailableError as exc:
+        return jsonify({"ok": False,
+                        "error": "Backend non raggiungibile: "
+                                 f"{exc.message}"}), 503
+    return jsonify({"ok": True, "result": result}), 200
 
 
 @bp.route("/systems/new", methods=["GET"])

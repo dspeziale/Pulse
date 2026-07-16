@@ -2,14 +2,23 @@
 
 from __future__ import annotations
 
+import time
+from typing import Any
+
+import httpx
 from fastapi import APIRouter, Depends, Query, Request, Response
 from sqlalchemy import delete, func, or_, select
 
 from .. import errors, schemas, serializers
 from ..audit import write_audit
-from ..deps import CurrentUser, SessionDep, client_ip, require_permission
+from ..deps import CurrentUser, SessionDep, client_ip, require_any_permission, require_permission
 from ..models import DiscoveredCheck, MaintenanceWindow, MonitoredSystem, Probe
 from ._helpers import clamp_pagination, commit_or_conflict, flush_or_conflict, offset, parse_uuid
+
+# Numero massimo di documenti canonici restituiti dal test heartbeat.
+_MAX_TEST_DOCUMENTS = 20
+# Campi obbligatori essenziali dello schema canonico Pulse.
+_REQUIRED_CANONICAL_FIELDS = ("system_id", "check_id", "status")
 
 router = APIRouter(prefix="/api/v1/systems", tags=["systems"])
 checks_router = APIRouter(prefix="/api/v1/checks", tags=["checks"])
@@ -195,6 +204,106 @@ def delete_system(
     )
     session.commit()
     return Response(status_code=204)
+
+
+def _build_test_client(timeout_seconds: float) -> httpx.Client:
+    """Costruisce il client HTTP per il test heartbeat (isolabile nei test)."""
+    return httpx.Client(timeout=timeout_seconds)
+
+
+def _parse_canonical(payload: Any) -> tuple[bool, list[schemas.SystemTestDocument], int]:
+    """Interpreta `payload` come schema canonico Pulse (oggetto singolo o array).
+
+    Ritorna `(valid_schema, documents, checks_count)`. Lo schema e' valido se e'
+    un oggetto o un array non vuoto di oggetti che espongono i campi obbligatori
+    essenziali (system_id, check_id, status). I documenti sono troncati a
+    `_MAX_TEST_DOCUMENTS`, mentre `checks_count` conteggia tutti quelli trovati.
+    """
+    if isinstance(payload, dict):
+        raw_docs: list[Any] = [payload]
+    elif isinstance(payload, list):
+        raw_docs = payload
+    else:
+        return False, [], 0
+    if not raw_docs:
+        return False, [], 0
+    documents: list[schemas.SystemTestDocument] = []
+    for item in raw_docs:
+        if not isinstance(item, dict):
+            return False, [], 0
+        if any(item.get(field) is None for field in _REQUIRED_CANONICAL_FIELDS):
+            return False, [], 0
+        if len(documents) < _MAX_TEST_DOCUMENTS:
+            documents.append(
+                schemas.SystemTestDocument(
+                    system_id=str(item["system_id"]),
+                    system_name=item.get("system_name"),
+                    check_id=str(item["check_id"]),
+                    check_name=item.get("check_name"),
+                    status=str(item["status"]),
+                    response_ms=item.get("response_ms"),
+                    message=item.get("message"),
+                )
+            )
+    return True, documents, len(raw_docs)
+
+
+@router.post(
+    "/test",
+    response_model=schemas.SystemTestResponse,
+    summary="Testa un endpoint heartbeat (aggiunta su richiesta utente)",
+    description=(
+        "Esegue una GET diagnostica verso `heartbeat_url` senza persistere nulla "
+        "ne' creare il sistema. Misura il tempo di risposta e prova a interpretare "
+        "la risposta come schema canonico Pulse (oggetto singolo o array). "
+        "L'irraggiungibilita' del target NON e' un errore HTTP: ritorna 200 con "
+        "`reachable=false` ed `error` valorizzato. Permesso: `systems.create` "
+        "OPPURE `systems.update`."
+    ),
+)
+def test_system_endpoint(
+    body: schemas.SystemTestRequest,
+    _: CurrentUser = Depends(require_any_permission("systems.create", "systems.update")),
+) -> schemas.SystemTestResponse:
+    start = time.perf_counter()
+    try:
+        with _build_test_client(float(body.timeout_seconds)) as client:
+            resp = client.get(body.heartbeat_url)
+    except httpx.HTTPError as exc:
+        elapsed = int((time.perf_counter() - start) * 1000)
+        return schemas.SystemTestResponse(
+            reachable=False,
+            http_status=None,
+            response_ms=elapsed,
+            valid_schema=False,
+            checks_count=0,
+            documents=[],
+            error=f"Target non raggiungibile: {exc}",
+        )
+    elapsed = int((time.perf_counter() - start) * 1000)
+    try:
+        payload = resp.json()
+    except ValueError:
+        return schemas.SystemTestResponse(
+            reachable=True,
+            http_status=resp.status_code,
+            response_ms=elapsed,
+            valid_schema=False,
+            checks_count=0,
+            documents=[],
+            error="La risposta del target non e' in formato JSON.",
+        )
+    valid, documents, count = _parse_canonical(payload)
+    error = None if valid else "La risposta JSON non e' conforme allo schema canonico Pulse."
+    return schemas.SystemTestResponse(
+        reachable=True,
+        http_status=resp.status_code,
+        response_ms=elapsed,
+        valid_schema=valid,
+        checks_count=count,
+        documents=documents,
+        error=error,
+    )
 
 
 @router.get("/{system_id}/checks", response_model=schemas.SystemChecksList)
