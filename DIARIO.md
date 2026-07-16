@@ -1047,3 +1047,63 @@ Decisioni prese
 - La condizione mostra/nascondi e il calcolo pagine usano ESCLUSIVAMENTE i valori della view; il backend fornisce solo total (unico dato autorevole che ritorna).
 
 ================================================
+
+ITERAZIONE 27
+
+Agente: BE
+Data: 2026-07-16
+
+Input ricevuti
+- Segnalazione orchestratore: regressione della feature TCP. Il probe-agent va in 500 su GET /api/v1/systems perche' pulse_probe/main.py costruisce schemas.ProbeSystemOut e Pydantic fallisce: heartbeat_url e' None per i sistemi TCP ma lo schema lo richiedeva come str. Fix limitato a probe/agent.
+
+Lavoro svolto (PROBE — probe/agent)
+- schemas.py, ProbeSystemOut: heartbeat_url reso `str | None = None`; aggiunti `kind: str = "http"`, `tcp_host: str | None = None`, `tcp_port: int | None = None` per coerenza col tipo TCP.
+- main.py, endpoint probe_systems (GET /api/v1/systems): valorizzati i nuovi campi da state.systems (kind=s.get("kind","http"), heartbeat_url=s.get("heartbeat_url"), tcp_host=s.get("tcp_host"), tcp_port=s.get("tcp_port")); rimosso il default "" su heartbeat_url che mascherava il None.
+- Verifica altri punti che assumevano heartbeat_url non nullo: poller.py legge system["heartbeat_url"] SOLO nel ramo kind=="http" (il ramo tcp usa tcp_host/tcp_port); /status e query.py non usano heartbeat_url. Nessun'altra correzione necessaria.
+
+Qualita'
+- mypy --strict: pulito su pulse_probe (12 file, "no issues found").
+- Test aggiunto: tests/test_main.py::test_probe_systems_includes_tcp — stato con un sistema kind="tcp" (heartbeat_url None, tcp_host/tcp_port valorizzati); GET /api/v1/systems risponde 200 e l'item ha heartbeat_url null, kind "tcp", tcp_host/tcp_port valorizzati.
+- Coverage: pulse_probe 100% (591 stmt, 126 branch). Esito: 77 test passati, 0 falliti.
+
+File toccati
+- probe/agent/pulse_probe/schemas.py
+- probe/agent/pulse_probe/main.py
+- probe/agent/tests/test_main.py
+
+Output consegnati
+- GET /api/v1/systems della Probe non va piu' in 500 con sistemi TCP: serializzazione corretta con heartbeat_url nullable e campi kind/tcp_host/tcp_port esposti.
+
+================================================
+
+
+ITERAZIONE 28
+
+Agente: FE
+Data: 2026-07-16
+
+Input ricevuti
+- Richiesta orchestratore: mancava la paginazione nella tabella "Heartbeat recenti" del dettaglio Sonda (server/dashboard/templates/probes/detail.html). Aggiungerla coerente con la macro pagination esistente.
+- Contesto: la view detail() gia'' costruisce hb_params = {**page_args(), **query_args(system_id, check_id, status, from, to, sort)} e chiama api_get(/probes/{id}/heartbeats). Il proxy accetta page/page_size (DEFAULT 50) e ritorna {items, total} (niente page/page_size).
+
+Lavoro svolto (server/dashboard) — solo dettaglio Sonda, overview/sistemi invariati
+- views/probes.py detail(): calcola page, page_size = paging(default_size=50) (default reale del proxy heartbeats). Costruisce hb_filters = hb_params senza "page" (include i filtri hb + page_size se custom) + probe_id (parametro di rotta) + window. Passa al template page, page_size e hb_filters oltre a heartbeats/window.
+- templates/probes/detail.html: import di pagination; sotto la tabella "Heartbeat recenti" aggiunto un card-footer che, se heartbeats.total > page_size, invoca pagination(page, page_size, total, ''probes.detail'', hb_filters); altrimenti mostra "Totale: N". La macro genera url_for(''probes.detail'', probe_id=..., window=..., page=..., **filtri): i link restano sulla rotta /probes/<id> conservando window e i filtri hb.
+
+Verifica REALE
+- Reso l''HTML servito di /probes/1?window=7d&system_id=s1&status=ok con risposta REALISTICA del proxy {items:[...], total:120} (senza page/page_size): l''HTML contiene <ul class="pagination">, page-link, "Pagina 1 di 3 - 120 totali" (default page_size 50) e link href="/probes/1?page=2&amp;system_id=s1&amp;status=ok&amp;window=7d" — probe_id (rotta) + window + filtri hb tutti conservati.
+
+Qualita'' / test
+- tests/test_pagination.py: aggiunti 3 test per il dettaglio Sonda (backend mockato): total>50 mostra la paginazione e i link conservano window+probe_id+system_id+status; total<=50 non la mostra (solo "Totale: N"); navigazione a page=2 -> backend heartbeats chiamato con page=2 e "Pagina 2 di 3".
+- Coverage 100%: server/dashboard 107 test (app code 783/783, views/probes.py 60/60), frontend_common 29 test (170/170), probe/dashboard 28 test (197/197). 0 test falliti.
+
+File toccati
+- server/dashboard/views/probes.py (detail: paging(50) + hb_filters)
+- server/dashboard/templates/probes/detail.html (import + footer paginazione heartbeat)
+- server/dashboard/tests/test_pagination.py (3 test dettaglio Sonda)
+
+Decisioni prese
+- page_size default 50 per gli heartbeat (= default del proxy /probes/{id}/heartbeats), diverso dal 20 delle altre liste, come da requisito.
+- hb_filters include probe_id (route param, riempie il placeholder della rotta) e window oltre ai filtri hb, così i link conservano l''intero contesto del drill-down.
+
+================================================

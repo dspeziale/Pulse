@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import status_badge %}
+{% from "_macros.html" import status_badge, pagination %}
 {% block title %}Sonda {{ probe.name }} — Pulse{% endblock %}
 {% block head_extra %}<script src="{{ url_for('static', filename='pulse-charts.js') }}"></script>{% endblock %}
 {% block content %}
@@ -80,6 +80,14 @@
       </tbody>
     </table>
   </div>
+  {% if heartbeats['items'] %}
+  <div class="card-footer">
+    {% set _tot = heartbeats.get('total', 0)|int %}
+    {% if _tot > page_size %}
+      {{ pagination(page, page_size, _tot, 'probes.detail', hb_filters) }}
+    {% else %}<span class="text-body-secondary small">Totale: {{ _tot }}</span>{% endif %}
+  </div>
+  {% endif %}
 </div>
 
 <script>

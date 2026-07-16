@@ -73,6 +73,23 @@ def test_probe_systems(client, state, auth) -> None:
     assert r.status_code == 200 and r.json()["items"][0]["system_id"] == "a"
 
 
+def test_probe_systems_includes_tcp(client, state, auth) -> None:
+    """Un sistema TCP (heartbeat_url None) non fa fallire la serializzazione (200)."""
+    state.systems = [{
+        "system_id": "cache", "system_name": "Cache", "kind": "tcp",
+        "heartbeat_url": None, "tcp_host": "cache.local", "tcp_port": 6379,
+        "poll_interval_seconds": 30, "timeout_seconds": 5, "enabled": True,
+    }]
+    r = client.get("/api/v1/systems", headers=auth)
+    assert r.status_code == 200, r.text
+    item = r.json()["items"][0]
+    assert item["system_id"] == "cache"
+    assert item["kind"] == "tcp"
+    assert item["heartbeat_url"] is None
+    assert item["tcp_host"] == "cache.local"
+    assert item["tcp_port"] == 6379
+
+
 def test_probe_status(client, state, auth) -> None:
     r = client.get("/api/v1/status", headers=auth)
     assert r.status_code == 200

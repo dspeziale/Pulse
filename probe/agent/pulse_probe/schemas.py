@@ -47,7 +47,12 @@ class QueryResponse(_Model):
 class ProbeSystemOut(_Model):
     system_id: str
     system_name: str
-    heartbeat_url: str
+    # Tipo di controllo (esteso su richiesta utente): 'http' o 'tcp'.
+    kind: str = "http"
+    # heartbeat_url e' None per i sistemi TCP: nullable per non far fallire la serializzazione.
+    heartbeat_url: str | None = None
+    tcp_host: str | None = None
+    tcp_port: int | None = None
     poll_interval_seconds: int
     timeout_seconds: int
     enabled: bool

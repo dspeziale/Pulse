@@ -182,7 +182,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             schemas.ProbeSystemOut(
                 system_id=s["system_id"],
                 system_name=s.get("system_name", s["system_id"]),
-                heartbeat_url=s.get("heartbeat_url", ""),
+                kind=s.get("kind", "http"),
+                heartbeat_url=s.get("heartbeat_url"),
+                tcp_host=s.get("tcp_host"),
+                tcp_port=s.get("tcp_port"),
                 poll_interval_seconds=s.get("poll_interval_seconds", 0),
                 timeout_seconds=s.get("timeout_seconds", 0),
                 enabled=s.get("enabled", True),

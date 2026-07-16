@@ -65,6 +65,14 @@ def detail(probe_id: str):
     hb_params = {**page_args(), **query_args("system_id", "check_id", "status",
                                              "from", "to", "sort")}
     heartbeats = api_get(f"/probes/{probe_id}/heartbeats", params=hb_params)
+    # Il proxy /probes/{id}/heartbeats usa page_size di default 50 e ritorna
+    # solo {items, total}: page/page_size effettivi vanno ricostruiti dalla view.
+    page, page_size = paging(default_size=50)
+    # Argomenti per i link di paginazione: probe_id (rotta), window e i filtri hb
+    # correnti (+ page_size se custom), così la navigazione conserva tutto.
+    hb_filters = {k: v for k, v in hb_params.items() if k != "page"}
+    hb_filters["probe_id"] = probe_id
+    hb_filters["window"] = window
     return render_template(
         "probes/detail.html",
         probe=probe,
@@ -72,6 +80,9 @@ def detail(probe_id: str):
         overview=overview,
         heartbeats=heartbeats,
         window=window,
+        page=page,
+        page_size=page_size,
+        hb_filters=hb_filters,
     )
 
 

@@ -182,6 +182,55 @@ def test_invalid_page_size_param_falls_back(client, login, fake):
     assert "Pagina 1 di 3" in r.data.decode()
 
 
+# -- Dettaglio Sonda: paginazione "Heartbeat recenti" (page_size default 50) --
+def _prep_probe_detail(fake, hb_total: int):
+    fake.set("GET", "/probes/1", {"id": "1", "name": "p"})
+    fake.set("GET", "/probes/1/status", {"status": "online"})
+    fake.set("GET", "/dashboard/probe/1", {"systems": [], "generated_at": "x"})
+    hb = {"@timestamp": "t", "system_name": "S", "check_name": "C",
+          "status": "ok", "response_ms": 5}
+    fake.set("GET", "/probes/1/heartbeats", {"items": [hb, hb], "total": hb_total})
+
+
+def test_probe_detail_heartbeats_pagination_shown(client, login, fake):
+    """total > page_size (default 50) -> paginazione heartbeat visibile."""
+    login(["probes.read"])
+    _prep_probe_detail(fake, hb_total=120)  # default 50 -> 3 pagine
+    r = client.get("/probes/1?window=7d&system_id=s1&status=ok")
+    assert r.status_code == 200
+    html = r.data.decode()
+    assert "page-link" in html
+    assert "Pagina 1 di 3" in html
+    assert "120 totali" in html
+    # I link puntano alla rotta /probes/1 e conservano window + filtri hb
+    assert "/probes/1?" in html
+    assert "page=2" in html
+    assert "window=7d" in html
+    assert "system_id=s1" in html
+    assert "status=ok" in html
+
+
+def test_probe_detail_heartbeats_pagination_hidden(client, login, fake):
+    """total <= page_size (default 50) -> nessun controllo, solo il totale."""
+    login(["probes.read"])
+    _prep_probe_detail(fake, hb_total=10)
+    r = client.get("/probes/1")
+    assert r.status_code == 200
+    html = r.data.decode()
+    assert "page-link" not in html
+    assert "Totale: 10" in html
+
+
+def test_probe_detail_heartbeats_forwards_page(client, login, fake):
+    """Navigazione a pagina 2 -> backend heartbeats chiamato con page=2."""
+    login(["probes.read"])
+    _prep_probe_detail(fake, hb_total=120)
+    r = client.get("/probes/1?page=2")
+    assert r.status_code == 200
+    assert fake.params[("GET", "/probes/1/heartbeats")].get("page") == "2"
+    assert "Pagina 2 di 3" in r.data.decode()
+
+
 # -- Test unitari della macro (indipendenti dai template chiamanti) -----------
 _MACRO_TPL = (
     '{% from "_macros.html" import pagination %}'
