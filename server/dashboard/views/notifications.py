@@ -11,7 +11,8 @@ from flask import (Blueprint, flash, redirect, render_template, request,
 
 from pulse_fe_common.auth import permission_required
 
-from sdk import (api_delete, api_get, api_post, api_put, page_args, query_args)
+from sdk import (api_delete, api_get, api_post, api_put, page_args, paging,
+                 query_args)
 
 bp = Blueprint("notifications", __name__)
 
@@ -61,7 +62,10 @@ def _build_payload() -> dict:
 def list_channels():
     params = {**page_args(), **query_args("type", "enabled")}
     data = api_get("/notification-channels", params=params)
-    return render_template("notifications/list.html", data=data)
+    filters = {k: v for k, v in params.items() if k != "page"}
+    page, page_size = paging()
+    return render_template("notifications/list.html", data=data, filters=filters,
+                           page=page, page_size=page_size)
 
 
 @bp.route("/notification-channels/new", methods=["GET"])
@@ -129,4 +133,7 @@ def history():
     params = {**page_args(),
               **query_args("channel_id", "workflow_id", "status", "from", "to")}
     data = api_get("/notifications/history", params=params)
-    return render_template("notifications/history.html", data=data)
+    filters = {k: v for k, v in params.items() if k != "page"}
+    page, page_size = paging()
+    return render_template("notifications/history.html", data=data,
+                           filters=filters, page=page, page_size=page_size)

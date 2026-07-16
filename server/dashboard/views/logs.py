@@ -5,7 +5,7 @@ from flask import Blueprint, render_template
 
 from pulse_fe_common.auth import permission_required
 
-from sdk import api_get, page_args, query_args
+from sdk import api_get, page_args, paging, query_args
 
 bp = Blueprint("logs", __name__)
 
@@ -16,4 +16,7 @@ def list_logs():
     params = {**page_args(),
               **query_args("component", "probe_id", "level", "from", "to", "q")}
     data = api_get("/logs", params=params)
-    return render_template("logs/list.html", data=data)
+    filters = {k: v for k, v in params.items() if k != "page"}
+    page, page_size = paging()
+    return render_template("logs/list.html", data=data, filters=filters,
+                           page=page, page_size=page_size)

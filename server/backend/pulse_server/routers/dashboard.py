@@ -93,6 +93,37 @@ def _latest_rollup(session: SessionDep, probe_id: Any) -> ProbeRollup | None:
     ).scalar_one_or_none()
 
 
+def _system_name_map(session: SessionDep, probe_id: Any) -> dict[str, str]:
+    """Mappa {system_id -> system_name} dei sistemi registrati per la Probe.
+
+    I rollup della Sonda espongono solo `system_id`; questa mappa consente di
+    arricchire ogni voce con il nome leggibile registrato lato Server. La
+    chiave `system_id` di MonitoredSystem e' unique globale.
+    """
+    rows = session.execute(
+        select(MonitoredSystem.system_id, MonitoredSystem.system_name).where(
+            MonitoredSystem.probe_id == probe_id
+        )
+    ).all()
+    return {row.system_id: row.system_name for row in rows}
+
+
+def _enrich_systems(
+    systems: list[dict[str, Any]], name_map: dict[str, str]
+) -> list[dict[str, Any]]:
+    """Aggiunge/valorizza `system_name` a ogni voce dei sistemi del rollup.
+
+    Fallback al `system_id` se il sistema non e' (piu') registrato lato Server.
+    """
+    enriched: list[dict[str, Any]] = []
+    for sysrec in systems:
+        item = dict(sysrec)
+        system_id = str(item.get("system_id", ""))
+        item["system_name"] = name_map.get(system_id, system_id)
+        enriched.append(item)
+    return enriched
+
+
 @router.get("/dashboard/aggregate", response_model=schemas.DashboardAggregate)
 def dashboard_aggregate(
     session: SessionDep,
@@ -146,6 +177,7 @@ def dashboard_probe(
     probe = _require_probe(session, probe_id)
     rollup = _latest_rollup(session, probe.id)
     systems = rollup.payload.get("systems", []) if rollup is not None else []
+    systems = _enrich_systems(systems, _system_name_map(session, probe.id))
     return schemas.DashboardProbeResponse(
         probe=serializers.probe_out(session, probe),
         systems=systems,

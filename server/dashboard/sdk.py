@@ -57,3 +57,23 @@ def page_args() -> dict:
     if page_size:
         out["page_size"] = page_size
     return out
+
+
+def paging(default_size: int = 20) -> tuple[int, int]:
+    """Valori EFFETTIVI di paginazione usati per la richiesta.
+
+    Le risposte di lista del backend contengono solo ``items`` e ``total`` (non
+    ``page``/``page_size``): questi valori vanno quindi ricostruiti dalla query
+    string, usando gli stessi default del backend (``page_size`` = 20), così che
+    il template possa decidere se/come mostrare la paginazione. Ritorna
+    ``(page, page_size)`` con ``page >= 1`` e ``page_size >= 1``.
+    """
+    from flask import request
+
+    def _int(name: str, default: int) -> int:
+        try:
+            return int(request.args.get(name, default))
+        except (TypeError, ValueError):
+            return default
+
+    return max(1, _int("page", 1)), max(1, _int("page_size", default_size))

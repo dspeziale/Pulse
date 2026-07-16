@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_macros.html" import pagination %}
 {% block title %}Utenti — Pulse{% endblock %}
 {% set acct = {'active':'b-ok','disabled':'b-off','locked':'b-warn'} %}
 {% block content %}
@@ -58,6 +59,13 @@
       </tbody>
     </table>
   </div>
-  {% if data['items'] %}<div class="card-footer text-body-secondary small">Totale: {{ data['total'] }}</div>{% endif %}
+  {% if data['items'] %}
+  <div class="card-footer">
+    {% set _tot = data.get('total', 0)|int %}
+    {% if _tot > page_size %}
+      {{ pagination(page, page_size, _tot, 'users.list_users', filters) }}
+    {% else %}<span class="text-body-secondary small">Totale: {{ _tot }}</span>{% endif %}
+  </div>
+  {% endif %}
 </div>
 {% endblock %}

@@ -5,7 +5,7 @@ from flask import Blueprint, render_template
 
 from pulse_fe_common.auth import permission_required
 
-from sdk import api_get, page_args, query_args
+from sdk import api_get, page_args, paging, query_args
 
 bp = Blueprint("audit", __name__)
 
@@ -17,7 +17,10 @@ def list_audit():
               **query_args("actor", "action", "entity_type", "entity_id",
                            "outcome", "from", "to")}
     data = api_get("/audit", params=params)
-    return render_template("audit/list.html", data=data)
+    filters = {k: v for k, v in params.items() if k != "page"}
+    page, page_size = paging()
+    return render_template("audit/list.html", data=data, filters=filters,
+                           page=page, page_size=page_size)
 
 
 @bp.route("/audit/<entry_id>")

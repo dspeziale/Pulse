@@ -11,7 +11,8 @@ from flask import (Blueprint, flash, redirect, render_template, request,
 
 from pulse_fe_common.auth import permission_required
 
-from sdk import (api_delete, api_get, api_post, api_put, page_args, query_args)
+from sdk import (api_delete, api_get, api_post, api_put, page_args, paging,
+                 query_args)
 
 bp = Blueprint("probes", __name__)
 
@@ -26,7 +27,10 @@ def _tags(raw: str) -> list:
 def list_probes():
     params = {**page_args(), **query_args("q", "status")}
     data = api_get("/probes", params=params)
-    return render_template("probes/list.html", data=data)
+    filters = {k: v for k, v in params.items() if k != "page"}
+    page, page_size = paging()
+    return render_template("probes/list.html", data=data, filters=filters,
+                           page=page, page_size=page_size)
 
 
 @bp.route("/probes/new", methods=["GET"])

@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_macros.html" import pagination %}
 {% block title %}Log di sistema — Pulse{% endblock %}
 {% set lvl = {'debug':'text-bg-secondary','info':'text-bg-info','warning':'text-bg-warning','error':'text-bg-danger','critical':'text-bg-dark'} %}
 {% block content %}
@@ -57,6 +58,13 @@
       </tbody>
     </table>
   </div>
-  {% if data['items'] %}<div class="card-footer text-body-secondary small">Totale: {{ data['total'] }}</div>{% endif %}
+  {% if data['items'] %}
+  <div class="card-footer">
+    {% set _tot = data.get('total', 0)|int %}
+    {% if _tot > page_size %}
+      {{ pagination(page, page_size, _tot, 'logs.list_logs', filters) }}
+    {% else %}<span class="text-body-secondary small">Totale: {{ _tot }}</span>{% endif %}
+  </div>
+  {% endif %}
 </div>
 {% endblock %}

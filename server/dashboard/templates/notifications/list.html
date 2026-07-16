@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import bool_badge %}
+{% from "_macros.html" import bool_badge, pagination %}
 {% block title %}Canali notifica — Pulse{% endblock %}
 {% set type_icons = {'email':'bi-envelope','telegram':'bi-telegram','whatsapp':'bi-whatsapp'} %}
 {% block content %}
@@ -62,6 +62,13 @@
       </tbody>
     </table>
   </div>
-  {% if data['items'] %}<div class="card-footer text-body-secondary small">Totale: {{ data['total'] }}</div>{% endif %}
+  {% if data['items'] %}
+  <div class="card-footer">
+    {% set _tot = data.get('total', 0)|int %}
+    {% if _tot > page_size %}
+      {{ pagination(page, page_size, _tot, 'notifications.list_channels', filters) }}
+    {% else %}<span class="text-body-secondary small">Totale: {{ _tot }}</span>{% endif %}
+  </div>
+  {% endif %}
 </div>
 {% endblock %}

@@ -6,7 +6,7 @@ from flask import (Blueprint, flash, redirect, render_template, request,
 
 from pulse_fe_common.auth import permission_required
 
-from sdk import api_get, api_post, page_args, query_args
+from sdk import api_get, api_post, page_args, paging, query_args
 
 bp = Blueprint("alarms", __name__)
 
@@ -17,7 +17,10 @@ def list_alarms():
     params = {**page_args(),
               **query_args("status", "system_id", "probe_id", "from", "to")}
     data = api_get("/alarms", params=params)
-    return render_template("alarms/list.html", data=data)
+    filters = {k: v for k, v in params.items() if k != "page"}
+    page, page_size = paging()
+    return render_template("alarms/list.html", data=data, filters=filters,
+                           page=page, page_size=page_size)
 
 
 @bp.route("/alarms/<alarm_id>/ack", methods=["POST"])

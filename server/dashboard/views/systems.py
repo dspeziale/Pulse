@@ -12,7 +12,8 @@ from pulse_fe_common.auth import permission_required
 from pulse_fe_common.http_client import (ApiAuthError, ApiError,
                                          ApiUnavailableError)
 
-from sdk import (api_delete, api_get, api_post, api_put, page_args, query_args)
+from sdk import (api_delete, api_get, api_post, api_put, page_args, paging,
+                 query_args)
 
 bp = Blueprint("systems", __name__)
 
@@ -65,7 +66,10 @@ def list_systems():
     params = {**page_args(), **query_args("q", "probe_id", "enabled")}
     data = api_get("/systems", params=params)
     probes = api_get("/probes")
-    return render_template("systems/list.html", data=data, probes=probes)
+    filters = {k: v for k, v in params.items() if k != "page"}
+    page, page_size = paging()
+    return render_template("systems/list.html", data=data, probes=probes,
+                           filters=filters, page=page, page_size=page_size)
 
 
 @bp.route("/systems-by-probe", methods=["GET"])

@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import bool_badge %}
+{% from "_macros.html" import bool_badge, pagination %}
 {% block title %}Ruoli — Pulse{% endblock %}
 {% block content %}
 <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
@@ -47,6 +47,13 @@
       </tbody>
     </table>
   </div>
-  {% if data['items'] %}<div class="card-footer text-body-secondary small">Totale: {{ data['total'] }}</div>{% endif %}
+  {% if data['items'] %}
+  <div class="card-footer">
+    {% set _tot = data.get('total', 0)|int %}
+    {% if _tot > page_size %}
+      {{ pagination(page, page_size, _tot, 'roles.list_roles', filters) }}
+    {% else %}<span class="text-body-secondary small">Totale: {{ _tot }}</span>{% endif %}
+  </div>
+  {% endif %}
 </div>
 {% endblock %}

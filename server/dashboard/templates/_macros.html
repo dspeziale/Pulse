@@ -1,7 +1,7 @@
 {# ==========================================================================
-   Macro condivise della dashboard SERVER: badge di stato coerenti e helper
-   per valori booleani. Importare con:
-     {% from "_macros.html" import status_badge, bool_badge %}
+   Macro condivise della dashboard SERVER: badge di stato coerenti, helper
+   per valori booleani e paginazione delle liste. Importare con:
+     {% from "_macros.html" import status_badge, bool_badge, pagination %}
    ========================================================================== #}
 
 {# Stati noti mappati a una classe colore b-* (vedi pulse-theme.css). #}
@@ -24,5 +24,79 @@
     <span class="badge b-ok">{{ yes }}</span>
   {%- else -%}
     <span class="badge b-off">{{ no }}</span>
+  {%- endif -%}
+{%- endmacro %}
+
+{# --------------------------------------------------------------------------
+   Paginazione riutilizzabile (Bootstrap/AdminLTE).
+
+   Uso:
+     {{ pagination(data.page, data.page_size, data.total,
+                   'audit.list_audit', filters) }}
+
+   - page/page_size/total: valori restituiti dal backend nella risposta di
+     lista. Coercizzati a intero in modo difensivo.
+   - endpoint: nome della rotta Flask (blueprint.funzione) per i link.
+   - args: dict dei filtri correnti (q, status, ...) da preservare nei link;
+     puo' includere page_size per mantenere una dimensione pagina custom.
+
+   I controlli sono mostrati SOLO se total > page_size; altrimenti la macro non
+   produce output (la lista mostra il solo conteggio totale nel footer).
+   -------------------------------------------------------------------------- #}
+{% macro pagination(page, page_size, total, endpoint, args={}) %}
+  {%- set page = page | int(1) -%}
+  {%- set page_size = page_size | int(0) -%}
+  {%- set total = total | int(0) -%}
+  {%- if page_size > 0 and total > page_size -%}
+    {%- set pages = ((total + page_size - 1) // page_size) | int -%}
+    {%- set page = [[page, 1] | max, pages] | min -%}
+    {%- set win = 2 -%}
+    {%- set start = [1, page - win] | max -%}
+    {%- set end = [pages, page + win] | min -%}
+    <nav class="d-flex flex-wrap justify-content-between align-items-center gap-2"
+         aria-label="Paginazione">
+      <span class="text-body-secondary small">
+        Pagina {{ page }} di {{ pages }} — {{ total }} totali
+      </span>
+      <ul class="pagination pagination-sm mb-0">
+        <li class="page-item {{ 'disabled' if page <= 1 }}">
+          {%- if page > 1 -%}
+            <a class="page-link" href="{{ url_for(endpoint, page=page - 1, **args) }}"
+               aria-label="Precedente"><i class="bi bi-chevron-left"></i> Precedente</a>
+          {%- else -%}
+            <span class="page-link"><i class="bi bi-chevron-left"></i> Precedente</span>
+          {%- endif -%}
+        </li>
+        {%- if start > 1 -%}
+          <li class="page-item"><a class="page-link" href="{{ url_for(endpoint, page=1, **args) }}">1</a></li>
+          {%- if start > 2 -%}
+            <li class="page-item disabled"><span class="page-link">…</span></li>
+          {%- endif -%}
+        {%- endif -%}
+        {%- for p in range(start, end + 1) -%}
+          <li class="page-item {{ 'active' if p == page }}">
+            {%- if p == page -%}
+              <span class="page-link">{{ p }}</span>
+            {%- else -%}
+              <a class="page-link" href="{{ url_for(endpoint, page=p, **args) }}">{{ p }}</a>
+            {%- endif -%}
+          </li>
+        {%- endfor -%}
+        {%- if end < pages -%}
+          {%- if end < pages - 1 -%}
+            <li class="page-item disabled"><span class="page-link">…</span></li>
+          {%- endif -%}
+          <li class="page-item"><a class="page-link" href="{{ url_for(endpoint, page=pages, **args) }}">{{ pages }}</a></li>
+        {%- endif -%}
+        <li class="page-item {{ 'disabled' if page >= pages }}">
+          {%- if page < pages -%}
+            <a class="page-link" href="{{ url_for(endpoint, page=page + 1, **args) }}"
+               aria-label="Successivo">Successivo <i class="bi bi-chevron-right"></i></a>
+          {%- else -%}
+            <span class="page-link">Successivo <i class="bi bi-chevron-right"></i></span>
+          {%- endif -%}
+        </li>
+      </ul>
+    </nav>
   {%- endif -%}
 {%- endmacro %}

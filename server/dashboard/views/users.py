@@ -10,7 +10,8 @@ from flask import (Blueprint, flash, redirect, render_template, request,
 
 from pulse_fe_common.auth import permission_required
 
-from sdk import (api_delete, api_get, api_post, api_put, page_args, query_args)
+from sdk import (api_delete, api_get, api_post, api_put, page_args, paging,
+                 query_args)
 
 bp = Blueprint("users", __name__)
 
@@ -20,7 +21,10 @@ bp = Blueprint("users", __name__)
 def list_users():
     params = {**page_args(), **query_args("q", "status", "role")}
     data = api_get("/users", params=params)
-    return render_template("users/list.html", data=data)
+    filters = {k: v for k, v in params.items() if k != "page"}
+    page, page_size = paging()
+    return render_template("users/list.html", data=data, filters=filters,
+                           page=page, page_size=page_size)
 
 
 @bp.route("/users/new", methods=["GET"])

@@ -44,6 +44,22 @@ def _probe(client, headers, name="p-dash"):
     ).json()["probe"]["id"]
 
 
+def _system(client, headers, pid, system_id, system_name):
+    return client.post(
+        "/api/v1/systems",
+        headers=headers,
+        json={
+            "system_id": system_id,
+            "system_name": system_name,
+            "heartbeat_url": "https://s.local/api/heartbeat",
+            "probe_id": pid,
+            "poll_interval_seconds": 30,
+            "timeout_seconds": 5,
+            "enabled": True,
+        },
+    )
+
+
 def test_get_heartbeats_proxy(client_with_probe, auth_headers) -> None:
     pid = _probe(client_with_probe, auth_headers)
     r = client_with_probe.get(
@@ -123,6 +139,42 @@ def test_dashboard_probe(client_with_probe, auth_headers, db_session) -> None:
     r = client_with_probe.get(f"/api/v1/dashboard/probe/{pid}", headers=auth_headers)
     assert r.status_code == 200
     assert len(r.json()["systems"]) == 1
+
+
+def test_dashboard_probe_enriches_system_name(client_with_probe, auth_headers, db_session) -> None:
+    """Il rollup espone solo system_id: il Server arricchisce con system_name.
+
+    - sistema registrato -> system_name = nome registrato;
+    - sistema NON registrato -> fallback al system_id.
+    """
+    from pulse_server.models import Probe, ProbeRollup
+    from sqlalchemy import select
+
+    pid = _probe(client_with_probe, auth_headers, name="p-names")
+    # Sistema registrato lato Server con nome leggibile.
+    assert _system(client_with_probe, auth_headers, pid, "sys-known", "Sistema Noto").status_code == 201
+    probe = db_session.execute(select(Probe).where(Probe.name == "p-names")).scalar_one()
+    db_session.add(
+        ProbeRollup(
+            probe_id=probe.id,
+            window="24h",
+            payload={
+                "systems": [
+                    {"system_id": "sys-known", "status": "ok", "avg_response_ms": 5, "uptime_pct": 100, "checks": []},
+                    {"system_id": "sys-orphan", "status": "down", "avg_response_ms": 0, "uptime_pct": 0, "checks": []},
+                ]
+            },
+            generated_at=dt.datetime.now(dt.timezone.utc),
+        )
+    )
+    db_session.flush()
+    r = client_with_probe.get(f"/api/v1/dashboard/probe/{pid}", headers=auth_headers)
+    assert r.status_code == 200
+    by_id = {s["system_id"]: s for s in r.json()["systems"]}
+    # Sistema registrato: nome valorizzato.
+    assert by_id["sys-known"]["system_name"] == "Sistema Noto"
+    # Sistema non piu' registrato: fallback al system_id.
+    assert by_id["sys-orphan"]["system_name"] == "sys-orphan"
 
 
 def test_dashboard_probe_no_rollup(client_with_probe, auth_headers) -> None:
