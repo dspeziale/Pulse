@@ -10,6 +10,15 @@ def test_healthz(client):
     assert r.get_json() == {"status": "ok"}
 
 
+def test_session_cookie_config(app):
+    # Nome cookie distinto da quello del Server + attributi di sessione sicuri.
+    assert app.config["SESSION_COOKIE_NAME"] == "pulse_probe_session"
+    assert app.config["SESSION_COOKIE_NAME"] != "pulse_server_session"
+    assert app.config["SESSION_COOKIE_HTTPONLY"] is True
+    assert app.config["SESSION_COOKIE_SAMESITE"] == "Lax"
+    assert app.config["SESSION_COOKIE_SECURE"] is False
+
+
 def test_root_anonymous_redirects_login(client):
     r = client.get("/")
     assert r.status_code == 302

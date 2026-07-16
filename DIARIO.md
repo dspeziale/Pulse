@@ -587,3 +587,35 @@ Output consegnati
 - Grep finale: nessun URL esterno (CDN) nei template o negli asset autorati; nessun riferimento alle vecchie classi rimosse (.muted/.grid2/.kpi/.flash) né a rotte/classi inesistenti; nessuna tabella/campo "nudo" senza classi Bootstrap.
 
 ================================================
+
+ITERAZIONE 15
+
+Agente: FE
+Data: 2026-07-16
+
+Input ricevuti
+- Bug di sessione confermato dall'orchestratore: le due dashboard (Server :5000 e Probe :5001) usavano lo stesso nome di cookie di sessione Flask ("session") su host localhost. Poiché i cookie non distinguono la porta, la sessione di una sovrascriveva l'altra: aprendo entrambe l'utente veniva deautenticato. Fix richiesto solo frontend, senza toccare rotte/logica/contratti.
+
+Lavoro svolto
+- Config (frontend_common/pulse_fe_common/config.py): aggiunti a ServerDashboardConfig e ProbeDashboardConfig i campi session_cookie_name (default "pulse_server_session" / "pulse_probe_session") e session_cookie_secure (default False), entrambi con default sui dataclass (retrocompatibili con le costruzioni esistenti nelle fixture) e override via env in from_env: PULSE_SERVER_SESSION_COOKIE_NAME / PULSE_SERVER_SESSION_COOKIE_SECURE e PULSE_PROBE_SESSION_COOKIE_NAME / PULSE_PROBE_SESSION_COOKIE_SECURE.
+- App (server/dashboard/app.py e probe/dashboard/app.py): accanto a SECRET_KEY impostati SESSION_COOKIE_NAME = cfg.session_cookie_name, SESSION_COOKIE_HTTPONLY = True, SESSION_COOKIE_SAMESITE = "Lax", SESSION_COOKIE_SECURE = cfg.session_cookie_secure (Secure default False, HTTP locale; configurabile via env per HTTPS).
+- Env: aggiornati server/dashboard/.env.example, probe/dashboard/.env.example, deploy/.env.server.example, deploy/.env.probe.example con le nuove variabili opzionali e relativa documentazione.
+
+File modificati
+- frontend_common/pulse_fe_common/config.py
+- server/dashboard/app.py; probe/dashboard/app.py
+- frontend_common/tests/test_config.py; server/dashboard/tests/test_app_and_auth.py; probe/dashboard/tests/test_probe_dashboard.py
+- server/dashboard/.env.example; probe/dashboard/.env.example; deploy/.env.server.example; deploy/.env.probe.example
+
+Problemi trovati
+- Nessuno: i campi aggiunti hanno default sui dataclass, quindi le fixture di test che costruiscono le config senza i nuovi kwargs continuano a funzionare.
+
+Decisioni prese
+- Secure=False di default (ambiente locale HTTP) ma reso configurabile via env, come richiesto; HttpOnly=True e SameSite=Lax impostati esplicitamente in entrambe le app.
+
+Output consegnati
+- Nomi cookie di sessione distinti confermati a runtime: Server = "pulse_server_session", Probe = "pulse_probe_session" (diversi). Attributi HttpOnly/SameSite/Secure impostati in entrambe le app.
+- Test: aggiunte asserzioni su config (nomi/secure, default + override env, nomi distinti) e sui SESSION_COOKIE_* di ciascuna app. Suite per-pacchetto: frontend_common 29, server/dashboard 51, probe/dashboard 28 = 108 test, 0 falliti.
+- Coverage combinata (.coveragerc radice): 1066 statement, 92 branch, 0 miss -> 100% (config.py e i due app.py inclusi al 100%).
+
+================================================

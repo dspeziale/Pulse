@@ -22,6 +22,13 @@ def create_app(config: Optional[ServerDashboardConfig] = None) -> Flask:
     cfg = config or ServerDashboardConfig.from_env()
     app = Flask(__name__)
     app.config["SECRET_KEY"] = cfg.secret_key
+    # Nome cookie di sessione distinto dalla dashboard Probe: su localhost i
+    # cookie non distinguono la porta, un nome condiviso deautenticherebbe l'utente
+    # aprendo entrambe le dashboard.
+    app.config["SESSION_COOKIE_NAME"] = cfg.session_cookie_name
+    app.config["SESSION_COOKIE_HTTPONLY"] = True
+    app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+    app.config["SESSION_COOKIE_SECURE"] = cfg.session_cookie_secure
     app.config["PULSE_CFG"] = cfg
     app.config["API_CLIENT"] = ApiClient(
         cfg.api_base_url, timeout=cfg.request_timeout, verify=cfg.verify_tls

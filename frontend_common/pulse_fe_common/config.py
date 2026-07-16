@@ -43,6 +43,12 @@ class ServerDashboardConfig:
     verify_tls: bool
     #: Porta di ascolto dell'app Flask.
     port: int
+    #: Nome del cookie di sessione Flask. DEVE differire da quello della Probe:
+    #: i cookie non distinguono la porta su localhost, quindi un nome condiviso
+    #: farebbe sovrascrivere a vicenda le due sessioni (deautenticazione).
+    session_cookie_name: str = "pulse_server_session"
+    #: Attributo Secure del cookie di sessione (True solo dietro HTTPS).
+    session_cookie_secure: bool = False
 
     @classmethod
     def from_env(cls) -> "ServerDashboardConfig":
@@ -54,6 +60,12 @@ class ServerDashboardConfig:
             request_timeout=_get_float("PULSE_HTTP_TIMEOUT", 10.0),
             verify_tls=_get_bool("PULSE_VERIFY_TLS", True),
             port=_get_int("PULSE_SERVER_DASH_PORT", 5000),
+            session_cookie_name=os.environ.get(
+                "PULSE_SERVER_SESSION_COOKIE_NAME", "pulse_server_session"
+            ),
+            session_cookie_secure=_get_bool(
+                "PULSE_SERVER_SESSION_COOKIE_SECURE", False
+            ),
         )
 
 
@@ -76,6 +88,12 @@ class ProbeDashboardConfig:
     verify_tls: bool
     #: Porta di ascolto dell'app Flask.
     port: int
+    #: Nome del cookie di sessione Flask. DEVE differire da quello del Server:
+    #: i cookie non distinguono la porta su localhost, quindi un nome condiviso
+    #: farebbe sovrascrivere a vicenda le due sessioni (deautenticazione).
+    session_cookie_name: str = "pulse_probe_session"
+    #: Attributo Secure del cookie di sessione (True solo dietro HTTPS).
+    session_cookie_secure: bool = False
 
     @classmethod
     def from_env(cls) -> "ProbeDashboardConfig":
@@ -90,4 +108,10 @@ class ProbeDashboardConfig:
             request_timeout=_get_float("PULSE_HTTP_TIMEOUT", 10.0),
             verify_tls=_get_bool("PULSE_VERIFY_TLS", True),
             port=_get_int("PULSE_PROBE_DASH_PORT", 5001),
+            session_cookie_name=os.environ.get(
+                "PULSE_PROBE_SESSION_COOKIE_NAME", "pulse_probe_session"
+            ),
+            session_cookie_secure=_get_bool(
+                "PULSE_PROBE_SESSION_COOKIE_SECURE", False
+            ),
         )
