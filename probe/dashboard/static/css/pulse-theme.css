@@ -1,0 +1,216 @@
+/*
+ * pulse-theme.css — livello tema locale sopra Bootstrap 5 + AdminLTE 4.
+ *
+ * Nessuna dipendenza CDN: font PT Sans Narrow, Bootstrap, AdminLTE e le icone
+ * sono tutti vendorizzati sotto static/vendor/. Questo foglio:
+ *  - imposta PT Sans Narrow come carattere globale, base 19px;
+ *  - abilita lo scaling del carattere via font-size su <html> (rem);
+ *  - fa da ponte tra le classi "legacy" dei template esistenti
+ *    (.card, .kpi, .badge.b-*, .flash, .btn-ghost, .grid2, .muted, ...) e
+ *    l'estetica Bootstrap/AdminLTE, rispettando tema chiaro/scuro (data-bs-theme).
+ */
+
+/* -- Carattere e scaling globale -------------------------------------------- */
+:root {
+  --pulse-font-size: 19px; /* dimensione base richiesta */
+}
+html {
+  /* Base rem: tutta la UI (Bootstrap/AdminLTE usano rem) scala da qui.
+     Il valore effettivo viene sovrascritto inline da pulse-theme.js
+     con la preferenza salvata (A- / A+). */
+  font-size: var(--pulse-font-size);
+}
+body,
+.app-wrapper,
+.sidebar-menu,
+.navbar,
+.btn,
+.form-control,
+.form-select,
+.nav-link,
+input,
+select,
+textarea,
+button,
+table {
+  font-family: 'PT Sans Narrow', system-ui, 'Segoe UI', Arial, sans-serif;
+}
+
+/* -- Colori di stato (semantici, coerenti fra le due dashboard) ------------- */
+:root {
+  --pulse-ok: #198754;
+  --pulse-warn: #ffc107;
+  --pulse-error: #dc3545;
+  --pulse-down: #fd7e14;
+  --pulse-unknown: #6c757d;
+  --pulse-online: #198754;
+  --pulse-offline: #dc3545;
+  --pulse-pending: #ffc107;
+}
+
+/* -- Badge di stato (mappa gli stati alle classi legacy .b-*) --------------- */
+.badge {
+  display: inline-block;
+  padding: 0.32em 0.6em;
+  border-radius: 0.4rem;
+  font-size: 0.8em;
+  font-weight: 700;
+  line-height: 1;
+  color: #fff;
+  vertical-align: baseline;
+}
+.badge.b-ok,
+.badge.b-online { background-color: var(--pulse-ok); }
+.badge.b-warn,
+.badge.b-pending { background-color: var(--pulse-warn); color: #212529; }
+.badge.b-error,
+.badge.b-offline { background-color: var(--pulse-error); }
+.badge.b-down { background-color: var(--pulse-down); }
+.badge.b-unknown { background-color: var(--pulse-unknown); }
+/* Stato sconosciuto/assente: fallback neutro se lo stato non è mappato. */
+.badge:not(.b-ok):not(.b-online):not(.b-warn):not(.b-pending):not(.b-error):not(.b-offline):not(.b-down):not(.b-unknown) {
+  background-color: var(--pulse-unknown);
+}
+
+/* -- Shell AdminLTE: rifiniture -------------------------------------------- */
+.brand-link .brand-text { font-weight: 700; letter-spacing: 0.02em; }
+.app-header .navbar-nav .nav-link { cursor: pointer; }
+.sidebar-brand { border-bottom: 1px solid var(--bs-border-color, rgba(0, 0, 0, 0.1)); }
+.app-content { padding-top: 1rem; padding-bottom: 1rem; }
+.content-header h1 { font-size: 1.6rem; margin: 0; }
+
+/* Pulsanti dimensione carattere nella navbar. */
+.pulse-fontsize-group .btn { min-width: 2.2rem; font-weight: 700; }
+
+/* -- Card (i template usano <div class="card"> come pannello con padding) --- */
+.card {
+  border: 1px solid var(--bs-border-color-translucent, rgba(0, 0, 0, 0.125));
+  border-radius: 0.5rem;
+  background-color: var(--bs-body-bg);
+  padding: 1rem;
+  margin: 0 0 1rem;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+}
+.card h1, .card h2, .card h3 { margin-top: 0; }
+
+/* -- KPI (riepiloghi numerici in dashboard) -------------------------------- */
+.kpis { display: flex; gap: 1rem; flex-wrap: wrap; }
+.kpi {
+  flex: 1;
+  min-width: 130px;
+  text-align: center;
+  padding: 0.5rem 0.25rem;
+  border-radius: 0.5rem;
+  background-color: var(--bs-tertiary-bg, rgba(0, 0, 0, 0.03));
+}
+.kpi .n { font-size: 2rem; font-weight: 700; line-height: 1.1; }
+
+/* -- Tabelle: aspetto Bootstrap "striped + hover" di default --------------- */
+table {
+  width: 100%;
+  margin: 1rem 0;
+  color: var(--bs-body-color);
+  border-color: var(--bs-border-color);
+  vertical-align: middle;
+}
+table th, table td {
+  padding: 0.5rem 0.6rem;
+  border-bottom: 1px solid var(--bs-border-color);
+  text-align: left;
+}
+table th { font-weight: 700; color: var(--bs-secondary-color, inherit); }
+table tbody tr:nth-of-type(odd) > * {
+  background-color: var(--bs-tertiary-bg, rgba(0, 0, 0, 0.02));
+}
+table tbody tr:hover > * {
+  background-color: var(--bs-secondary-bg, rgba(0, 0, 0, 0.05));
+}
+
+/* -- Form: allinea i controlli "nudi" allo stile Bootstrap ----------------- */
+label { display: block; margin-bottom: 0.15rem; font-size: 0.9em; color: var(--bs-secondary-color, inherit); }
+label.inline { display: inline; margin-right: 0.4rem; }
+input:not([type=checkbox]):not([type=radio]):not([type=submit]):not([type=button]),
+select,
+textarea {
+  display: block;
+  width: 100%;
+  margin: 0.15rem 0 0.7rem;
+  padding: 0.4rem 0.6rem;
+  font-size: 1em;
+  line-height: 1.5;
+  color: var(--bs-body-color);
+  background-color: var(--bs-body-bg);
+  border: 1px solid var(--bs-border-color);
+  border-radius: 0.375rem;
+}
+input:focus, select:focus, textarea:focus {
+  outline: 0;
+  border-color: #86b7fe;
+  box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+}
+input[style*="width:auto"], select[style*="width:auto"] { display: inline-block; width: auto; }
+
+/* -- Pulsanti: stile Bootstrap per <button> e classi legacy ---------------- */
+button,
+.btn {
+  display: inline-block;
+  font-weight: 600;
+  line-height: 1.5;
+  text-align: center;
+  text-decoration: none;
+  vertical-align: middle;
+  cursor: pointer;
+  border: 1px solid transparent;
+  padding: 0.4rem 0.8rem;
+  font-size: 1em;
+  border-radius: 0.375rem;
+  color: #fff;
+  background-color: #0d6efd;
+}
+button:hover, .btn:hover { filter: brightness(0.94); color: #fff; }
+a.btn { color: #fff; }
+.btn-ghost {
+  background-color: transparent;
+  border-color: var(--bs-border-color);
+  color: var(--bs-body-color);
+}
+a.btn-ghost, .btn-ghost { color: var(--bs-body-color); }
+.btn-ghost:hover { background-color: var(--bs-secondary-bg, rgba(0, 0, 0, 0.05)); color: var(--bs-body-color); filter: none; }
+.btn-danger { background-color: var(--pulse-error); border-color: var(--pulse-error); color: #fff; }
+
+/* -- Messaggi flash / alert ------------------------------------------------ */
+.flash {
+  padding: 0.7rem 1rem;
+  border: 1px solid transparent;
+  border-radius: 0.375rem;
+  margin: 0.5rem 0;
+}
+.flash.success { color: #0a3622; background-color: #d1e7dd; border-color: #a3cfbb; }
+.flash.danger  { color: #58151c; background-color: #f8d7da; border-color: #f1aeb5; }
+.flash.warning { color: #664d03; background-color: #fff3cd; border-color: #ffe69c; }
+.flash.info    { color: #055160; background-color: #cff4fc; border-color: #9eeaf9; }
+[data-bs-theme="dark"] .flash.success { color: #d1e7dd; background-color: #051b11; border-color: #0f5132; }
+[data-bs-theme="dark"] .flash.danger  { color: #f8d7da; background-color: #2c0b0e; border-color: #842029; }
+[data-bs-theme="dark"] .flash.warning { color: #fff3cd; background-color: #332701; border-color: #997404; }
+[data-bs-theme="dark"] .flash.info    { color: #cff4fc; background-color: #032830; border-color: #087990; }
+
+/* -- Utilità legacy -------------------------------------------------------- */
+.muted { color: var(--bs-secondary-color, #6c757d); }
+.inline { display: inline; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+@media (max-width: 720px) { .grid2 { grid-template-columns: 1fr; } }
+pre { white-space: pre-wrap; word-break: break-word; }
+canvas { max-width: 100%; }
+
+/* -- Login "boxed" in stile AdminLTE --------------------------------------- */
+.login-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--bs-tertiary-bg, #e9ecef);
+}
+.login-box { width: 22rem; max-width: 92vw; }
+.login-box .card { box-shadow: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.15); }
+.login-logo { text-align: center; font-size: 1.7rem; font-weight: 700; margin-bottom: 0.75rem; }
+.login-logo .accent { color: #0d6efd; }

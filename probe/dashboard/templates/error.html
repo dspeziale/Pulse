@@ -1,9 +1,9 @@
 {% extends "base.html" %}
-{% block title %}Errore {{ code }} — Pulse Probe{% endblock %}
+{% block title %}Errore {{ code }} — Pulse Sonda{% endblock %}
 {% block content %}
-<h1>Errore {{ code }}</h1>
 <div class="card">
-  <p>{{ message }}</p>
-  <p><a class="btn-ghost" href="{{ url_for('dashboard.index') }}">Torna alla dashboard</a></p>
+  <h1 class="text-danger"><i class="bi bi-exclamation-octagon"></i> Errore {{ code }}</h1>
+  <p class="fs-5">{{ message }}</p>
+  <p><a class="btn btn-ghost" href="{{ url_for('dashboard.index') }}"><i class="bi bi-arrow-left"></i> Torna alla dashboard</a></p>
 </div>
 {% endblock %}

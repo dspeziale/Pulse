@@ -1,14 +1,17 @@
 {% extends "base.html" %}
 {% block title %}Accesso — Pulse Server{% endblock %}
 {% block content %}
-<div class="card" style="max-width:360px;margin:3rem auto">
-  <h1>Pulse · Server</h1>
-  <form method="post" action="{{ url_for('auth.login') }}">
-    <label>Username</label>
-    <input name="username" autocomplete="username" required>
-    <label>Password</label>
-    <input name="password" type="password" autocomplete="current-password" required>
-    <button type="submit">Accedi</button>
-  </form>
+<div class="login-box">
+  <div class="login-logo">Pulse <span class="accent">— Server</span></div>
+  <div class="card">
+    <p class="muted text-center">Accedi con le tue credenziali.</p>
+    <form method="post" action="{{ url_for('auth.login') }}">
+      <label>Username</label>
+      <input class="form-control" name="username" autocomplete="username" required autofocus>
+      <label>Password</label>
+      <input class="form-control" name="password" type="password" autocomplete="current-password" required>
+      <button type="submit" class="btn w-100 mt-2"><i class="bi bi-box-arrow-in-right"></i> Accedi</button>
+    </form>
+  </div>
 </div>
 {% endblock %}

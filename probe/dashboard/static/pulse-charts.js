@@ -25,6 +25,18 @@
     return Math.ceil(v / mag) * mag;
   }
 
+  // Colore derivato dal tema corrente (Bootstrap/AdminLTE, data-bs-theme):
+  // così assi ed etichette restano leggibili sia in chiaro sia in scuro.
+  function themeColor(varName, fallback) {
+    try {
+      var v = getComputedStyle(document.documentElement)
+        .getPropertyValue(varName);
+      return (v && v.trim()) || fallback;
+    } catch (e) {
+      return fallback;
+    }
+  }
+
   function Chart(canvas, cfg) {
     if (typeof canvas === "string") canvas = document.getElementById(canvas);
     if (!canvas || !canvas.getContext) return;
@@ -43,16 +55,19 @@
     var plotH = H - pad.t - pad.b;
     var max = niceMax(Math.max.apply(null, values.length ? values : [0]));
 
+    var axisColor = themeColor("--bs-border-color", "#334155");
+    var labelColor = themeColor("--bs-secondary-color", "#94a3b8");
+
     ctx.clearRect(0, 0, W, H);
     // assi
-    ctx.strokeStyle = "#334155";
+    ctx.strokeStyle = axisColor;
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.moveTo(pad.l, pad.t);
     ctx.lineTo(pad.l, pad.t + plotH);
     ctx.lineTo(pad.l + plotW, pad.t + plotH);
     ctx.stroke();
-    ctx.fillStyle = "#94a3b8";
+    ctx.fillStyle = labelColor;
     ctx.font = "10px system-ui,Arial,sans-serif";
     ctx.fillText(String(max), 2, pad.t + 8);
     ctx.fillText("0", 2, pad.t + plotH);
@@ -83,7 +98,7 @@
       });
     }
     // etichette asse X
-    ctx.fillStyle = "#94a3b8";
+    ctx.fillStyle = labelColor;
     labels.forEach(function (lab, i) {
       if (labels.length > 12 && i % Math.ceil(labels.length / 12) !== 0) return;
       var px = x(i);
