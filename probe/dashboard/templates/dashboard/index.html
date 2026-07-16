@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import status_badge, bool_badge %}
+{% from "_macros.html" import status_badge, bool_badge, pagination, page_size_selector %}
 {% block title %}Dashboard — Pulse Probe{% endblock %}
 {% block head_extra %}<script src="{{ url_for('static', filename='pulse-charts.js') }}"></script>{% endblock %}
 {% block content %}
@@ -59,7 +59,10 @@
 </div>
 
 <div class="card">
-  <div class="card-header"><i class="bi bi-clock-history me-1"></i>Heartbeat recenti</div>
+  <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+    <span><i class="bi bi-clock-history me-1"></i>Heartbeat recenti</span>
+    {{ page_size_selector(page_size, 'dashboard.index', hb_filters) }}
+  </div>
   <div class="table-responsive">
     <table class="table table-hover align-middle mb-0">
       <thead><tr><th>Timestamp</th><th>Sistema</th><th>Check</th><th>Stato</th><th class="text-end">ms</th></tr></thead>
@@ -78,6 +81,14 @@
       </tbody>
     </table>
   </div>
+  {% if heartbeats['items'] %}
+  <div class="card-footer">
+    {% set _tot = heartbeats.get('total', 0)|int %}
+    {% if _tot > page_size %}
+      {{ pagination(page, page_size, _tot, 'dashboard.index', hb_filters) }}
+    {% else %}<span class="text-body-secondary small">Totale: {{ _tot }}</span>{% endif %}
+  </div>
+  {% endif %}
 </div>
 
 <script>

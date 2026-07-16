@@ -45,3 +45,22 @@ def page_args() -> dict:
         if value:
             out[name] = value
     return out
+
+
+def paging(default_size: int = 50) -> tuple[int, int]:
+    """Valori EFFETTIVI di paginazione usati per la richiesta.
+
+    Le risposte di ``/query/heartbeats`` contengono solo ``items`` e ``total``
+    (non ``page``/``page_size``): questi valori vanno ricostruiti dalla query
+    string, usando gli stessi default del backend (proxy Sonda: ``page_size`` =
+    50), così che il template possa decidere se/come mostrare la paginazione.
+    Ritorna ``(page, page_size)`` con ``page >= 1`` e ``page_size >= 1``.
+    Coerente con ``server/dashboard/sdk.py:paging``.
+    """
+    def _int(name: str, default: int) -> int:
+        try:
+            return int(request.args.get(name, default))
+        except (TypeError, ValueError):
+            return default
+
+    return max(1, _int("page", 1)), max(1, _int("page_size", default_size))

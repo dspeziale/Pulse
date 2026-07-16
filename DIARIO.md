@@ -1107,3 +1107,47 @@ Decisioni prese
 - hb_filters include probe_id (route param, riempie il placeholder della rotta) e window oltre ai filtri hb, così i link conservano l''intero contesto del drill-down.
 
 ================================================
+
+
+ITERAZIONE 29
+
+Agente: FE
+Data: 2026-07-16
+
+Input ricevuti
+- Richiesta orchestratore: le tabelle "Heartbeat recenti" (lato Server e lato Sonda) devono essere PAGINATE e permettere all'utente di scegliere quanti item per pagina (selettore page size). Modificare SOLO server/dashboard e probe/dashboard (+ eventuale frontend_common). NON toccare backend/probe-agent.
+
+Lavoro svolto
+- Macro `page_size_selector(current, endpoint, args={}, options=[10,25,50,100])` creata (identica) in server/dashboard/templates/_macros.html e probe/dashboard/templates/_macros.html. Rende un <form method="get"> con <select name="page_size"> e onchange="this.form.submit()" (nessun CDN/JS esterno). I filtri correnti sono ri-emessi come <input hidden> (escludendo page e page_size): il submit riparte quindi da page=1 (page assente) col page_size scelto; i parametri di rotta (probe_id/system_id) sono assorbiti nel path da url_for(endpoint, **args). Se il page_size corrente non e' tra le opzioni viene aggiunto e la lista riordinata, restando selezionato.
+- Dashboard SONDA: mancavano sia la macro `pagination` sia l'helper `paging`. Replicati coerentemente col Server: macro `pagination` aggiunta a probe/dashboard/templates/_macros.html (identica) e helper `paging(default_size=50)` aggiunto a probe/dashboard/sdk.py (stessa logica difensiva di server/dashboard/sdk.py, default 50 = default del proxy /query/heartbeats).
+- SERVER (probes/detail.html): nel card-header di "Heartbeat recenti" aggiunto page_size_selector(page_size, 'probes.detail', hb_filters). La paginazione esistente resta invariata.
+- SONDA dashboard/index.html "Heartbeat recenti": aggiunto il selettore nel card-header + card-footer con pagination(...)/"Totale: N", endpoint 'dashboard.index'. dashboard/system.html "Heartbeat": stessa cosa, endpoint 'dashboard.system_detail' (system_id di rotta).
+- SONDA views/dashboard.py: index() e system_detail() ora chiamano paging(default_size=50), costruiscono hb_filters = hb_params senza "page" e passano page/page_size/hb_filters al template. system_detail() include page_args() + query_args("check_id","status","sort") + system_id/from/to nei parametri heartbeat (prima non paginava).
+- Test: probe/dashboard/tests/conftest.py FakeApiClient esteso per tracciare self.params/self.sent (come il conftest del Server), così i test possono verificare i parametri inoltrati al backend.
+
+Verifica REALE (app istanziata, backend simulato)
+- PROBE /dashboard?system_id=s1&status=ok e /systems/s1?page_size=25 con risposta realistica {items:[...], total:120} (senza page/page_size): HTML servito contiene sia il <select name="page_size"> sia i controlli di paginazione (page-link, "Pagina 1 di N") e i link page=2 con filtri conservati.
+- SERVER /probes/1?window=7d&system_id=s1&status=ok&page_size=25: HTML contiene il selettore con <option value="25" selected>, "Pagina 1 di 5" (120/25) e i filtri preservati come hidden input.
+
+Qualita' / test
+- Opzioni page size: 10, 25, 50, 100 (default 50, = default del proxy). Il valore scelto si propaga via ?page_size= ed e' rispettato dalle chiamate al backend (gestito da paging()/page_args()).
+- Nuovi test: probe/dashboard/tests/test_heartbeat_pagination.py (13 test: selettore rende le opzioni con quella corrente selezionata, preserva i filtri e resetta page; cambio page_size inoltrato al backend; paginazione visibile quando total>page_size su index e system_detail; fallback su page/page_size non numerici). server/dashboard/tests/test_pagination.py: +8 test (selettore sul dettaglio Sonda + unit test della macro page_size_selector).
+- Coverage 100% (app code) su tutti i pacchetti, 0 test falliti: frontend_common 29 test (170/170), server/dashboard 113 test (783/783; sdk.py e views/probes.py 100%), probe/dashboard 40 test (app code 100%: sdk.py 33/33, views/dashboard.py 27/27). Totale 182 test.
+
+File toccati
+- server/dashboard/templates/_macros.html (macro page_size_selector)
+- server/dashboard/templates/probes/detail.html (selettore nel card-header)
+- server/dashboard/tests/test_pagination.py (+8 test)
+- probe/dashboard/templates/_macros.html (macro pagination + page_size_selector)
+- probe/dashboard/sdk.py (helper paging)
+- probe/dashboard/views/dashboard.py (paging + hb_filters in index/system_detail)
+- probe/dashboard/templates/dashboard/index.html (selettore + footer paginazione)
+- probe/dashboard/templates/dashboard/system.html (selettore + footer paginazione)
+- probe/dashboard/tests/conftest.py (FakeApiClient traccia params/sent)
+- probe/dashboard/tests/test_heartbeat_pagination.py (nuovo, 13 test)
+
+Decisioni prese
+- Selettore come form GET puro con onchange submit: i parametri di rotta finiscono nel path via url_for(endpoint, **args) mentre i filtri di query sopravvivono al submit come <input hidden> (la query string dell'action viene scartata dai browser sui form GET). page/page_size esclusi dagli hidden -> reset a page=1 col page_size del <select>.
+- Macro pagination e helper paging replicati (non condivisi) nella dashboard Sonda per coerenza col Server, dato che i due frontend hanno moduli/entrypoint distinti.
+
+================================================

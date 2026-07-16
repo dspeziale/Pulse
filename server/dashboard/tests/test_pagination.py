@@ -231,6 +231,85 @@ def test_probe_detail_heartbeats_forwards_page(client, login, fake):
     assert "Pagina 2 di 3" in r.data.decode()
 
 
+# -- Selettore "quanti item per pagina" sul dettaglio Sonda -------------------
+def test_probe_detail_page_size_selector_options_and_current(client, login,
+                                                             fake):
+    """Il selettore rende 10/25/50/100 con quella corrente selezionata."""
+    login(["probes.read"])
+    _prep_probe_detail(fake, hb_total=120)
+    r = client.get("/probes/1?page_size=25")
+    assert r.status_code == 200
+    html = r.data.decode()
+    assert 'name="page_size"' in html
+    for opt in (10, 25, 50, 100):
+        assert f'<option value="{opt}"' in html
+    assert '<option value="25" selected' in html
+    # page_size custom usato per il calcolo pagine (120/25 = 5) e inoltrato.
+    assert "Pagina 1 di 5" in html
+    assert fake.params[("GET", "/probes/1/heartbeats")].get("page_size") == "25"
+
+
+def test_probe_detail_page_size_selector_preserves_and_resets(client, login,
+                                                             fake):
+    """Il form preserva i filtri (hidden) e non riemette `page`."""
+    login(["probes.read"])
+    _prep_probe_detail(fake, hb_total=120)
+    r = client.get("/probes/1?window=7d&system_id=s1&status=ok&page=3")
+    assert r.status_code == 200
+    html = r.data.decode()
+    assert '<input type="hidden" name="window" value="7d">' in html
+    assert '<input type="hidden" name="system_id" value="s1">' in html
+    assert '<input type="hidden" name="status" value="ok">' in html
+    assert '<input type="hidden" name="page"' not in html
+    assert '<input type="hidden" name="page_size"' not in html
+    # L'action del form punta alla rotta /probes/1 (probe_id nel path).
+    assert 'action="/probes/1' in html
+
+
+def test_probe_detail_page_size_default_selected(client, login, fake):
+    """Senza page_size in query il default 50 e' preselezionato."""
+    login(["probes.read"])
+    _prep_probe_detail(fake, hb_total=120)
+    r = client.get("/probes/1")
+    assert r.status_code == 200
+    assert '<option value="50" selected' in r.data.decode()
+
+
+# -- Test unitari della macro page_size_selector -----------------------------
+_PS_TPL = (
+    '{% from "_macros.html" import page_size_selector %}'
+    "{{ page_size_selector(current, endpoint, args) }}"
+)
+
+
+def _render_ps(app, **kwargs):
+    from flask import render_template_string
+    with app.test_request_context("/"):
+        return render_template_string(_PS_TPL, **kwargs)
+
+
+def test_ps_macro_marks_current_selected(app):
+    out = _render_ps(app, current=25, endpoint="audit.list_audit", args={})
+    assert '<option value="25" selected' in out
+    assert '<option value="50"' in out
+    assert 'selected' not in out.split('value="50"')[1].split('>')[0]
+
+
+def test_ps_macro_injects_custom_size(app):
+    """current fuori dalle opzioni viene aggiunto e ordinato."""
+    out = _render_ps(app, current=42, endpoint="audit.list_audit", args={})
+    assert '<option value="42" selected' in out
+
+
+def test_ps_macro_emits_filters_but_not_paging(app):
+    out = _render_ps(app, current=50, endpoint="audit.list_audit",
+                     args={"q": "x", "page": "3", "page_size": "50"})
+    assert '<input type="hidden" name="q" value="x">' in out
+    assert 'name="page"' not in out.replace('name="page_size"', "")
+    # page_size non deve comparire come hidden (viene dal select).
+    assert '<input type="hidden" name="page_size"' not in out
+
+
 # -- Test unitari della macro (indipendenti dai template chiamanti) -----------
 _MACRO_TPL = (
     '{% from "_macros.html" import pagination %}'
