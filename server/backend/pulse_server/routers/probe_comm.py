@@ -8,9 +8,11 @@ token monouso a scadenza.
 from __future__ import annotations
 
 import datetime as dt
+import uuid
 
 from fastapi import APIRouter, Request
 from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from .. import errors, schemas
 from ..audit import write_audit
@@ -18,6 +20,7 @@ from ..context import SecretBoxDep
 from ..deps import AuthedProbeDep, SessionDep, SettingsDep, client_ip
 from ..models import (
     Configuration,
+    DiscoveredCheck,
     EnrollmentToken,
     MonitoredSystem,
     Probe,
@@ -164,6 +167,55 @@ def probe_events(
     return schemas.ProbeEventsResponse(accepted=len(body.events))
 
 
+def _sync_discovered_checks(
+    session: SessionDep, probe_id: uuid.UUID, systems: list[schemas.ProbeRollupSystem]
+) -> None:
+    """Popola/aggiorna discovered_checks dal payload di rollup (UPSERT).
+
+    Per ogni sistema del rollup registrato per questa Probe, effettua un upsert
+    (vincolo UNIQUE system_id+check_id) di ciascun check osservato. I check senza
+    check_id e i sistemi non registrati per la Probe vengono ignorati.
+    Non esegue commit: lo fa il chiamante nella stessa transazione del rollup.
+    """
+    now = dt.datetime.now(dt.timezone.utc)
+    for sysrec in systems:
+        monitored = session.execute(
+            select(MonitoredSystem).where(
+                MonitoredSystem.system_id == sysrec.system_id,
+                MonitoredSystem.probe_id == probe_id,
+            )
+        ).scalar_one_or_none()
+        if monitored is None:
+            continue
+        for check in sysrec.checks:
+            check_id = check.get("check_id")
+            if not check_id:
+                continue
+            check_name = check.get("check_name")
+            stmt = (
+                pg_insert(DiscoveredCheck)
+                .values(
+                    system_id=monitored.id,
+                    check_id=check_id,
+                    check_name=check_name,
+                    probe_id=probe_id,
+                    last_status=check.get("status"),
+                    last_seen_at=now,
+                )
+                .on_conflict_do_update(
+                    constraint="uq_discovered_checks",
+                    set_={
+                        "probe_id": probe_id,
+                        "last_status": check.get("status"),
+                        "last_seen_at": now,
+                        # aggiorna check_name solo se fornito, altrimenti conserva il valore esistente
+                        "check_name": check_name if check_name is not None else DiscoveredCheck.check_name,
+                    },
+                )
+            )
+            session.execute(stmt)
+
+
 @router.post("/rollup", response_model=schemas.ProbeRollupResponse, status_code=202)
 def probe_rollup(
     body: schemas.ProbeRollupRequest,
@@ -177,6 +229,7 @@ def probe_rollup(
             payload=body.model_dump(),
         )
     )
+    _sync_discovered_checks(session, probe.id, body.systems)
     session.commit()
     return schemas.ProbeRollupResponse(accepted=True)
 

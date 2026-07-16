@@ -130,3 +130,88 @@ def test_events_trigger_workflow_and_alarm(client, auth_headers, db_session) -> 
         assert alarms.json()["total"] >= 1
     finally:
         set_notifier("telegram", original)
+
+
+# --- Popolamento discovered_checks dal rollup (§1.9 /probe/rollup) -------------
+
+def _make_system(client, headers, pid, system_id):
+    return client.post(
+        "/api/v1/systems",
+        headers=headers,
+        json={
+            "system_id": system_id, "system_name": f"Sys {system_id}",
+            "heartbeat_url": "https://s.local/api/heartbeat", "probe_id": pid,
+            "poll_interval_seconds": 30, "timeout_seconds": 5, "enabled": True,
+        },
+    ).json()["id"]
+
+
+def _rollup_body(system_id, checks, window="1h"):
+    return {
+        "window": window,
+        "generated_at": "2026-07-16T00:00:00Z",
+        "systems": [{"system_id": system_id, "status": "error", "avg_response_ms": 5.0, "uptime_pct": 90.0, "checks": checks}],
+    }
+
+
+def test_rollup_populates_discovered_checks(client, auth_headers) -> None:
+    pid, token = _create_probe(client, auth_headers, name="probe-dc")
+    sid = _make_system(client, auth_headers, pid, "dc-sys")
+    ptok = _enroll(client, token).json()["probe_token"]
+    ph = {"Authorization": f"Bearer {ptok}"}
+
+    body = _rollup_body("dc-sys", [
+        {"check_id": "db", "check_name": "Database", "status": "ok"},
+        {"check_id": "web", "check_name": "Web", "status": "error"},
+    ])
+    assert client.post("/api/v1/probe/rollup", headers=ph, json=body).status_code == 202
+
+    checks = client.get(f"/api/v1/systems/{sid}/checks", headers=auth_headers).json()["items"]
+    by_id = {c["check_id"]: c for c in checks}
+    assert set(by_id) == {"db", "web"}
+    assert by_id["db"]["check_name"] == "Database" and by_id["db"]["last_status"] == "ok"
+    assert by_id["db"]["last_seen_at"] is not None
+
+
+def test_rollup_upsert_updates_no_duplicates(client, auth_headers) -> None:
+    pid, token = _create_probe(client, auth_headers, name="probe-dc2")
+    sid = _make_system(client, auth_headers, pid, "dc-sys2")
+    ph = {"Authorization": f"Bearer {_enroll(client, token).json()['probe_token']}"}
+
+    client.post("/api/v1/probe/rollup", headers=ph, json=_rollup_body("dc-sys2", [{"check_id": "db", "check_name": "Database", "status": "ok"}]))
+    # secondo rollup: stesso check, status cambiato, senza check_name (deve conservarlo)
+    client.post("/api/v1/probe/rollup", headers=ph, json=_rollup_body("dc-sys2", [{"check_id": "db", "status": "error"}]))
+
+    checks = client.get(f"/api/v1/systems/{sid}/checks", headers=auth_headers).json()["items"]
+    assert len(checks) == 1  # nessun duplicato (UNIQUE system_id, check_id)
+    assert checks[0]["last_status"] == "error"
+    assert checks[0]["check_name"] == "Database"  # conservato
+
+
+def test_rollup_unregistered_system_skipped(client, auth_headers, db_session) -> None:
+    from sqlalchemy import func, select
+
+    from pulse_server.models import DiscoveredCheck
+
+    pid, token = _create_probe(client, auth_headers, name="probe-dc3")
+    ph = {"Authorization": f"Bearer {_enroll(client, token).json()['probe_token']}"}
+    before = int(db_session.execute(select(func.count(DiscoveredCheck.id))).scalar_one())
+    # system_id non registrato per questa probe -> nessuna riga creata
+    r = client.post("/api/v1/probe/rollup", headers=ph, json=_rollup_body("ghost-sys", [{"check_id": "db", "status": "ok"}]))
+    assert r.status_code == 202
+    after = int(db_session.execute(select(func.count(DiscoveredCheck.id))).scalar_one())
+    assert after == before
+
+
+def test_rollup_check_without_check_id_skipped(client, auth_headers) -> None:
+    pid, token = _create_probe(client, auth_headers, name="probe-dc4")
+    sid = _make_system(client, auth_headers, pid, "dc-sys4")
+    ph = {"Authorization": f"Bearer {_enroll(client, token).json()['probe_token']}"}
+    body = _rollup_body("dc-sys4", [
+        {"check_name": "NoId", "status": "ok"},           # senza check_id -> saltato
+        {"check_id": "", "status": "ok"},                  # check_id vuoto -> saltato
+        {"check_id": "ok1", "check_name": "Valido", "status": "ok"},
+    ])
+    client.post("/api/v1/probe/rollup", headers=ph, json=body)
+    checks = client.get(f"/api/v1/systems/{sid}/checks", headers=auth_headers).json()["items"]
+    assert [c["check_id"] for c in checks] == ["ok1"]

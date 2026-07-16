@@ -80,8 +80,8 @@ def test_detect_events_unreachable_and_threshold() -> None:
 def test_build_rollup() -> None:
     docs_by_system = {
         "a": [
-            {"check_id": "db", "status": "ok", "response_ms": 10},
-            {"check_id": "web", "status": "error", "response_ms": 30},
+            {"check_id": "db", "check_name": "Database", "status": "ok", "response_ms": 10},
+            {"check_id": "web", "check_name": "Web", "status": "error", "response_ms": 30},
         ],
         "empty": [],
     }
@@ -92,6 +92,10 @@ def test_build_rollup() -> None:
     assert sys_a["status"] == "error"  # peggiore
     assert sys_a["avg_response_ms"] == 20.0
     assert 0 <= sys_a["uptime_pct"] <= 100
+    # ogni check del rollup include check_id, check_name e status
+    assert {"check_id", "check_name", "status"} <= set(sys_a["checks"][0].keys())
+    by_id = {c["check_id"]: c for c in sys_a["checks"]}
+    assert by_id["db"]["check_name"] == "Database"
 
 
 class _FakeServer(ServerClient):

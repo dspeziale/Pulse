@@ -146,7 +146,10 @@ def build_rollup(docs_by_system: dict[str, list[dict[str, Any]]], window: str) -
         uptime = round(100.0 * up / len(docs), 2) if docs else 0.0
         # stato peggiore osservato come stato del sistema
         worst = _worst_status(docs)
-        checks = [{"check_id": d["check_id"], "status": d["status"]} for d in docs]
+        checks = [
+            {"check_id": d["check_id"], "check_name": d.get("check_name"), "status": d["status"]}
+            for d in docs
+        ]
         systems.append(
             {
                 "system_id": system_id,
