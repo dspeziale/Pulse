@@ -42,8 +42,8 @@ services:
 
   server-backend:
     build:
-      context: ..
-      dockerfile: server/backend/Dockerfile
+      context: ../server/backend
+      dockerfile: Dockerfile
     image: pulse-server-backend:latest
     container_name: pulse-server-backend
     restart: unless-stopped

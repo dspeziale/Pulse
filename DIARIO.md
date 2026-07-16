@@ -451,3 +451,32 @@ Output consegnati
 - Progetto Pulse completo, documentato, versionato e certificato: analisi (9 doc), DB PostgreSQL validato, backend FastAPI (coverage 100%), frontend Flask (coverage 100%), deploy Docker/Podman, QA_REPORT.md con verdetto PASS, DIARIO.md completo (iterazioni 0-10).
 
 ================================================
+
+ITERAZIONE 11
+
+Agente: ORCHESTRATORE
+Data: 2026-07-16
+
+Input ricevuti
+- Richiesta utente: avviare Server e Sonda su questo PC.
+
+Lavoro svolto
+- Avviati gli stack Docker Server (postgres+backend+dashboard) e Sonda (opensearch+agent+dashboard).
+- Rilevato e corretto un bug di deploy emerso solo alla build reale: nei compose il build context di server-backend e probe-agent era la radice repo (..), ma i rispettivi Dockerfile usano percorsi relativi alla propria cartella. Corretti i context a ../server/backend e ../probe/agent. Le dashboard restano con context = radice (usano frontend_common/).
+- Aggiunti .dockerignore (radice, server/backend, probe/agent) per escludere .venv/cache dal build context.
+- Rimosse due cartelle vuote spurie in deploy/ (schema.sql;C, seed.sql;C), residui di un mount Windows errato.
+
+File creati
+- .dockerignore, server/backend/.dockerignore, probe/agent/.dockerignore
+- File modificati: deploy/docker-compose.server.yml, deploy/docker-compose.probe.yml
+
+Problemi trovati
+- Gap di verifica pregresso: la build Docker delle immagini non era mai stata eseguita realmente (validazione limitata a `docker compose config` + avvio uvicorn diretto), per cui il disallineamento context/Dockerfile non era emerso.
+
+Decisioni prese
+- Fix di configurazione deploy applicato dall'orchestratore per soddisfare la richiesta di avvio immediato; artefatti versionati.
+
+Output consegnati
+- Stack in esecuzione e verificato: backend /health 200, login admin 200 (SuperAdmin/40 permessi), probe-agent /health 200, dashboard Server :5000 e Sonda :5001 rispondono (login 200).
+
+================================================

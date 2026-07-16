@@ -1,0 +1,11 @@
+# Escludi dal build context (context = radice repo) tutto ciò che non serve nelle immagini
+**/.venv/
+**/__pycache__/
+**/.mypy_cache/
+**/.pytest_cache/
+**/htmlcov/
+**/.coverage
+**/*.pyc
+.git/
+node_modules/
+*.log

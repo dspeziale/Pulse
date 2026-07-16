@@ -49,8 +49,8 @@ services:
 
   probe-agent:
     build:
-      context: ..
-      dockerfile: probe/agent/Dockerfile
+      context: ../probe/agent
+      dockerfile: Dockerfile
     image: pulse-probe-agent:latest
     container_name: pulse-probe-agent
     restart: unless-stopped
