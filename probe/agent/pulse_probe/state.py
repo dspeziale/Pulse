@@ -42,9 +42,12 @@ class RuntimeState:
     scans_semaphore: threading.BoundedSemaphore = field(
         default_factory=lambda: threading.BoundedSemaphore(1)
     )
-    # Disponibilita' di nmap nel container (self-check all'avvio).
+    # Disponibilita' di nmap (self-check all'avvio: locale o via proxy).
     nmap_available: bool = False
     nmap_version: str | None = None
+    # Backend di esecuzione nmap effettivo: "local" (in-container) o "proxy"
+    # (host esterno, es. Windows). Solo informativo (esposto in /status).
+    scan_backend: str = "local"
 
     def __post_init__(self) -> None:
         # Dimensiona il semaforo secondo la concorrenza configurata.

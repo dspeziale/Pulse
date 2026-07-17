@@ -47,6 +47,19 @@ TECHNIQUE_FLAGS: dict[str, str] = {
     "ping": "-sn",
 }
 
+# Insiemi/regex per la RI-VALIDAZIONE di un argv gia' costruito (usata dal proxy
+# nmap esterno, che non si fida mai del client). Devono restare coerenti con
+# ``build_nmap_argv`` (un test lo verifica costruendo argv reali).
+_TECHNIQUE_SET: frozenset[str] = frozenset(TECHNIQUE_FLAGS.values())
+_TIMING_RE = re.compile(r"^-T[0-5]$")
+_INT_RE = re.compile(r"^[0-9]+$")
+#: Flag standalone (senza valore) ammesse.
+_STANDALONE_FLAGS: frozenset[str] = frozenset({"--privileged", "-sV", "-O", "-Pn"})
+#: Flag seguite da un valore intero.
+_INT_VALUE_FLAGS: frozenset[str] = frozenset(
+    {"--top-ports", "--version-intensity", "--min-rate", "--max-rate", "--max-retries"}
+)
+
 # Allowlist di flag "extra" avanzate ma sicure (NESSUNA flag di output/lettura
 # file, nessuno spoofing di sorgente/decoy). Tutto cio' che non e' qui -> 422.
 EXTRA_ALLOWED_FLAGS: frozenset[str] = frozenset(
@@ -219,6 +232,92 @@ def build_nmap_argv(req: ScanRequest, *, binary: str = "nmap") -> list[str]:
     argv += ["-oX", "-"]
     # Target in coda, ognuno gia' validato.
     argv += validate_target(req.target)
+    return argv
+
+
+# --------------------------------------------------------------------------- #
+# Ri-validazione di un argv gia' costruito (difesa lato PROXY nmap esterno)
+# --------------------------------------------------------------------------- #
+
+
+def assert_safe_argv(argv: list[str], *, binary: str = "nmap") -> list[str]:
+    """Ri-valida un argv nmap gia' costruito, senza fidarsi del chiamante.
+
+    Usata dal proxy nmap esterno (host Windows): accetta SOLO argv nella forma
+    prodotta da ``build_nmap_argv`` (flag su whitelist, output XML forzato su
+    stdout, target validati). Analisi indipendente dall'ordine dei token; solleva
+    ``ScanValidationError`` su qualunque token non riconosciuto/non consentito.
+    """
+    if not argv:
+        raise ScanValidationError("argv vuoto.")
+    if argv[0] != binary:
+        raise ScanValidationError(f"Binario non consentito: {argv[0]!r}")
+
+    toks = list(argv[1:])
+    i, n = 0, len(toks)
+    techniques = 0
+    targets = 0
+    has_stdout_xml = False
+
+    while i < n:
+        t = toks[i]
+        if t in _STANDALONE_FLAGS:
+            i += 1
+            continue
+        if t in _TECHNIQUE_SET:
+            techniques += 1
+            i += 1
+            continue
+        if _TIMING_RE.match(t):
+            i += 1
+            continue
+        if t == "-p":
+            if i + 1 >= n:
+                raise ScanValidationError("-p senza valore.")
+            validate_ports(toks[i + 1])
+            i += 2
+            continue
+        if t in _INT_VALUE_FLAGS:
+            if i + 1 >= n or not _INT_RE.match(toks[i + 1]):
+                raise ScanValidationError(f"{t} richiede un valore intero.")
+            if t == "--version-intensity" and not 0 <= int(toks[i + 1]) <= 9:
+                raise ScanValidationError("--version-intensity fuori range (0-9).")
+            i += 2
+            continue
+        if t == "--script-args":
+            if i + 1 >= n:
+                raise ScanValidationError("--script-args senza valore.")
+            validate_script_args(toks[i + 1])
+            i += 2
+            continue
+        if t.startswith("--script="):
+            validate_scripts(t[len("--script="):].split(","))
+            i += 1
+            continue
+        if t == "-oX":
+            if i + 1 >= n or toks[i + 1] != "-":
+                raise ScanValidationError("Output XML consentito solo su stdout (-oX -).")
+            has_stdout_xml = True
+            i += 2
+            continue
+        if t.startswith("-"):
+            flag = t.split("=", 1)[0]
+            if flag in EXTRA_ALLOWED_FLAGS and _EXTRA_TOKEN_RE.match(t):
+                i += 1
+                continue
+            raise ScanValidationError(f"Flag non consentita: {t!r}")
+        # Non e' una flag: deve essere un target valido.
+        if not _is_valid_host_token(t):
+            raise ScanValidationError(f"Target non valido: {t!r}")
+        targets += 1
+        i += 1
+
+    if techniques != 1:
+        raise ScanValidationError("Tecnica di scansione mancante o duplicata.")
+    if not has_stdout_xml:
+        raise ScanValidationError("Output XML su stdout obbligatorio (-oX -).")
+    if targets < 1:
+        raise ScanValidationError("Nessun target valido nell'argv.")
     return argv
 
 

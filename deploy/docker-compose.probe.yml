@@ -63,6 +63,10 @@ services:
     depends_on:
       opensearch:
         condition: service_healthy
+    # Raggiungibilita' dell'host (proxy nmap su Windows): host.docker.internal.
+    # Su Docker Desktop e' automatico; lo dichiariamo per portabilita' (Linux).
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     environment:
       PULSE_PROBE_API_PORT: ${PULSE_PROBE_API_PORT:-8444}
       PULSE_PROBE_SERVER_BASE_URL: ${PULSE_PROBE_SERVER_BASE_URL:-https://server-backend:9443}
@@ -73,6 +77,17 @@ services:
       PULSE_PROBE_HTTP_VERIFY: ${PULSE_PROBE_HTTP_VERIFY:-false}
       PULSE_PROBE_LOG_LEVEL: ${PULSE_PROBE_LOG_LEVEL:-info}
       PULSE_PROBE_SCAN_TIMEOUT: ${PULSE_PROBE_SCAN_TIMEOUT:-1800}
+      # --- Proxy nmap esterno (host Windows). Valorizzati dall'installer in
+      #     deploy/.env.probe. Se URL vuoto -> nmap locale nel container. ---
+      PULSE_PROBE_NMAP_PROXY_URL: ${PULSE_PROBE_NMAP_PROXY_URL:-}
+      PULSE_PROBE_NMAP_PROXY_TOKEN: ${PULSE_PROBE_NMAP_PROXY_TOKEN:-}
+      PULSE_PROBE_NMAP_PROXY_CA_CERT_PATH: ${PULSE_PROBE_NMAP_PROXY_CA_CERT_PATH:-}
+      PULSE_PROBE_NMAP_PROXY_CLIENT_CERT_PATH: ${PULSE_PROBE_NMAP_PROXY_CLIENT_CERT_PATH:-}
+      PULSE_PROBE_NMAP_PROXY_CLIENT_KEY_PATH: ${PULSE_PROBE_NMAP_PROXY_CLIENT_KEY_PATH:-}
+    volumes:
+      # Certificati mTLS del client (agent) per parlare col proxy nmap dell'host.
+      # Popolati dall'installer Windows in deploy/certs/nmap-proxy/ (sola lettura).
+      - ./certs/nmap-proxy:/certs/nmap-proxy:ro
     ports:
       - "${PULSE_PROBE_API_PORT:-8444}:${PULSE_PROBE_API_PORT:-8444}"
     networks: [pulse, shared]

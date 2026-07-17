@@ -22,6 +22,7 @@ from . import __version__, errors, nmap_scan, schemas, scanner
 from .config import Settings, get_settings
 from .deps import get_state, require_server_token
 from .poller import poll_once
+from .proxy_runner import ProxyScanRunner
 from .server_client import ServerClient
 from .state import RuntimeState
 from .store import build_store
@@ -37,7 +38,7 @@ def bootstrap_state(settings: Settings) -> RuntimeState:
     store = build_store(settings)
     server = ServerClient(settings)
     nmap_available, nmap_version = scanner.detect_nmap()
-    return RuntimeState(
+    state = RuntimeState(
         settings=settings,
         store=store,
         server=server,
@@ -46,6 +47,34 @@ def bootstrap_state(settings: Settings) -> RuntimeState:
         nmap_available=nmap_available,
         nmap_version=nmap_version,
     )
+    _select_scan_backend(state)
+    return state
+
+
+def _select_scan_backend(state: RuntimeState) -> None:
+    """Sceglie il backend nmap: proxy esterno se configurato e raggiungibile.
+
+    Su Windows/Docker Desktop il container non raggiunge la LAN fisica: se e'
+    configurato un proxy nmap esterno e risponde, l'agent gli delega le scansioni
+    (nmap nativo sull'host). Se non configurato o irraggiungibile all'avvio, resta
+    il runner locale (nmap nel container). Scelta automatica, con log esplicito.
+    """
+    settings = state.settings
+    if not settings.nmap_proxy_url:
+        return
+    runner = ProxyScanRunner(settings)
+    ok, version = runner.health()
+    if ok:
+        state.scan_runner = runner
+        state.scan_backend = "proxy"
+        state.nmap_available = True
+        state.nmap_version = version or state.nmap_version
+        logger.info("Backend nmap: PROXY esterno (%s) — nmap %s",
+                    settings.nmap_proxy_url, version)
+    else:
+        logger.warning(
+            "Proxy nmap configurato (%s) ma non raggiungibile all'avvio: "
+            "uso nmap locale nel container.", settings.nmap_proxy_url)
 
 
 def sync_config(state: RuntimeState) -> None:
@@ -219,6 +248,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             pending_events=state.pending_events,
             nmap_available=state.nmap_available,
             nmap_version=state.nmap_version,
+            scan_backend=state.scan_backend,
         )
 
     @app.post("/api/v1/scan", response_model=schemas.ScanStartResponse, tags=["scan"])

@@ -1,0 +1,9 @@
+# Dipendenze del proxy nmap (host Windows).
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+pydantic==2.10.4
+pydantic-settings==2.7.0
+cryptography==44.0.0
+# La validazione dell'argv e' condivisa con l'agent: l'installer installa anche
+# il pacchetto dell'agent (probe/agent) per importare `pulse_probe.nmap_scan`,
+# unica fonte di verita' delle regole di sicurezza. Vedi install-windows.ps1.

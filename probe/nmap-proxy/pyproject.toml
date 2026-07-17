@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pulse-nmap-proxy"
+version = "1.0.0"
+description = "Pulse — proxy nmap esterno (host Windows) per scansioni raw/LAN dalla Probe"
+requires-python = ">=3.11"
+readme = "README.md"
+dependencies = [
+    "fastapi==0.115.6",
+    "uvicorn[standard]==0.34.0",
+    "pydantic==2.10.4",
+    "pydantic-settings==2.7.0",
+    "cryptography==44.0.0",
+    # La validazione dell'argv e' condivisa con l'agent (unica fonte di verita').
+    "pulse-probe",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["pulse_nmap_proxy*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

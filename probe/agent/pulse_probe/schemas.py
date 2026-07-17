@@ -84,9 +84,11 @@ class ProbeStatusOut(_Model):
     last_poll_at: str | None
     config_version: str | None
     pending_events: int
-    # Self-check: nmap disponibile nel container e relativa versione.
+    # Self-check: nmap disponibile (nel container o via proxy) e relativa versione.
     nmap_available: bool = False
     nmap_version: str | None = None
+    # Backend di esecuzione nmap: "local" (in-container) o "proxy" (host esterno).
+    scan_backend: str = "local"
 
 
 # ============================ Scansioni NMAP ==============================

@@ -61,6 +61,23 @@ class Settings(BaseSettings):
     # Numero massimo di scansioni concorrenti.
     scan_max_concurrency: int = 2
 
+    # --- Proxy nmap ESTERNO (host Windows) ---
+    # Su Docker Desktop (Windows/WSL2) il container e' dietro NAT e non e' sul
+    # segmento L2 fisico: le scansioni raw (-sS/-sU/-O) e la discovery della LAN
+    # non funzionano dal container. Se configurato e raggiungibile, l'agent
+    # delega l'esecuzione di nmap a un proxy esterno che gira sull'host Windows
+    # (nmap nativo + Npcap). Se assente/irraggiungibile all'avvio -> nmap locale.
+    # URL del proxy (es. https://host.docker.internal:8556). Vuoto -> disattivato.
+    nmap_proxy_url: str | None = None
+    # Token Bearer condiviso col proxy.
+    nmap_proxy_token: str | None = None
+    # mTLS: CA che firma il certificato del proxy + certificato/chiave client.
+    nmap_proxy_ca_cert_path: str | None = None
+    nmap_proxy_client_cert_path: str | None = None
+    nmap_proxy_client_key_path: str | None = None
+    # Timeout (s) delle chiamate HTTP al proxy (oltre al timeout scansione).
+    nmap_proxy_connect_timeout: int = 10
+
     # --- Logging ---
     log_level: str = "info"
 
