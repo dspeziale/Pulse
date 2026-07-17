@@ -1555,3 +1555,30 @@ Output consegnati
 - Tutte le date-ora delle due dashboard sono mostrate nel fuso configurato (Server da /config con cache 60s, Probe da env), formato 24h dd/MM/YYYY HH:MM:SS, con ripiego robusto. UI config con select del fuso. Grafico P-05 a piena larghezza. Coverage 100%, tutti i test verdi.
 
 ================================================
+
+ITERAZIONE 42
+
+Agente: FE (recuperata dall'ORCHESTRATORE dopo interruzione dell'agente)
+Data: 2026-07-17
+
+Input ricevuti
+- Richiesta utente: nella dashboard aggregata poter andare subito su Warn/Error/Down; chiarire il LED "Criticita' rilevate" con allarmi 0 (rumore).
+
+Lavoro svolto
+- KPI Warn/Error/Down e LED complessivo resi CLICCABILI: linkano a probes.detail?status=... (drill-down sui check nello stato scelto; con singola Probe usa quella Probe).
+- LED complessivo con etichetta ESPLICITA basata sui conteggi (es. "1 in errore, 0 non raggiungibili"; giallo se solo warn; "Tutto regolare" se ok). Il colore riflette SOLO lo stato dei check, non gli allarmi.
+- "Allarmi attivi" mantenuto come voce/KPI separata, con nota esplicativa che gli allarmi sono generati dai workflow di notifica.
+
+File creati/modificati
+- server/dashboard/templates/dashboard/index.html, server/dashboard/views/dashboard.py, server/dashboard/templates/_macros.html (macro led), test aggiornati.
+
+Problemi trovati
+- L'agente FE si e' interrotto prima di aggiornare il DIARIO; le modifiche erano gia' committate (fbcda52). Recuperata la registrazione qui.
+
+Decisioni prese
+- Diagnosi condivisa con l'utente: il LED rosso era corretto (check 'consumer' di texa_ares in error: Oracle DPY-4011, connessione persa). Il LED ora spiega il motivo ed e' azionabile.
+
+Output consegnati
+- Dashboard cliccabile + LED chiaro. Verificato live (link a /probes/{id}?status=error, label "in errore"/"non raggiungibili") e test: server/dashboard 162 passati.
+
+================================================
