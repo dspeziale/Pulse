@@ -1762,3 +1762,42 @@ Output consegnati
 - Nuova pagina Compendio sistema (GET /systems/<id>/report) col riepilogo del periodo selezionato (default Oggi) e rotta PDF (GET /systems/<id>/report.pdf) che produce un report professionale in PT Sans Narrow, ben dimensionato per A4. Solo endpoint esistenti, nessun CDN, nessuna modifica a backend/probe-agent. Coverage 100% sul codice applicativo, 309 test verdi.
 
 ================================================
+
+ITERAZIONE 47
+
+Agente: FE
+Data: 2026-07-17
+
+Input ricevuti
+- Richiesta orchestratore (SOLO server/dashboard; NIENTE modifiche a backend/probe-agent; niente CDN): creare un menu "Guida" con il dettaglio COMPLETO di funzionamento dell'applicazione, accessibile a TUTTI gli utenti autenticati (nessun permesso speciale). Contenuti accurati basati sulle funzionalita' realmente implementate (docs/analisi/*, docs/api/DOCUMENTO_API.md e ispezione delle rotte/pagine esistenti), pagina con indice ad ancore e sezioni (card/accordion Bootstrap coerenti con AdminLTE/tema/compattezza).
+
+Lavoro svolto (FE, solo server/dashboard)
+- BLUEPRINT + ROTTA: nuovo views/guida.py con GET /guida protetto dalla sola autenticazione (decoratore login_required di pulse_fe_common.auth: nessun permesso richiesto). Non consuma alcuna API del backend (pagina interamente statica). Registrato in views/__init__.py.
+- MENU: aggiunta la voce "Guida" (icona bi-question-circle) nella sidebar (templates/base.html) in una nuova sezione "Aiuto" in fondo, subito dopo Account. La voce e' fuori da ogni blocco {% if can(...) %}, quindi visibile a QUALSIASI utente autenticato; evidenziazione della voce attiva come le altre (ep.startswith('guida.')).
+- PAGINA (templates/guida/index.html): layout a due colonne con INDICE (table of contents) sticky a sinistra (13 ancore #sec-*) e ACCORDION Bootstrap a destra con 13 sezioni. Uso delle macro _macros.html (status_badge, led) per mostrare visivamente stati/LED, tabelle table-sm, alert informativi; nessun asset esterno. Piccolo JS inline (body_extra) che, arrivando con un'ancora o cliccando l'indice, apre la sezione dell'accordion (API bootstrap.Collapse gia' vendorizzata) e vi scorre.
+- CONTENUTI (accurati, italiano): 1) Panoramica (monitoraggio connettivita'/stato applicativo HTTP e TCP; Server + Sonde + OpenSearch locale; comunicazione cifrata); 2) Architettura e flusso dati (ruoli Server/Sonda/Sistema; heartbeat->OpenSearch->rollup/eventi->Server->dashboard; Sonda indipendente dal Server); 3) Accesso e sicurezza (login/token, RBAC utenti->ruoli->permessi catalogo fisso, audit log, log di sistema); 4) Sonde (enrollment con token MONOUSO, anagrafica posizione/referente, stato online/offline+timeout configurabile, rotazione credenziali, drill-down, pacchetto deploy/probe-package con passi essenziali); 5) Sistemi monitorati (tab Applicazioni http /api/heartbeat vs Connettivita' tcp host:porta, pulsante Testa endpoint/connessione, check scoperti, soglie response_ms, Sonda assegnata 1:1); 6) Schema heartbeat canonico (obbligatori system_id/check_id/status; consigliati @timestamp/system_name/check_name/response_ms/message/details-stringa; valori status ok/warn/error/down/unknown); 7) Dashboard (LED complessivo basato sullo stato dei check e NON sugli allarmi, KPI cliccabili, riepilogo per Sonda); 8) Query dati (filtri guidati Sonda->Sistema->Check->Stato, preset periodo default Oggi, scorciatoia Solo problemi, query avanzata JSON) + Grafici; 9) Notifiche e allarmi (canali Email/Telegram/WhatsApp + test invio, comandi in ingresso e relative fattibilita', workflow trigger/ambito/condizioni/soppressione/step+escalation, allarmi active/acknowledged/resolved con ack, storico invii; box che chiarisce stato check vs allarme); 10) Configurazione (parametri a schede, fuso orario default Europe/Rome, normalizzazione date-ora UTC->fuso configurato); 11) Report/Compendio (riepilogo per periodo + export PDF PT Sans Narrow); 12) Tabelle (DataTables: ordinamento/ricerca/paginazione/righe per pagina); + FAQ/Troubleshooting (LED rosso con 0 allarmi, Sonda offline, token enrollment monouso, test "non raggiungibile", permesso negato/voce di menu assente, date-ora e fuso).
+
+Qualita'
+- NIENTE CDN (verifica reale: nessun riferimento a //cdn o a host https esterni nella pagina resa). NESSUNA modifica a backend/probe-agent. Coerenza AdminLTE/Bootstrap/tema/compattezza (accordion, card, badge b-*, LED, table-sm).
+- Coverage 100% sul codice applicativo nuovo (views/guida.py 8/8 100%); tutti gli altri moduli server/dashboard restano 100%; frontend_common e probe/dashboard invariati e 100%. Esito complessivo: frontend_common 71 + server/dashboard 200 + probe/dashboard 43 = 314 test passati, 0 falliti. (Le uniche righe non coperte residue sono in file di TEST: conftest _Blank/sys.path guard, test_timezone e un ramo di test_guida non applicabile -- non codice applicativo.)
+- Test aggiunti (server/dashboard/tests/test_guida.py, 5 test): /guida senza login -> 302 al login; /guida con utente autenticato SENZA permessi -> 200 con titolo e indice ad ancore; presenza delle 13 sezioni principali e di contenuti chiave (heartbeat, token di enrollment, Europe/Rome); la voce "Guida" (href="/guida") appare nella sidebar su un'altra pagina interna (Profilo, backend GET /auth/me mockato); la voce Guida compare anche per un utente senza alcun permesso.
+- Verifica REALE: app Flask reale (test client WSGI) -> GET /guida rende 200 (35002 byte) con indice (id="guida-toc") + 13 ancore #sec-*, accordion (id="guida-acc") con 13 sezioni id="sec-*", link "Guida" in sidebar, nessun asset esterno/CDN.
+
+File creati
+- server/dashboard/views/guida.py
+- server/dashboard/templates/guida/index.html
+- server/dashboard/tests/test_guida.py
+
+File modificati
+- server/dashboard/views/__init__.py (import + registrazione blueprint guida)
+- server/dashboard/templates/base.html (sezione "Aiuto" + voce menu "Guida", visibile a tutti gli autenticati)
+
+Decisioni prese
+- Guida come pagina STATICA protetta da login_required (non permission_required): garantisce l'accesso a TUTTI gli utenti autenticati e non introduce dipendenze dal backend (nessun rischio di errore per dati/permessi assenti).
+- Voce di menu collocata in una nuova sezione "Aiuto" in fondo alla sidebar, fuori dai controlli di permesso, cosi' da non sparire per utenti con pochi permessi.
+- Indice + accordion (multi-open con data-bs-parent) per compattezza; JS inline minimale per apertura/scroll da ancora (API Bootstrap gia' vendorizzata), nessun CDN.
+
+Output consegnati
+- Voce menu "Guida" (sezione Aiuto della sidebar) -> rotta GET /guida, accessibile a TUTTI gli utenti autenticati. Pagina con indice ad ancore e 13 sezioni (Panoramica, Architettura, Accesso e sicurezza, Sonde, Sistemi monitorati, Schema heartbeat, Dashboard, Query dati e Grafici, Notifiche e allarmi, Configurazione, Report/Compendio, Tabelle, FAQ/Troubleshooting). Solo server/dashboard, nessun CDN, nessuna modifica a backend/probe-agent. Coverage 100% sul codice applicativo, 314 test verdi.
+
+================================================

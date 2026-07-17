@@ -3,9 +3,9 @@ from __future__ import annotations
 
 from flask import Flask
 
-from . import (alarms, audit, auth, config_bp, dashboard, identities, logs,
-               notifications, permissions, probes, profile, query, report,
-               roles, systems, users, workflows)
+from . import (alarms, audit, auth, config_bp, dashboard, guida, identities,
+               logs, notifications, permissions, probes, profile, query,
+               report, roles, systems, users, workflows)
 
 _BLUEPRINTS = [
     auth.bp,
@@ -25,6 +25,7 @@ _BLUEPRINTS = [
     config_bp.bp,
     profile.bp,
     query.bp,
+    guida.bp,
 ]
 
 

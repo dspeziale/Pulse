@@ -1,0 +1,499 @@
+{% extends "base.html" %}
+{% from "_macros.html" import status_badge, led %}
+{% block title %}Guida — Pulse{% endblock %}
+
+{% block content %}
+<h1 class="h3 mb-1"><i class="bi bi-question-circle me-2"></i>Guida a Pulse</h1>
+<p class="text-body-secondary mb-3">
+  Manuale d'uso della dashboard del Server. Descrive le funzionalità realmente
+  disponibili nell'applicazione. Questa pagina è consultabile da tutti gli utenti
+  autenticati; ciò che ciascuno può <em>fare</em> dipende comunque dai propri
+  permessi (RBAC).
+</p>
+
+<div class="row g-3">
+
+  {# ===================== INDICE (Table of Contents) ===================== #}
+  <div class="col-lg-3">
+    <div class="card sticky-lg-top" style="top:1rem">
+      <div class="card-header py-2"><i class="bi bi-list-ol me-1"></i>Indice</div>
+      <nav id="guida-toc" class="list-group list-group-flush small">
+        <a class="list-group-item list-group-item-action py-1" href="#sec-panoramica">1. Panoramica</a>
+        <a class="list-group-item list-group-item-action py-1" href="#sec-architettura">2. Architettura</a>
+        <a class="list-group-item list-group-item-action py-1" href="#sec-accesso">3. Accesso e sicurezza</a>
+        <a class="list-group-item list-group-item-action py-1" href="#sec-sonde">4. Sonde (Probe)</a>
+        <a class="list-group-item list-group-item-action py-1" href="#sec-sistemi">5. Sistemi monitorati</a>
+        <a class="list-group-item list-group-item-action py-1" href="#sec-heartbeat">6. Schema heartbeat</a>
+        <a class="list-group-item list-group-item-action py-1" href="#sec-dashboard">7. Dashboard</a>
+        <a class="list-group-item list-group-item-action py-1" href="#sec-query">8. Query dati e Grafici</a>
+        <a class="list-group-item list-group-item-action py-1" href="#sec-notifiche">9. Notifiche e allarmi</a>
+        <a class="list-group-item list-group-item-action py-1" href="#sec-config">10. Configurazione</a>
+        <a class="list-group-item list-group-item-action py-1" href="#sec-report">11. Report / Compendio</a>
+        <a class="list-group-item list-group-item-action py-1" href="#sec-tabelle">12. Tabelle</a>
+        <a class="list-group-item list-group-item-action py-1" href="#sec-faq">FAQ / Risoluzione problemi</a>
+      </nav>
+    </div>
+  </div>
+
+  {# ===================== CONTENUTO ===================== #}
+  <div class="col-lg-9">
+    <div class="accordion" id="guida-acc">
+
+      {# ---------- 1. PANORAMICA ---------- #}
+      <div class="accordion-item" id="sec-panoramica">
+        <h2 class="accordion-header">
+          <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#c-panoramica">
+            <i class="bi bi-info-circle me-2"></i>1. Panoramica
+          </button>
+        </h2>
+        <div id="c-panoramica" class="accordion-collapse collapse show" data-bs-parent="#guida-acc">
+          <div class="accordion-body">
+            <p><strong>Pulse</strong> è un sistema distribuito per il
+              <strong>monitoraggio della connettività e dello stato applicativo</strong>
+              di sistemi che espongono un endpoint HTTP/HTTPS di heartbeat, oppure di
+              endpoint di sola connettività (TCP host:porta).</p>
+            <p>L'architettura è composta da:</p>
+            <ul>
+              <li><strong>Server centrale</strong>: aggregazione dati, amministrazione,
+                dashboard aggregata, gestione utenti/ruoli/permessi, notifiche e configurazione.</li>
+              <li><strong>Sonde (Probe)</strong>: componenti distribuiti, tipicamente vicini
+                ai sistemi da monitorare, che interrogano periodicamente i sistemi e archiviano
+                gli heartbeat su <strong>OpenSearch locale</strong> a ciascuna Sonda.</li>
+              <li><strong>OpenSearch</strong>: la serie temporale grezza degli heartbeat risiede
+                <em>solo</em> sull'OpenSearch della Sonda; il Server usa rollup aggregati e query
+                on-demand verso le Sonde.</li>
+            </ul>
+            <p>Tutta la comunicazione tra Server e Sonde è <strong>cifrata</strong>. Le Sonde
+              continuano a monitorare i sistemi locali anche se il Server non è raggiungibile.</p>
+          </div>
+        </div>
+      </div>
+
+      {# ---------- 2. ARCHITETTURA ---------- #}
+      <div class="accordion-item" id="sec-architettura">
+        <h2 class="accordion-header">
+          <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#c-architettura">
+            <i class="bi bi-diagram-3 me-2"></i>2. Architettura e flusso dei dati
+          </button>
+        </h2>
+        <div id="c-architettura" class="accordion-collapse collapse" data-bs-parent="#guida-acc">
+          <div class="accordion-body">
+            <p>Ruoli dei componenti:</p>
+            <ul>
+              <li><strong>Sistema monitorato</strong>: applicazione/servizio esterno; passivo
+                rispetto a Pulse. Espone <code>GET /api/heartbeat</code> (tipo Applicazioni) oppure
+                una porta TCP (tipo Connettività).</li>
+              <li><strong>Sonda</strong>: interroga i sistemi a lei assegnati secondo l'intervallo
+                di polling, indicizza ogni heartbeat come documento su OpenSearch, invia al Server
+                liveness, eventi (cambi di stato) e rollup aggregati.</li>
+              <li><strong>Server</strong>: raccoglie rollup ed eventi, calcola lo stato aggregato,
+                genera allarmi/notifiche tramite i workflow, offre la dashboard e le pagine di
+                amministrazione. Per il drill-down interroga on-demand l'OpenSearch della Sonda.</li>
+            </ul>
+            <p class="mb-1"><strong>Flusso tipico:</strong></p>
+            <div class="bg-body-tertiary border rounded p-2 small font-monospace">
+              Sistema monitorato → (polling della Sonda) → Heartbeat su OpenSearch locale →
+              rollup + eventi → Server → workflow/allarmi + dashboard aggregata
+            </div>
+            <p class="mt-2 mb-0 text-body-secondary">
+              Una Sonda è indipendente: il monitoraggio locale prosegue anche senza il Server.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {# ---------- 3. ACCESSO E SICUREZZA ---------- #}
+      <div class="accordion-item" id="sec-accesso">
+        <h2 class="accordion-header">
+          <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#c-accesso">
+            <i class="bi bi-shield-lock me-2"></i>3. Accesso e sicurezza
+          </button>
+        </h2>
+        <div id="c-accesso" class="accordion-collapse collapse" data-bs-parent="#guida-acc">
+          <div class="accordion-body">
+            <ul>
+              <li><strong>Login</strong> con username e password. La sessione emette un token di
+                accesso a breve durata e un refresh token; alla scadenza si viene reindirizzati
+                al login. Dal menu <em>Account → Profilo</em> si cambia la propria password.</li>
+              <li><strong>RBAC (Role-Based Access Control)</strong>: ogni operazione è protetta da
+                un permesso granulare (es. <code>systems.read</code>, <code>probes.create</code>).
+                Un utente ha uno o più <strong>ruoli</strong>, ciascun ruolo raggruppa un insieme
+                di <strong>permessi</strong>. I permessi sono un catalogo fisso definito dal sistema
+                (non creabili a runtime). Le voci di menu e i pulsanti compaiono solo se si dispone
+                del permesso relativo.</li>
+              <li><strong>Ruoli</strong> predefiniti (es. Super Amministratore, Amministratore,
+                Operatore, Visualizzatore, Auditor) non eliminabili + ruoli personalizzati. Deve
+                sempre esistere almeno un Super Amministratore attivo.</li>
+              <li><strong>Audit log</strong> (<em>Sistema → Audit log</em>): registro immutabile
+                delle azioni che modificano lo stato (login/logout, modifiche a utenti/ruoli/
+                sonde/sistemi/canali/workflow/configurazione, comandi, invii notifica), con filtri.</li>
+              <li><strong>Log di sistema</strong> (<em>Sistema → Log di sistema</em>): log tecnici
+                dei componenti (livello, componente, sonda, messaggio, timestamp), filtrabili.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      {# ---------- 4. SONDE ---------- #}
+      <div class="accordion-item" id="sec-sonde">
+        <h2 class="accordion-header">
+          <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#c-sonde">
+            <i class="bi bi-hdd-network me-2"></i>4. Sonde (Probe)
+          </button>
+        </h2>
+        <div id="c-sonde" class="accordion-collapse collapse" data-bs-parent="#guida-acc">
+          <div class="accordion-body">
+            <p>Menu <em>Monitoraggio → Sonde</em>. Funzioni disponibili:</p>
+            <ul>
+              <li><strong>Creazione / enrollment</strong>: creando una Sonda si ottiene un
+                <strong>token di enrollment monouso</strong>. Va copiato subito: serve alla Sonda
+                per registrarsi al Server e non viene più mostrato in seguito.</li>
+              <li><strong>Anagrafica</strong>: oltre a nome, descrizione, endpoint di query e tag,
+                si registrano <strong>posizione</strong> e <strong>referente</strong> (nome, email,
+                telefono). I campi anagrafici sono opzionali.</li>
+              <li><strong>Stato / liveness</strong>: ogni Sonda ha uno stato
+                {{ status_badge('online') }} / {{ status_badge('offline') }} con ultimo contatto e
+                versione. Il timeout oltre il quale una Sonda è considerata offline è configurabile.</li>
+              <li><strong>Rotazione credenziali</strong>: dal dettaglio Sonda si possono ruotare le
+                credenziali; viene generato un nuovo token di enrollment (anch'esso da copiare subito).</li>
+              <li><strong>Drill-down</strong>: dal dettaglio Sonda si vedono i suoi sistemi, i
+                check e gli heartbeat recenti, filtrabili per periodo/stato.</li>
+              <li><strong>Pacchetto di installazione</strong>: la Sonda si installa come container
+                Docker/Podman. Il pacchetto pronto è in <code>deploy/probe-package/</code>
+                (compose, <code>.env.probe.example</code>, script <code>install.sh</code>/
+                <code>install.ps1</code> e <code>INSTALL.md</code>). Passi essenziali: compilare il
+                file <code>.env</code> con endpoint del Server e token di enrollment, avviare il
+                compose, verificare che la Sonda risulti <em>online</em> in questa pagina.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      {# ---------- 5. SISTEMI MONITORATI ---------- #}
+      <div class="accordion-item" id="sec-sistemi">
+        <h2 class="accordion-header">
+          <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#c-sistemi">
+            <i class="bi bi-hdd-stack me-2"></i>5. Sistemi monitorati
+          </button>
+        </h2>
+        <div id="c-sistemi" class="accordion-collapse collapse" data-bs-parent="#guida-acc">
+          <div class="accordion-body">
+            <p>Menu <em>Monitoraggio → Sistemi monitorati</em>. L'elenco è diviso in due schede:</p>
+            <ul>
+              <li><strong>Applicazioni</strong> (tipo <code>http</code>): il sistema espone
+                <code>GET /api/heartbeat</code>; si configura l'<strong>URL heartbeat</strong>.</li>
+              <li><strong>Connettività</strong> (tipo <code>tcp</code>): controllo di raggiungibilità
+                di un <strong>host:porta</strong>; si configurano <strong>host TCP</strong> e
+                <strong>porta TCP</strong>.</li>
+            </ul>
+            <p>Per ogni sistema si impostano: <code>system_id</code> (identificatore tecnico), nome,
+              tipo, <strong>Sonda assegnata</strong> (ogni sistema appartiene a esattamente una Sonda),
+              intervallo di polling, timeout, abilitazione e <strong>soglie</strong> di
+              <code>response_ms</code> (warning ed error).</p>
+            <ul>
+              <li><strong>Testa endpoint / connessione</strong>: prima di salvare, il pulsante di test
+                verifica la raggiungibilità del target (HTTP heartbeat o connettività TCP). Un target
+                irraggiungibile <em>non</em> è un errore del test: viene riportato come non raggiungibile.</li>
+              <li><strong>Check scoperti</strong>: dal dettaglio del sistema si vedono i check
+                (<code>check_id</code>/<code>check_name</code>) rilevati automaticamente dagli heartbeat,
+                con ultimo stato e ultimo contatto. Un sistema espone da 1 a N check.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      {# ---------- 6. SCHEMA HEARTBEAT ---------- #}
+      <div class="accordion-item" id="sec-heartbeat">
+        <h2 class="accordion-header">
+          <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#c-heartbeat">
+            <i class="bi bi-heart-pulse me-2"></i>6. Schema heartbeat canonico
+          </button>
+        </h2>
+        <div id="c-heartbeat" class="accordion-collapse collapse" data-bs-parent="#guida-acc">
+          <div class="accordion-body">
+            <p>Utile a chi deve <strong>esporre l'endpoint</strong> su un sistema di tipo Applicazioni.
+              <code>GET /api/heartbeat</code> restituisce un oggetto (o un array di oggetti, uno per
+              check) conforme a:</p>
+            <pre class="bg-body-tertiary border rounded p-2 small mb-3"><code>{
+  "@timestamp": "2026-07-13T10:00:00Z",
+  "system_id": "myapp",
+  "system_name": "MyApp",
+  "check_id": "db",
+  "check_name": "Database",
+  "status": "ok",
+  "response_ms": 12,
+  "message": null,
+  "details": "{\"response_ms\":12,\"metrics\":{}}"
+}</code></pre>
+            <div class="table-responsive">
+              <table class="table table-sm table-striped align-middle">
+                <thead><tr><th>Campo</th><th>Obbligo</th><th>Note</th></tr></thead>
+                <tbody>
+                  <tr><td><code>system_id</code></td><td>Obbligatorio</td><td>Identificatore tecnico del sistema.</td></tr>
+                  <tr><td><code>check_id</code></td><td>Obbligatorio</td><td>Identificatore tecnico del check.</td></tr>
+                  <tr><td><code>status</code></td><td>Obbligatorio</td><td>Stato applicativo del check (vedi valori sotto).</td></tr>
+                  <tr><td><code>@timestamp</code></td><td>Consigliato</td><td>Istante del check, ISO-8601 UTC.</td></tr>
+                  <tr><td><code>system_name</code></td><td>Consigliato</td><td>Nome leggibile del sistema.</td></tr>
+                  <tr><td><code>check_name</code></td><td>Consigliato</td><td>Nome leggibile del check.</td></tr>
+                  <tr><td><code>response_ms</code></td><td>Consigliato</td><td>Tempo di risposta interno del check (ms).</td></tr>
+                  <tr><td><code>message</code></td><td>Consigliato</td><td>Messaggio descrittivo opzionale (o null).</td></tr>
+                  <tr><td><code>details</code></td><td>Consigliato</td><td>Dettaglio strutturato serializzato come <strong>stringa</strong> JSON.</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <p class="mb-1">Valori di <code>status</code> (dominio aperto, normalizzato a):</p>
+            <p class="mb-0">
+              {{ status_badge('ok') }} {{ status_badge('warn') }} {{ status_badge('error') }}
+              {{ status_badge('down') }} {{ status_badge('unknown') }}
+            </p>
+            <p class="mt-2 mb-0 text-body-secondary">Valori non riconosciuti sono trattati come
+              <code>unknown</code>. Se un sistema è irraggiungibile, la Sonda genera un documento con
+              status normalizzato <code>down</code>.</p>
+          </div>
+        </div>
+      </div>
+
+      {# ---------- 7. DASHBOARD ---------- #}
+      <div class="accordion-item" id="sec-dashboard">
+        <h2 class="accordion-header">
+          <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#c-dashboard">
+            <i class="bi bi-speedometer2 me-2"></i>7. Dashboard
+          </button>
+        </h2>
+        <div id="c-dashboard" class="accordion-collapse collapse" data-bs-parent="#guida-acc">
+          <div class="accordion-body">
+            <p>Menu <em>Monitoraggio → Dashboard</em>. Fornisce la vista aggregata di tutte le Sonde
+              e i sistemi:</p>
+            <ul>
+              <li><strong>LED complessivo</strong> {{ led('ok') }} {{ led('warn') }} {{ led('error') }}:
+                riflette lo <strong>stato dei check</strong> (systems summary). È
+                <strong>rosso</strong> se esistono check in <code>error</code> o <code>down</code>,
+                <strong>giallo</strong> se ci sono <code>warn</code>, altrimenti verde. La sua etichetta
+                spiega il motivo con i conteggi. <strong>Non</strong> dipende dagli allarmi.</li>
+              <li><strong>KPI cliccabili</strong>: totale sistemi, conteggi per stato
+                (ok/warn/error/down/unknown), allarmi attivi, Sonde online/offline. Cliccando una tile
+                si apre il drill-down filtrato (es. i soli check <code>down</code>).</li>
+              <li><strong>Riepilogo per Sonda</strong>: ogni Sonda ha un proprio LED (offline → rosso;
+                online con sistemi down → giallo; altrimenti verde), col numero di sistemi totali/down
+                e il link al proprio dettaglio.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      {# ---------- 8. QUERY E GRAFICI ---------- #}
+      <div class="accordion-item" id="sec-query">
+        <h2 class="accordion-header">
+          <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#c-query">
+            <i class="bi bi-search me-2"></i>8. Query dati e Grafici
+          </button>
+        </h2>
+        <div id="c-query" class="accordion-collapse collapse" data-bs-parent="#guida-acc">
+          <div class="accordion-body">
+            <p>Menu <em>Monitoraggio → Query dati</em>. Ricerca guidata sugli heartbeat archiviati
+              nell'OpenSearch di una Sonda:</p>
+            <ul>
+              <li><strong>Filtri guidati</strong> a tendina concatenati:
+                <em>Sonda → Sistema → Check → Stato</em> (i menu si popolano in base alla scelta
+                precedente).</li>
+              <li><strong>Preset di periodo</strong>: Ultima ora, Oggi (predefinito), Ultime 24h,
+                7 giorni, 30 giorni, oppure intervallo personalizzato. Il periodo è calcolato nel
+                fuso orario configurato e convertito in UTC per la query.</li>
+              <li><strong>Scorciatoia "Solo problemi"</strong> per filtrare rapidamente gli stati non ok.</li>
+              <li><strong>Query avanzata</strong>: sezione collassabile con filtri/aggregazioni in
+                formato JSON strutturato, per interrogazioni più fini.</li>
+              <li>I risultati sono mostrati come tabella DataTables server-side con il totale.</li>
+            </ul>
+            <p class="mb-0">Menu <em>Monitoraggio → Grafici</em>: serie temporali del tempo di
+              risposta (<code>response_ms</code>), disponibilità (uptime) e distribuzione degli stati
+              per un sistema in un intervallo.</p>
+          </div>
+        </div>
+      </div>
+
+      {# ---------- 9. NOTIFICHE E ALLARMI ---------- #}
+      <div class="accordion-item" id="sec-notifiche">
+        <h2 class="accordion-header">
+          <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#c-notifiche">
+            <i class="bi bi-broadcast me-2"></i>9. Notifiche e allarmi
+          </button>
+        </h2>
+        <div id="c-notifiche" class="accordion-collapse collapse" data-bs-parent="#guida-acc">
+          <div class="accordion-body">
+            <div class="alert alert-info py-2">
+              <strong>Stato check vs Allarme.</strong> Lo <em>stato di un check</em> (ok/warn/error/
+              down/unknown) descrive il risultato del monitoraggio. Un <em>allarme</em> è un incidente
+              generato da un <strong>workflow di notifica</strong> quando si verificano le sue
+              condizioni. Sono due cose distinte: un check può essere in <code>error</code> senza che
+              esista un allarme (se nessun workflow lo prevede), e viceversa.
+            </div>
+            <p><strong>Canali</strong> (<em>Notifiche → Canali</em>): Email, Telegram, WhatsApp,
+              ciascuno coi propri parametri (es. SMTP/IMAP per Email, bot token per Telegram, provider
+              Business API per WhatsApp). È possibile eseguire un <strong>test di invio</strong> su un
+              canale e, dove supportato, abilitare la <strong>ricezione comandi</strong>.</p>
+            <p><strong>Comandi in ingresso</strong>: alcuni canali possono ricevere comandi
+              (es. <code>/status</code>, <code>/ack</code>, <code>/silence</code>). Telegram li supporta
+              pienamente via webhook; WhatsApp solo con Business API; Email in modo limitato (rischio
+              spoofing). Un comando viene eseguito solo se l'identità del canale
+              (<em>Notifiche → Identità canali</em>) è associata a un utente con il permesso richiesto.</p>
+            <p><strong>Workflow</strong> (<em>Notifiche → Workflow</em>): regole configurabili
+              <em>trigger → ambito → condizioni → controlli di soppressione → step di azione</em>.
+              I trigger includono cambio di stato, stato persistente, tempo di risposta superato,
+              sistema irraggiungibile/recuperato, sonda offline/online. I controlli di soppressione
+              comprendono throttling, deduplica, finestre di manutenzione e orari attivi. Gli step
+              gestiscono canale/destinatari/template, ritardi ed <strong>escalation</strong>.
+              L'invio di una notifica è governato esclusivamente da un workflow abilitato.</p>
+            <p><strong>Allarmi</strong> (<em>Monitoraggio → Allarmi</em>): elenco degli incidenti;
+              si filtrano per stato ({{ status_badge('active') }} / {{ status_badge('acknowledged') }} /
+              {{ status_badge('resolved') }}). Un allarme attivo può essere <strong>riconosciuto (ack)</strong>
+              dalla UI o via comando <code>/ack</code>: l'ack ferma le escalation successive.
+              Al recupero del sistema l'allarme si risolve.</p>
+            <p class="mb-0"><strong>Storico invii</strong> (<em>Notifiche → Storico invii</em>):
+              delivery log di tutte le notifiche inviate con esito, filtrabile per canale/workflow/
+              stato/periodo.</p>
+          </div>
+        </div>
+      </div>
+
+      {# ---------- 10. CONFIGURAZIONE ---------- #}
+      <div class="accordion-item" id="sec-config">
+        <h2 class="accordion-header">
+          <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#c-config">
+            <i class="bi bi-gear me-2"></i>10. Configurazione
+          </button>
+        </h2>
+        <div id="c-config" class="accordion-collapse collapse" data-bs-parent="#guida-acc">
+          <div class="accordion-body">
+            <p>Menu <em>Sistema → Configurazione</em>. I parametri globali del Server sono organizzati
+              in <strong>schede (tab)</strong>: Localizzazione, Rete &amp; porte, Autenticazione, Sonde,
+              Retention e Altro. Alcuni parametri, se modificati, richiedono il riavvio del servizio
+              (indicato dopo il salvataggio).</p>
+            <ul>
+              <li><strong>Fuso orario (timezone)</strong>: parametro nella scheda Localizzazione
+                (predefinito <code>Europe/Rome</code>). Determina come vengono visualizzate le date-ora
+                nell'interfaccia.</li>
+              <li><strong>Normalizzazione date-ora</strong>: gli istanti sono memorizzati in UTC e
+                <strong>convertiti nel fuso configurato</strong> al momento della visualizzazione. La
+                stessa fonte alimenta i preset di periodo di Query dati e del Compendio.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      {# ---------- 11. REPORT / COMPENDIO ---------- #}
+      <div class="accordion-item" id="sec-report">
+        <h2 class="accordion-header">
+          <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#c-report">
+            <i class="bi bi-file-earmark-pdf me-2"></i>11. Report / Compendio
+          </button>
+        </h2>
+        <div id="c-report" class="accordion-collapse collapse" data-bs-parent="#guida-acc">
+          <div class="accordion-body">
+            <p>Dal dettaglio di un sistema, il pulsante <strong>Compendio</strong> apre un riepilogo
+              del sistema su un <strong>periodo</strong> selezionabile (predefinito: Oggi), con gli
+              stessi preset di Query dati.</p>
+            <p>Il compendio mostra: stato complessivo nel periodo (stato peggiore + distribuzione),
+              KPI (uptime %, response_ms medio/min/max, numero campioni, numero check, incidenti),
+              tabella per-check e allarmi del periodo, oltre a un grafico del tempo di risposta.</p>
+            <p class="mb-0"><strong>Export PDF</strong>: il pulsante <em>Scarica PDF</em> genera lato
+              server un report professionale (font PT Sans Narrow) con gli stessi dati del periodo scelto,
+              pronto per l'archiviazione o la condivisione.</p>
+          </div>
+        </div>
+      </div>
+
+      {# ---------- 12. TABELLE ---------- #}
+      <div class="accordion-item" id="sec-tabelle">
+        <h2 class="accordion-header">
+          <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#c-tabelle">
+            <i class="bi bi-table me-2"></i>12. Tabelle (elenchi)
+          </button>
+        </h2>
+        <div id="c-tabelle" class="accordion-collapse collapse" data-bs-parent="#guida-acc">
+          <div class="accordion-body">
+            <p class="mb-0">Gli elenchi principali usano <strong>DataTables</strong>:
+              <strong>ordinamento</strong> per colonna, <strong>ricerca</strong> rapida,
+              <strong>paginazione</strong> e scelta del numero di <strong>righe per pagina</strong>.
+              I filtri specifici della pagina (Sonda, sistema, stato, periodo…) si combinano con la
+              ricerca della tabella.</p>
+          </div>
+        </div>
+      </div>
+
+      {# ---------- FAQ ---------- #}
+      <div class="accordion-item" id="sec-faq">
+        <h2 class="accordion-header">
+          <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#c-faq">
+            <i class="bi bi-life-preserver me-2"></i>FAQ / Risoluzione problemi
+          </button>
+        </h2>
+        <div id="c-faq" class="accordion-collapse collapse" data-bs-parent="#guida-acc">
+          <div class="accordion-body">
+            <dl class="mb-0">
+              <dt>Il LED è rosso ma gli allarmi attivi sono 0. Perché?</dt>
+              <dd class="mb-3">Il LED complessivo dipende dallo <strong>stato dei check</strong>, non
+                dagli allarmi. Un LED rosso con 0 allarmi significa che almeno un check è in
+                <code>error</code>/<code>down</code>, ma nessun workflow di notifica ha (ancora)
+                generato un allarme per quella condizione.</dd>
+
+              <dt>Una Sonda risulta offline.</dt>
+              <dd class="mb-3">La Sonda non contatta il Server entro il timeout configurato. Verificare
+                che il container della Sonda sia in esecuzione, che l'endpoint del Server e le
+                credenziali/token nel suo <code>.env</code> siano corretti e che la rete tra Sonda e
+                Server sia raggiungibile. Il timeout di offline è modificabile in Configurazione → Sonde.</dd>
+
+              <dt>Ho perso il token di enrollment.</dt>
+              <dd class="mb-3">Il token di enrollment è <strong>monouso</strong> e viene mostrato una
+                sola volta alla creazione della Sonda. Se lo si perde, usare
+                <em>Ruota credenziali</em> dal dettaglio della Sonda per generarne uno nuovo (da copiare
+                subito).</dd>
+
+              <dt>Il test dell'endpoint dice "non raggiungibile".</dt>
+              <dd class="mb-3">Non è un errore del test: significa che il target HTTP/TCP indicato non
+                ha risposto entro il timeout. Verificare URL/host/porta, il timeout impostato e che il
+                sistema sia effettivamente esposto verso la Sonda assegnata.</dd>
+
+              <dt>Non vedo una voce di menu o ricevo "Permesso negato".</dt>
+              <dd class="mb-3">Le funzioni sono protette da permessi (RBAC): le voci compaiono solo se si
+                dispone del permesso corrispondente. Richiedere a un amministratore il ruolo/permesso
+                adeguato. Questa Guida è invece accessibile a tutti gli utenti autenticati.</dd>
+
+              <dt>Le date-ora non corrispondono al mio orario.</dt>
+              <dd class="mb-0">Gli istanti sono salvati in UTC e mostrati nel fuso orario configurato in
+                <em>Sistema → Configurazione → Localizzazione</em> (predefinito Europe/Rome).</dd>
+            </dl>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block body_extra %}
+<script>
+  // Se si arriva con un'ancora (#sec-...), apre la relativa sezione dell'accordion
+  // e vi scorre. Nessuna dipendenza esterna: usa l'API collapse di Bootstrap.
+  (function () {
+    function openFromHash() {
+      var hash = window.location.hash;
+      if (!hash || hash.charAt(0) !== '#') { return; }
+      var section = document.querySelector(hash);
+      if (!section) { return; }
+      var panel = section.querySelector('.accordion-collapse');
+      if (panel && window.bootstrap && bootstrap.Collapse) {
+        bootstrap.Collapse.getOrCreateInstance(panel).show();
+      }
+      section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+    document.querySelectorAll('#guida-toc a').forEach(function (a) {
+      a.addEventListener('click', function () {
+        // Aggiorna l'hash e apre la sezione (setTimeout: dopo l'update dell'hash).
+        setTimeout(openFromHash, 0);
+      });
+    });
+    if (window.location.hash) { openFromHash(); }
+  })();
+</script>
+{% endblock %}

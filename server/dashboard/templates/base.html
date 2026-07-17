@@ -130,6 +130,10 @@
           {# ---- ACCOUNT ---- #}
           <li class="nav-header">Account</li>
           {{ navlink(url_for('profile.show_profile'), 'bi-person-circle', 'Profilo', ep.startswith('profile.')) }}
+
+          {# ---- GUIDA (visibile a tutti gli utenti autenticati) ---- #}
+          <li class="nav-header">Aiuto</li>
+          {{ navlink(url_for('guida.index'), 'bi-question-circle', 'Guida', ep.startswith('guida.')) }}
         </ul>
       </nav>
     </div>
