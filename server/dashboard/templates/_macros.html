@@ -18,6 +18,16 @@
   <span class="badge {{ cls }}">{{ value if (value is not none and v) else '—' }}</span>
 {%- endmacro %}
 
+{# LED di stato riutilizzabile: pallino colorato (vedi .pulse-led in
+   pulse-theme.css). state ammessi: ok/online, warn/pending, error/offline,
+   down, unknown. Con large=true usa la variante grande (indicatore complessivo).
+   Uso: {{ led('ok') }}  oppure  {{ led(overall, large=true) }} #}
+{% macro led(state, large=false) %}
+  {%- set s = (state | string | lower | trim) if state is not none else 'unknown' -%}
+  <span class="pulse-led led-{{ s }}{{ ' pulse-led-lg' if large else '' }}"
+        role="img" aria-label="stato: {{ s }}" title="{{ s }}"></span>
+{%- endmacro %}
+
 {# Badge Sì/No per campi booleani. #}
 {% macro bool_badge(value, yes='Sì', no='No') %}
   {%- if value -%}

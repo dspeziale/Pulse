@@ -106,14 +106,10 @@
   <main class="app-main">
     <div class="app-content">
       <div class="container-fluid">
-        {% with messages = get_flashed_messages(with_categories=true) %}
-          {% for category, message in messages %}
-            <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show" role="alert">
-              {{ message }}
-              <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Chiudi"></button>
-            </div>
-          {% endfor %}
-        {% endwith %}
+        {# Nessun banner flash nelle pagine interne (richiesta UI): eventuali
+           messaggi post-azione vengono svuotati silenziosamente per non
+           accumularsi in sessione. Il feedback di errore resta solo sul login. #}
+        {%- set _ = get_flashed_messages() -%}
 {% else %}
   {% with messages = get_flashed_messages(with_categories=true) %}
     {% if messages %}

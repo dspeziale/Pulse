@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import status_badge %}
+{% from "_macros.html" import status_badge, led %}
 {% block title %}Dashboard — Pulse Server{% endblock %}
 {% block head_extra %}<script src="{{ url_for('static', filename='pulse-charts.js') }}"></script>{% endblock %}
 {% block content %}
@@ -14,28 +14,49 @@
     </select>
   </form>
 </div>
-<p class="text-body-secondary">Stato consolidato di tutte le Sonde e dei sistemi monitorati nella finestra selezionata.</p>
 
-{% set s = aggregate.systems_summary %}
-<div class="row g-3 mb-3">
-  {% set cards = [
-    ('OK', s.ok, 'success', 'bi-check-circle'),
-    ('Warn', s.warn, 'warning', 'bi-exclamation-triangle'),
-    ('Error', s.error, 'danger', 'bi-x-octagon'),
-    ('Down', s.down, 'warning', 'bi-plug'),
-    ('Unknown', s.unknown, 'secondary', 'bi-question-circle'),
-    ('Allarmi attivi', aggregate.active_alarms, 'danger', 'bi-bell')
+{# ===================== Indicatore di stato complessivo ===================== #}
+<div class="card mb-3 border-start border-4 border-{{ 'success' if overall == 'ok' else 'warning' if overall == 'warn' else 'danger' }}">
+  <div class="card-body d-flex flex-wrap align-items-center gap-3">
+    {{ led(overall, large=true) }}
+    <div class="flex-grow-1">
+      <div class="fs-4 fw-bold" data-overall-status="{{ overall }}">{{ overall_label }}</div>
+      <div class="text-body-secondary small">
+        Stato consolidato di tutte le Sonde e dei sistemi monitorati nella finestra
+        <span class="fw-semibold">{{ window }}</span>.
+      </div>
+    </div>
+    <div class="text-end">
+      <div class="text-body-secondary small">Allarmi attivi</div>
+      <div class="fs-4 fw-bold text-{{ 'danger' if kpis.active_alarms else 'success' }}">{{ kpis.active_alarms }}</div>
+    </div>
+  </div>
+</div>
+
+{# ===================== KPI tiles ===================== #}
+<div class="row g-2 mb-3">
+  {% set tiles = [
+    ('Sistemi totali', kpis.systems_total, 'primary', 'bi-hdd-stack'),
+    ('OK', kpis.ok, 'success', 'bi-check-circle'),
+    ('Warn', kpis.warn, 'warning', 'bi-exclamation-triangle'),
+    ('Error', kpis.error, 'danger', 'bi-x-octagon'),
+    ('Down', kpis.down, 'orange', 'bi-plug'),
+    ('Unknown', kpis.unknown, 'secondary', 'bi-question-circle'),
+    ('Sonde totali', kpis.probes_total, 'primary', 'bi-hdd-network'),
+    ('Sonde online', kpis.probes_online, 'success', 'bi-wifi'),
+    ('Sonde offline', kpis.probes_offline, 'danger', 'bi-wifi-off'),
+    ('Allarmi attivi', kpis.active_alarms, 'danger', 'bi-bell')
   ] %}
-  {% for label, value, color, icon in cards %}
+  {% for label, value, color, icon in tiles %}
   <div class="col-6 col-md-4 col-xl-2">
-    <div class="card h-100 border-start border-4 border-{{ color }}">
-      <div class="card-body py-3">
+    <div class="card h-100 border-start border-4 border-{{ 'warning' if color == 'orange' else color }}">
+      <div class="card-body py-2">
         <div class="d-flex justify-content-between align-items-center">
           <div>
-            <div class="pulse-kpi-value">{{ value if value is not none else 0 }}</div>
+            <div class="pulse-kpi-value">{{ value }}</div>
             <div class="text-body-secondary small">{{ label }}</div>
           </div>
-          <i class="bi {{ icon }} fs-3 text-{{ color }} opacity-50"></i>
+          <i class="bi {{ icon }} fs-3 text-{{ 'warning' if color == 'orange' else color }} opacity-50"></i>
         </div>
       </div>
     </div>
@@ -43,28 +64,55 @@
   {% endfor %}
 </div>
 
+{# ===================== Grafico distribuzione stati ===================== #}
 <div class="card mb-3">
   <div class="card-header"><i class="bi bi-bar-chart me-1"></i>Distribuzione stati sistemi</div>
-  <div class="card-body"><canvas id="statusChart" height="90"></canvas></div>
+  <div class="card-body"><canvas id="statusChart" height="110"></canvas></div>
 </div>
 
+{# ===================== Riepilogo per Sonda (LED) ===================== #}
+<div class="card mb-3">
+  <div class="card-header"><i class="bi bi-hdd-network me-1"></i>Sonde — riepilogo rapido</div>
+  <div class="card-body">
+    <div class="row g-2">
+      {% for p in probe_rows %}
+      <div class="col-12 col-md-6 col-xl-4">
+        <div class="border rounded p-2 h-100 d-flex align-items-center gap-2">
+          {{ led(p.led) }}
+          <div class="flex-grow-1 text-truncate">
+            <div class="fw-semibold text-truncate" title="{{ p.probe_id }}">{{ p.probe_id }}</div>
+            <div class="text-body-secondary small">
+              {{ p.systems_total }} sistemi · {{ p.systems_down }} down · {{ status_badge(p.status) }}
+            </div>
+          </div>
+        </div>
+      </div>
+      {% else %}
+      <div class="col-12 text-center text-body-secondary py-3">Nessuna Sonda registrata.</div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+{# ===================== Tabelle dettaglio ===================== #}
 <div class="row g-3">
   <div class="col-12 col-xl-6">
     <div class="card h-100">
       <div class="card-header"><i class="bi bi-hdd-network me-1"></i>Sonde</div>
       <div class="table-responsive">
         <table class="table table-hover align-middle mb-0">
-          <thead><tr><th>Sonda</th><th>Stato</th><th class="text-end">Sistemi</th><th class="text-end">Down</th></tr></thead>
+          <thead><tr><th></th><th>Sonda</th><th>Stato</th><th class="text-end">Sistemi</th><th class="text-end">Down</th></tr></thead>
           <tbody>
-          {% for p in aggregate.probes %}
+          {% for p in probe_rows %}
           <tr>
+            <td class="text-center">{{ led(p.led) }}</td>
             <td>{{ p.probe_id }}</td>
             <td>{{ status_badge(p.status) }}</td>
             <td class="text-end">{{ p.systems_total }}</td>
             <td class="text-end">{{ p.systems_down }}</td>
           </tr>
           {% else %}
-          <tr><td colspan="4" class="text-center text-body-secondary py-4">Nessuna Sonda registrata.</td></tr>
+          <tr><td colspan="5" class="text-center text-body-secondary py-4">Nessuna Sonda registrata.</td></tr>
           {% endfor %}
           </tbody>
         </table>
@@ -95,13 +143,18 @@
 </div>
 
 <script>
-const d = {{ s|tojson }};
+const d = {{ summary|tojson }};
 new Chart(document.getElementById('statusChart'), {
   type: 'bar',
-  data: { labels:['OK','Warn','Error','Down','Unknown'],
-    datasets:[{ label:'Sistemi', data:[d.ok,d.warn,d.error,d.down,d.unknown],
-      backgroundColor:['#198754','#ffc107','#dc3545','#fd7e14','#6c757d'] }] },
-  options:{ plugins:{legend:{display:false}} }
+  data: {
+    labels: ['OK', 'Warn', 'Error', 'Down', 'Unknown'],
+    datasets: [{
+      label: 'Sistemi',
+      data: [d.ok, d.warn, d.error, d.down, d.unknown],
+      backgroundColor: ['#198754', '#ffc107', '#dc3545', '#fd7e14', '#6c757d']
+    }]
+  },
+  options: { yLabel: 'Sistemi', title: 'Sistemi per stato', legend: false }
 });
 </script>
 {% endblock %}

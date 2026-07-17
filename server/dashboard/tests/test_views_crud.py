@@ -1,21 +1,141 @@
 """Test viste: dashboard, utenti, ruoli, permessi, sonde, sistemi."""
 
+from views.dashboard import _build_context, _probe_led
+
 
 # -- P-02 Dashboard -----------------------------------------------------------
-def test_dashboard_index(client, login, fake):
-    login(["dashboard.read"])
+def _dash(fake, summary=None, active_alarms=0, probes=None, alarms_items=None):
     fake.set("GET", "/dashboard/aggregate", {
-        "systems_summary": {"ok": 3, "warn": 1, "error": 0, "down": 0, "unknown": 0},
-        "active_alarms": 2,
-        "probes": [{"probe_id": "p1", "status": "online", "systems_total": 4,
-                    "systems_down": 0}],
+        "systems_summary": summary or {"ok": 0, "warn": 0, "error": 0,
+                                       "down": 0, "unknown": 0},
+        "active_alarms": active_alarms,
+        "probes": probes or [],
     })
     fake.set("GET", "/probes", {"items": []})
-    fake.set("GET", "/alarms", {"items": [{"system_id": "s1", "status": "error",
-                                           "opened_at": "2026-07-15T00:00:00Z"}]})
+    fake.set("GET", "/alarms", {"items": alarms_items or []})
+
+
+def test_dashboard_index(client, login, fake):
+    login(["dashboard.read"])
+    _dash(fake,
+          summary={"ok": 3, "warn": 1, "error": 0, "down": 0, "unknown": 0},
+          active_alarms=2,
+          probes=[{"probe_id": "p1", "status": "online", "systems_total": 4,
+                   "systems_down": 0}],
+          alarms_items=[{"system_id": "s1", "status": "error",
+                         "opened_at": "2026-07-15T00:00:00Z"}])
     r = client.get("/dashboard")
     assert r.status_code == 200
     assert b"Dashboard aggregata" in r.data
+    # KPI arricchite + LED complessivo presenti.
+    assert b"Sistemi totali" in r.data
+    assert b"Sonde online" in r.data
+    assert b"Sonde offline" in r.data
+    assert b"pulse-led" in r.data
+
+
+def test_dashboard_overall_ok(client, login, fake):
+    login(["dashboard.read"])
+    _dash(fake, summary={"ok": 5, "warn": 0, "error": 0, "down": 0, "unknown": 0},
+          probes=[{"probe_id": "p1", "status": "online", "systems_total": 5,
+                   "systems_down": 0}])
+    r = client.get("/dashboard")
+    assert b'data-overall-status="ok"' in r.data
+    assert b"Tutto OK" in r.data
+    assert b"led-ok" in r.data
+
+
+def test_dashboard_overall_warn(client, login, fake):
+    login(["dashboard.read"])
+    _dash(fake, summary={"ok": 2, "warn": 3, "error": 0, "down": 0, "unknown": 0})
+    r = client.get("/dashboard")
+    assert b'data-overall-status="warn"' in r.data
+    assert b"Attenzione" in r.data
+
+
+def test_dashboard_overall_error_by_status(client, login, fake):
+    login(["dashboard.read"])
+    _dash(fake, summary={"ok": 1, "warn": 0, "error": 2, "down": 0, "unknown": 0})
+    r = client.get("/dashboard")
+    assert b'data-overall-status="error"' in r.data
+
+
+def test_dashboard_overall_error_by_alarms(client, login, fake):
+    login(["dashboard.read"])
+    _dash(fake, summary={"ok": 1, "warn": 0, "error": 0, "down": 0, "unknown": 0},
+          active_alarms=1)
+    r = client.get("/dashboard")
+    assert b'data-overall-status="error"' in r.data
+
+
+def test_dashboard_probe_leds(client, login, fake):
+    login(["dashboard.read"])
+    _dash(fake, summary={"ok": 1, "warn": 0, "error": 0, "down": 0, "unknown": 0},
+          probes=[
+              {"probe_id": "on", "status": "online", "systems_total": 3, "systems_down": 0},
+              {"probe_id": "off", "status": "offline", "systems_total": 2, "systems_down": 0},
+              {"probe_id": "deg", "status": "online", "systems_total": 4, "systems_down": 1},
+          ])
+    r = client.get("/dashboard")
+    assert b"led-ok" in r.data
+    assert b"led-error" in r.data
+    assert b"led-warn" in r.data
+
+
+def test_dashboard_no_probes(client, login, fake):
+    login(["dashboard.read"])
+    _dash(fake)
+    r = client.get("/dashboard")
+    assert b"Nessuna Sonda registrata." in r.data
+
+
+def test_dashboard_missing_aggregate_is_safe(client, login, fake):
+    # Nessuna risposta pre-registrata: la view non deve andare in errore.
+    login(["dashboard.read"])
+    fake.set("GET", "/probes", {"items": []})
+    fake.set("GET", "/alarms", {"items": []})
+    r = client.get("/dashboard")
+    assert r.status_code == 200
+    assert b'data-overall-status="ok"' in r.data
+
+
+# -- Unita': logica LED / KPI -------------------------------------------------
+def test_probe_led_states():
+    assert _probe_led("online", 0) == "ok"
+    assert _probe_led("online", 2) == "warn"
+    assert _probe_led("offline", 0) == "error"
+    assert _probe_led("down", 0) == "error"
+    assert _probe_led("weird", 0) == "error"   # stato ignoto -> rosso
+    assert _probe_led("", 0) == "ok"           # assenza stato: verde se no down
+    assert _probe_led("ok", 0) == "ok"
+
+
+def test_build_context_counts():
+    ctx = _build_context(
+        {"systems_summary": {"ok": 1, "warn": 2, "error": 3, "down": 4, "unknown": 5},
+         "active_alarms": 6,
+         "probes": [
+             {"probe_id": "a", "status": "online", "systems_total": 2, "systems_down": 0},
+             {"probe_id": "b", "status": "offline", "systems_total": 1, "systems_down": 0},
+         ]},
+        {"items": []}, {"items": []})
+    k = ctx["kpis"]
+    assert k["systems_total"] == 15
+    assert k["active_alarms"] == 6
+    assert k["probes_total"] == 2
+    assert k["probes_online"] == 1
+    assert k["probes_offline"] == 1
+    assert ctx["overall"] == "error"
+
+
+def test_build_context_defensive_non_numeric():
+    ctx = _build_context(
+        {"systems_summary": {"ok": None, "warn": "x", "error": None,
+                             "down": None, "unknown": None},
+         "active_alarms": None, "probes": None},
+        None, None)
+    assert ctx["kpis"]["systems_total"] == 0
+    assert ctx["overall"] == "ok"
 
 
 # -- P-06 Utenti --------------------------------------------------------------

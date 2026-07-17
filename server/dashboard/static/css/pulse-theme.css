@@ -143,6 +143,58 @@ canvas { max-width: 100%; }
 /* Numeri grandi nelle card di riepilogo (KPI). */
 .pulse-kpi-value { font-size: 2rem; font-weight: 700; line-height: 1.1; }
 
+/* -- Layout compatto (densita' uniforme) -----------------------------------
+ * Riduzione misurata (~25-35%) dei padding rispetto ai default Bootstrap,
+ * applicata tramite le variabili CSS native dei componenti così da restare
+ * coerente in tema chiaro e scuro senza rompere la leggibilita'. */
+.card {
+  --bs-card-spacer-y: 0.7rem;   /* card-body: 1rem -> 0.7rem   (-30%) */
+  --bs-card-spacer-x: 0.8rem;   /* card-body: 1rem -> 0.8rem   (-20%) */
+  --bs-card-cap-padding-y: 0.4rem; /* header/footer: 0.5rem -> 0.4rem */
+  --bs-card-cap-padding-x: 0.8rem; /* header/footer: 1rem -> 0.8rem   */
+}
+.table {
+  --bs-table-cell-padding-y: 0.35rem; /* celle: 0.5rem -> 0.35rem (-30%) */
+  --bs-table-cell-padding-x: 0.55rem; /* celle: 0.5rem -> 0.55rem        */
+}
+/* Controlli di form piu' bassi (padding verticale 0.375rem -> 0.26rem). */
+.form-control,
+.form-select {
+  padding-top: 0.26rem;
+  padding-bottom: 0.26rem;
+}
+.form-control-sm,
+.form-select-sm { padding-top: 0.15rem; padding-bottom: 0.15rem; }
+.form-label { margin-bottom: 0.25rem; } /* 0.5rem -> 0.25rem */
+/* Contenuto principale: meno respiro sopra/sotto. */
+.app-content { padding-top: 0.7rem; padding-bottom: 0.7rem; }
+
+/* -- Componente LED riutilizzabile -----------------------------------------
+ * Pallino colorato con alone morbido, dimensionato in em (scala col font).
+ * Stati: ok/online (verde), warn/pending (giallo), error/offline (rosso),
+ * down (arancio), unknown (grigio). Usa .pulse-led-lg per l'indicatore
+ * complessivo piu' grande. */
+.pulse-led {
+  display: inline-block;
+  width: 0.72em;
+  height: 0.72em;
+  border-radius: 50%;
+  color: var(--pulse-unknown);
+  background-color: currentColor;
+  box-shadow: 0 0 0.4em -0.02em currentColor;
+  vertical-align: middle;
+  flex: 0 0 auto;
+}
+.pulse-led-lg { font-size: 1.7rem; }
+.pulse-led.led-ok,
+.pulse-led.led-online { color: var(--pulse-ok); }
+.pulse-led.led-warn,
+.pulse-led.led-pending { color: var(--pulse-warn); }
+.pulse-led.led-error,
+.pulse-led.led-offline { color: var(--pulse-error); }
+.pulse-led.led-down { color: var(--pulse-down); }
+.pulse-led.led-unknown { color: var(--pulse-unknown); }
+
 /* -- Login "boxed" in stile AdminLTE --------------------------------------- */
 .login-page {
   min-height: 100vh;

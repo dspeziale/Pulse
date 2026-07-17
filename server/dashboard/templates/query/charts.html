@@ -82,7 +82,8 @@ const hb = {{ heartbeats['items']|tojson }};
 new Chart(document.getElementById('rt'), {
   type:'line',
   data:{ labels: hb.map(h=>h['@timestamp']),
-    datasets:[{label:'response_ms', data:hb.map(h=>h.response_ms), borderColor:'#0d6efd'}] }
+    datasets:[{label:'Tempo di risposta', data:hb.map(h=>h.response_ms), borderColor:'#0d6efd'}] },
+  options:{ title:'Tempo di risposta (response_ms)', yLabel:'Tempo', yUnit:'ms', xTime:true }
 });
 </script>
 {% else %}

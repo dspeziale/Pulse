@@ -70,6 +70,30 @@ def test_login_failure(client):
         assert "probe_user" not in s
 
 
+def test_login_page_preserves_flash_error(client):
+    with client.session_transaction() as s:
+        s["_flashes"] = [("danger", "Credenziali locali non valide.")]
+    r = client.get("/login")
+    assert r.status_code == 200
+    assert b"Credenziali locali non valide." in r.data
+    assert b'class="alert alert-danger' in r.data
+
+
+def test_internal_pages_have_no_flash_banner(client, login, fake):
+    login()
+    fake.set("GET", "/status", {"opensearch_healthy": True, "version": "1.0"})
+    fake.set("GET", "/systems", {"items": []})
+    fake.set("GET", "/query/heartbeats", {"items": []})
+    with client.session_transaction() as s:
+        s["_flashes"] = [("success", "Operazione completata.")]
+    r = client.get("/dashboard")
+    assert r.status_code == 200
+    assert b"Operazione completata." not in r.data
+    assert b'class="alert alert-' not in r.data
+    with client.session_transaction() as s:
+        assert not s.get("_flashes")
+
+
 def test_logout(client, login):
     login()
     r = client.post("/logout")

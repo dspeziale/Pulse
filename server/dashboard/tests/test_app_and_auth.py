@@ -119,3 +119,31 @@ def test_login_required_redirect(client):
     r = client.get("/dashboard")
     assert r.status_code == 302
     assert "/login" in r.headers["Location"]
+
+
+# -- Flash: rimossi nelle pagine interne, preservati sul login ----------------
+def test_internal_pages_have_no_flash_banner(client, login, fake):
+    login(["dashboard.read"])
+    fake.set("GET", "/dashboard/aggregate",
+             {"systems_summary": {"ok": 1, "warn": 0, "error": 0, "down": 0,
+                                  "unknown": 0}, "active_alarms": 0, "probes": []})
+    fake.set("GET", "/probes", {"items": []})
+    fake.set("GET", "/alarms", {"items": []})
+    with client.session_transaction() as s:
+        s["_flashes"] = [("success", "Operazione completata.")]
+    r = client.get("/dashboard")
+    assert r.status_code == 200
+    assert b"Operazione completata." not in r.data      # niente banner interno
+    assert b'class="alert alert-' not in r.data
+    # Il messaggio e' stato drenato: non riappare su una successiva pagina.
+    with client.session_transaction() as s:
+        assert not s.get("_flashes")
+
+
+def test_login_page_preserves_flash_error(client):
+    with client.session_transaction() as s:
+        s["_flashes"] = [("danger", "Credenziali non valide.")]
+    r = client.get("/login")
+    assert r.status_code == 200
+    assert b"Credenziali non valide." in r.data
+    assert b'class="alert alert-danger' in r.data

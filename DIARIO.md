@@ -1393,3 +1393,36 @@ Output consegnati
 - GET /api/v1/systems supporta il filtro kind=http|tcp (422 su valore non ammesso), combinabile con gli altri filtri; documentazione aggiornata. Nessuna modifica a probe/frontend.
 
 ================================================
+
+ITERAZIONE 37
+
+Agente: FE
+Data: 2026-07-17
+
+Input ricevuti
+- Richiesta orchestratore (solo frontend, entrambe le dashboard, nessun nuovo endpoint, nessun CDN): 1) eliminare i banner flash "in alto" nelle pagine interne mantenendo il feedback di errore sul login; 2) compattare le visualizzazioni riducendo i padding in modo uniforme; 3) arricchire la dashboard principale del Server con LED di stato complessivo, riga di KPI e LED per-sonda usando solo endpoint esistenti; 4) rendere i grafici piu' comprensibili (assi, unita', legenda, tooltip, tick temporali leggibili, colori tema-aware).
+
+Lavoro svolto (FE — server/dashboard + probe/dashboard + frontend_common)
+- Flash rimossi dalle pagine interne: in server/dashboard/templates/base.html e probe/dashboard/templates/base.html il blocco che renderizzava i flash nel ramo autenticato e' sostituito da un drenaggio silenzioso ({% set _ = get_flashed_messages() %}), così i messaggi post-azione non compaiono piu' e non si accumulano in sessione. Il ramo NON autenticato (banner fisso in alto sul login) resta invariato: l'errore credenziali su auth/login.html e' preservato (server e sonda).
+- Layout compatto (static/css/pulse-theme.css, identico tra le due dashboard): nuova sezione "Layout compatto" che riduce i padding via le variabili native dei componenti Bootstrap. card-body 1rem->0.7rem/0.8rem (~-30%/-20%); card-header/footer 0.5rem/1rem->0.4rem/0.8rem; celle tabella y 0.5rem->0.35rem (-30%); form-control/select padding verticale 0.375rem->0.26rem (~-30%); form-label margin 0.5rem->0.25rem; .app-content 1rem->0.7rem. Verificato leggibile in chiaro e scuro (usa solo variabili tema-aware).
+- Componente LED riutilizzabile: classe CSS .pulse-led (+ modificatori led-ok/online, led-warn/pending, led-error/offline, led-down, led-unknown e variante .pulse-led-lg) in pulse-theme.css, e macro led(state, large) in server/dashboard/templates/_macros.html.
+- Dashboard Server arricchita (views/dashboard.py + templates/dashboard/index.html), solo endpoint esistenti (GET /dashboard/aggregate, GET /probes, GET /alarms?status=active). La view calcola in _build_context: LED complessivo (verde "Tutto OK" se nessun error/down e nessun allarme; giallo "Attenzione" se warn; rosso "Criticita' rilevate" se error/down o allarmi attivi), KPI (Sistemi totali, OK/Warn/Error/Down/Unknown, Sonde totali/online/offline, Allarmi attivi) e LED per-sonda (_probe_led: offline/stato-non-online -> rosso; online con systems_down>0 -> giallo; altrimenti verde). Aggiunto mini-riepilogo a card per ogni sonda con LED + tabella con colonna LED. Grafico distribuzione stati mantenuto e migliorato.
+- Grafici (static/pulse-charts.js, allineato identico tra le due dashboard): riscritta la micro-libreria canvas locale (nessun CDN) con titolo, etichetta/unita' asse Y (es. ms), legenda automatica multi-serie, gridlines leggere, tick Y arrotondati, tick asse tempo ridotti e formattati (HH:MM o dd/MM), tooltip al passaggio del mouse (punto piu' vicino), scaling HiDPI e colori derivati dal tema (data-bs-theme). Aggiornati i punti d'uso (probe dashboard/system, query/charts, dashboard server) con le nuove options (title/yLabel/yUnit/xTime).
+
+Qualita'
+- Coverage 100% sul codice applicativo: server/dashboard views+app+sdk 100% (863 stmt), probe/dashboard views+app+sdk+probe_auth 100% (209 stmt), frontend_common 100%. Le uniche righe non coperte restano in tests/conftest.py (guard sys.path e ramo _Blank), pre-esistenti. Esito: server 138 test, sonda 42 test, frontend_common 29 test — tutti passati, 0 falliti.
+- Test aggiornati/aggiunti: dashboard Server (LED complessivo ok/warn/error da stato e da allarmi, LED per-sonda online/offline/degradata, nessuna sonda, aggregate mancante robusto) e unita' _probe_led/_build_context; regressione flash (pagine interne senza banner + drenaggio; login preserva l'errore) su Server e Sonda.
+- Verifica reale (app Flask con backend simulato): render /dashboard mostra LED complessivo, KPI e LED per-sonda; nessun banner flash nelle pagine interne; login mostra ancora l'errore. pulse-charts.js validato con `node --check`.
+
+File toccati
+- server/dashboard/templates/base.html, probe/dashboard/templates/base.html (flash)
+- server/dashboard/static/css/pulse-theme.css, probe/dashboard/static/css/pulse-theme.css (compattazione + LED, identici)
+- server/dashboard/static/pulse-charts.js, probe/dashboard/static/pulse-charts.js (grafici, identici)
+- server/dashboard/views/dashboard.py, server/dashboard/templates/dashboard/index.html, server/dashboard/templates/_macros.html (dashboard + macro LED)
+- probe/dashboard/templates/dashboard/index.html, probe/dashboard/templates/dashboard/system.html, server/dashboard/templates/query/charts.html (options grafici)
+- server/dashboard/tests/test_views_crud.py, server/dashboard/tests/test_app_and_auth.py, probe/dashboard/tests/test_probe_dashboard.py (test)
+
+Output consegnati
+- Flash post-azione rimossi dalle pagine interne di entrambe le dashboard (errore di login preservato). Padding ridotti ~25-35% in modo uniforme (card/tabelle/form/contenuto) via pulse-theme.css. Dashboard Server con LED complessivo + KPI + LED per-sonda dai soli endpoint esistenti. Grafici locali piu' leggibili (assi/unita'/legenda/tooltip/tick temporali). Coverage 100% sul codice applicativo, tutti i test verdi.
+
+================================================
