@@ -58,6 +58,12 @@ services:
       PULSE_PROBE_QUERY_TOKEN: ${PULSE_PROBE_QUERY_TOKEN:-server-to-probe-token}
       PULSE_WORKERS: ${PULSE_WORKERS:-2}
       PULSE_LOG_LEVEL: ${PULSE_LOG_LEVEL:-info}
+      # Gateway Nominatim (aggiunta su richiesta utente)
+      PULSE_NOMINATIM_URL: ${PULSE_NOMINATIM_URL:-https://nominatim.openstreetmap.org}
+      PULSE_NOMINATIM_USER_AGENT: ${PULSE_NOMINATIM_USER_AGENT:-Pulse/1.0 (+https://pulse.local)}
+      PULSE_NOMINATIM_API_KEY: ${PULSE_NOMINATIM_API_KEY:-}
+      PULSE_NOMINATIM_MIN_INTERVAL_MS: ${PULSE_NOMINATIM_MIN_INTERVAL_MS:-1000}
+      PULSE_NOMINATIM_CACHE_TTL_SECONDS: ${PULSE_NOMINATIM_CACHE_TTL_SECONDS:-300}
     ports:
       - "${PULSE_API_PORT:-8443}:${PULSE_API_PORT:-8443}"
     networks: [pulse, shared]

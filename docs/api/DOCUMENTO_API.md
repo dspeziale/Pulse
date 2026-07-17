@@ -523,6 +523,58 @@ Formato corpo errore:
 | Log | /logs | syslog.read |
 | Config | /config* | config.read, config.update |
 | Health | /health, /health/ready | — |
+| Nominatim gateway | /nominatim/{endpoint} | JWT Pulse **oppure** X-API-Key |
+
+---
+
+## 1.19 Area: Nominatim gateway (aggiunta su richiesta utente)
+
+Proxy HTTP **GET** verso Nominatim con **base URL FISSA** da configurazione, così che
+**Sonde** e **altri servizi** che NON raggiungono direttamente Nominatim possano
+geocodificare passando dal Server (che invece lo raggiunge).
+
+### GET /api/v1/nominatim/{endpoint}
+- **Descrizione**: inoltra la richiesta a `f"{PULSE_NOMINATIM_URL}/{endpoint}"` preservando
+  la **query string** del chiamante e forzando il metodo **GET**. Restituisce il corpo
+  upstream con lo **stesso Content-Type** (di norma JSON).
+- **`{endpoint}`**: ammesso SOLO se in **allowlist** `{search, reverse, lookup, status, details}`.
+  Qualsiasi altro valore → **404 NOT_FOUND**. Il chiamante controlla solo `endpoint` (allowlist)
+  e i query params: **host/schema NON sono modificabili** (anti-SSRF).
+- **Auth (duale, una delle due)**:
+  - **(a)** JWT Pulse valido di un utente **attivo** — header `Authorization: Bearer <token>`
+    (riusa la logica di autenticazione esistente, senza richiedere un permesso RBAC specifico);
+    **oppure**
+  - **(b)** **API key**: header `X-API-Key: <chiave>` (o query param `api_key=<chiave>`) uguale a
+    `PULSE_NOMINATIM_API_KEY`, **se** questa è configurata (non vuota). Se la chiave non è
+    configurata, l'accesso via API key è disabilitato.
+  - Nessuna delle due → **401 UNAUTHORIZED**. L'eventuale `api_key` usato per l'autenticazione
+    **non viene inoltrato** a Nominatim.
+- **Rate limit / cache** (rispetto ToS Nominatim ~1 req/s):
+  - le chiamate **upstream** sono **serializzate e limitate** in-process all'intervallo minimo
+    `PULSE_NOMINATIM_MIN_INTERVAL_MS` (default 1000 ms); in caso di burst la richiesta **attende
+    brevemente** (throttle) invece di rispondere 429, così da non perdere richieste legittime;
+  - una **cache in-process** con TTL `PULSE_NOMINATIM_CACHE_TTL_SECONDS` (default 300 s) evita di
+    colpire upstream per richieste GET identiche ravvicinate (cache solo delle risposte 2xx).
+  - Viene sempre impostato l'header `User-Agent = PULSE_NOMINATIM_USER_AGENT` (richiesto dalla ToS).
+- **Errori**: endpoint fuori allowlist → **404**; credenziali assenti/non valide → **401**;
+  Nominatim non raggiungibile / errore di trasporto → **503 SERVICE_UNAVAILABLE**.
+
+**Esempi**
+```bash
+# (a) con JWT Pulse
+curl -H "Authorization: Bearer $ACCESS_TOKEN" \
+  "https://server:8443/api/v1/nominatim/search?q=Via+Roma+1+Torino&format=json&limit=1"
+
+# (b) con API key (altro servizio senza JWT Pulse), header
+curl -H "X-API-Key: $PULSE_NOMINATIM_API_KEY" \
+  "https://server:8443/api/v1/nominatim/reverse?lat=45.07&lon=7.68&format=json"
+
+# (b) con API key via query param (equivalente; l'api_key non viene inoltrata a Nominatim)
+curl "https://server:8443/api/v1/nominatim/search?q=Torino&format=json&api_key=$PULSE_NOMINATIM_API_KEY"
+```
+
+**Configurazione** (prefisso `PULSE_`, vedi `.env.example`): `NOMINATIM_URL`,
+`NOMINATIM_USER_AGENT`, `NOMINATIM_API_KEY`, `NOMINATIM_MIN_INTERVAL_MS`, `NOMINATIM_CACHE_TTL_SECONDS`.
 
 ---
 

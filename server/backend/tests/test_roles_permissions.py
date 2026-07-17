@@ -5,10 +5,11 @@ from __future__ import annotations
 SUPERADMIN_ROLE = "00000000-0000-0000-0000-000000000001"
 
 
-def test_permissions_catalog_has_40(client, auth_headers) -> None:
+def test_permissions_catalog_has_42(client, auth_headers) -> None:
     r = client.get("/api/v1/permissions", headers=auth_headers)
     assert r.status_code == 200
-    assert len(r.json()["items"]) == 40
+    # 42 permessi dopo l'aggiunta di scans.run/scans.read (seed iterazione 51).
+    assert len(r.json()["items"]) == 42
 
 
 def test_role_crud_flow(client, auth_headers) -> None:

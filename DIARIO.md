@@ -1962,3 +1962,99 @@ Output consegnati
 - Permessi scans.run/scans.read disponibili su installazioni pulite (seed) e su DB esistenti (migrazione 005), matrice/catalogo/docs aggiornati (totale 42), validazione su DB vivo superata (applicazione + idempotenza + SuperAdmin/Admin/Operator con scans.run confermati). Pronto per BE/Probe che implementeranno gli endpoint di scansione NMAP protetti da scans.run/scans.read.
 
 ================================================
+
+ITERAZIONE 52
+
+Agente: BE
+Data: 2026-07-17
+
+Input ricevuti
+- Richiesta orchestratore: implementare nella Probe (probe/agent) un motore di scansioni NMAP eseguite DALLA Probe verso ip/subnet, con risultati su OpenSearch locale. Sicurezza prioritaria (argv lista, mai shell; validazione target/opzioni con whitelist; -oX - forzato; niente flag di output/file). Endpoint POST /scan, GET /scans, GET /scan/{id}. Deploy: nmap+setcap nel Dockerfile, cap_add nei compose. Coverage 100%.
+- Aggiunta: documentare l'uso di nmap in container su Windows/Docker Desktop (WSL2) ed esporre nmap_available nello /status.
+
+Lavoro svolto (PROBE — probe/agent, + deploy)
+- nmap_scan.py (core sicurezza): validate_target (IP/IPv6/CIDR/hostname; RIFIUTA token con '-' iniziale -> anti argument-injection, e metacaratteri), validate_ports (^[0-9,\-]+$), validate_scripts (^[A-Za-z0-9_\-.\*]+$, niente slash), validate_script_args (niente metacaratteri shell), validate_extra (tokenizza + ALLOWLIST di flag sicure; esclude -oN/-oX/-oG/-oA/-iL/--datadir/-e/--script-con-path/-D...). build_nmap_argv costruisce l'ARGV LISTA, sempre con -oX - e target in coda (rivalidati). parse_nmap_xml -> {hosts:[{ip,hostname,state,ports:[{port,protocol,state,service,product,version,scripts}],os,hostscripts]}], summary:{hosts_up,hosts_total,ports_open}}.
+- scanner.py: run_nmap (subprocess.run ARGV LISTA, shell=False, timeout), detect_nmap (self-check nmap --version), _classify_error (privilegi/CAP_NET_RAW vs generico), execute_scan (semaforo concorrenza; gestisce success/rc!=0/Timeout/OSError/XML invalido -> aggiorna doc done|failed).
+- store.py: Protocol + InMemoryStore + OpenSearchStore estesi con index_scan/get_scan/search_scans (upsert per scan_id, ordinamento started_at desc, paginazione) + NMAP_SCAN_MAPPING; indice OpenSearch "pulse-nmap-scans".
+- config.py: PULSE_PROBE_SCAN_TIMEOUT (default 1800, cap 3600 via validator), PULSE_PROBE_SCAN_MAX_CONCURRENCY (default 2), nmap_scan_index.
+- state.py: scan_runner iniettabile (default run_nmap), scans_semaphore (BoundedSemaphore dimensionato in __post_init__), nmap_available/nmap_version.
+- schemas.py: ScanRequest (contratto FE) con field_validator che convertono ScanValidationError in PydanticCustomError (422 JSON-safe); ScanStartResponse/ScanList/ScanListItem/ScanDetail; ProbeStatusOut esteso con nmap_available/nmap_version.
+- main.py: endpoint POST /api/v1/scan (avvia in background via BackgroundTasks -> deterministico nei test; ritorna scan_id+running), GET /api/v1/scans (paginato), GET /api/v1/scan/{scan_id} (404 se assente); bootstrap_state esegue il self-check nmap; /status espone nmap_available/nmap_version.
+- errors.py: aggiunto helper not_found (404).
+- Dockerfile: apt-get install nmap + libcap2-bin, setcap cap_net_raw,cap_net_admin+eip /usr/bin/nmap PRIMA di USER non-root. Immagine COSTRUITA e VERIFICATA: con cap_add nmap 7.95 esegue come utente 'pulse' non-root; getcap conferma le capabilities.
+- Compose (docker-compose.probe.yml, probe-package/docker-compose.yml, podman-compose.probe.yml, probe-package/podman-compose.yml): aggiunto cap_add [NET_RAW, NET_ADMIN] e env PULSE_PROBE_SCAN_TIMEOUT al servizio probe-agent. `docker compose config` OK su entrambi i file Docker.
+- Docs: sezione "Scansioni NMAP" + "NMAP in container (Windows/Docker Desktop)" in probe/agent/README.md e nota in deploy/probe-package/INSTALL.md (target NAT vs LAN fisica; connect/-sV/ping/NSE senza root, SYN/UDP/OS con caps; file-capabilities +eip richiedono le caps per l'esecuzione).
+
+Contratto argv sicuro (esempio)
+- ScanRequest(target="10.0.0.5", technique="syn", top_ports=100, service_version=True)
+  -> ["nmap","-sS","-T3","--top-ports","100","-sV","-oX","-","10.0.0.5"]
+- Sempre: argv LISTA (shell=False), -oX - forzato, target in coda validati, flag di output/file rifiutate (422).
+
+Endpoint creati (base /api/v1, auth token Server)
+- POST /scan -> {scan_id, status:"running", started_at, target}
+- GET /scans?page&page_size -> {items:[{scan_id,target,status,started_at,finished_at,summary}], total}
+- GET /scan/{scan_id} -> dettaglio completo (options,status,error,summary,hosts) | 404
+
+Storage OpenSearch
+- Indice "pulse-nmap-scans" (mapping keyword/date; options/hosts object non indicizzati a fondo). Metodi: index_scan (upsert id=scan_id), get_scan, search_scans (paginato, started_at desc). InMemoryStore equivalente (dict) per test/fallback.
+
+Qualita'
+- mypy --strict: pulito (14 file, "no issues found").
+- Coverage probe/agent: 100% (925 stmt, 198 branch). Test: 139 passati, 0 falliti. nmap MOCKATO nei test (scan_runner/subprocess monkeypatch); nessuna esecuzione reale di nmap nei test.
+- Sicurezza testata: target validi/invalidi (leading '-' -> 422), argv corretto (LISTA, -oX - presente, nessuna flag vietata), extra fuori allowlist -> 422, tecnica->flag, parsing XML full/edge/invalid, storage CRUD, endpoint POST/GET/404/401/422, errore privilegi -> failed.
+
+File toccati
+- probe/agent/pulse_probe/nmap_scan.py (nuovo), scanner.py (nuovo), store.py, config.py, state.py, schemas.py, main.py, errors.py
+- probe/agent/tests/test_nmap_scan.py (nuovo), test_scanner.py (nuovo), test_scan_endpoints.py (nuovo)
+- probe/agent/Dockerfile, probe/agent/README.md
+- deploy/docker-compose.probe.yml, deploy/podman-compose.probe.yml, deploy/probe-package/docker-compose.yml, deploy/probe-package/podman-compose.yml, deploy/probe-package/INSTALL.md
+
+================================================
+
+
+ITERAZIONE 53
+
+Agente: BE
+Data: 2026-07-17
+
+Input ricevuti
+- Richiesta orchestratore: nuova funzionalita' GATEWAY/tunnel a NOMINATIM sul Server, cosi' che Sonde e ALTRI SERVIZI (che NON raggiungono Nominatim) possano geocodificare passando dal Server. Modificare SOLO server/backend. Proxy HTTP GET con base URL FISSA da config (anti-SSRF: il chiamante NON sceglie l'host). Auth duale (JWT Pulse o X-API-Key). Rate-limit (ToS ~1 req/s) + cache TTL. Tipizzato, mypy --strict, coverage 100%.
+
+Lavoro svolto
+- CONFIG (pulse_server/config.py): 5 nuove impostazioni prefisso PULSE_: nominatim_url (default https://nominatim.openstreetmap.org), nominatim_user_agent (default "Pulse/1.0 (+https://pulse.local)"), nominatim_api_key (default vuota), nominatim_min_interval_ms (default 1000), nominatim_cache_ttl_seconds (default 300).
+- GATEWAY (pulse_server/nominatim.py, nuovo): classe NominatimGateway (usata come SINGLETON) con throttle in-process (serializza le chiamate upstream rispettando min_interval_ms; in caso di burst ATTENDE brevemente invece di 429, per non perdere richieste legittime) e cache TTL in-process (chiave endpoint+query; cache solo risposte 2xx). Base URL FISSA da config; User-Agent identificativo forzato; follow_redirects=False e header Location NON propagato (il gateway non segue/inoltra redirect verso host arbitrari). httpx.HTTPError -> 503. Clock/sleep/client_factory iniettabili per i test.
+- ROUTER (pulse_server/routers/nominatim.py, nuovo): prefix /api/v1/nominatim, tag "nominatim". GET /{endpoint} con endpoint in ALLOWLIST {search, reverse, lookup, status, details} (fuori allowlist -> 404). Auth DUALE: (a) JWT Pulse valido (riusa deps.get_current_user, nessun permesso RBAC specifico) OPPURE (b) X-API-Key header o query api_key == nominatim_api_key SE configurata; nessuna delle due -> 401. Confronto API key a tempo costante (hmac.compare_digest). Query string del chiamante preservata, rimosso SOLO l'eventuale api_key (auth del gateway, non parametro Nominatim). Content-Type upstream propagato.
+- WIRING: context.py get_nominatim_gateway (singleton di processo, NominatimGatewayDep) + registrazione router e tag OpenAPI in main.py.
+- DEPLOY/DOC: aggiunte le 5 variabili a server/backend/.env.example, deploy/docker-compose.server.yml e deploy/podman-compose.server.yml (con default, api_key vuota). docs/api/DOCUMENTO_API.md: nuova sezione 1.19 "Nominatim gateway (aggiunta su richiesta utente)" con endpoint, auth (JWT o X-API-Key), rate-limit/cache, esempi curl, nota anti-SSRF; riga aggiunta alla tabella tracciabilita' endpoint->permesso.
+
+Qualita'
+- mypy --strict: Success, no issues (33 source files).
+- Coverage 100% su server/backend (TOTAL 3116 stmts, 634 branch, 0 miss): nominatim.py 78 stmts/14 branch 100%, routers/nominatim.py 42 stmts/12 branch 100%, config.py e context.py 100%.
+- Test: 288 passed, 0 failed. Nuovo tests/test_nominatim_gateway.py (18 test, httpx MockTransport + clock iniettabile, NESSUNA chiamata a Nominatim reale): inoltro con User-Agent+query corretti; endpoint fuori allowlist -> 404; auth senza credenziali -> 401, API key valida (header e query) -> 200, JWT valido -> 200, JWT/API key invalidi -> 401; api_key NON inoltrata upstream; Content-Type propagato; cache evita la 2a chiamata entro il TTL (e refetch a scadenza); ttl=0 disabilita la cache; errori upstream non cache-ati; rate-limit throttla (~1s, mock del monotonic/sleep) e nessun throttle se l'intervallo e' gia' trascorso; errore trasporto -> 503; factory httpx reale (follow_redirects=False); singleton del gateway.
+
+Problemi trovati
+- Test PREESISTENTE rosso NON legato a questa feature: tests/test_roles_permissions.py::test_permissions_catalog_has_40 falliva (42 != 40) perche' il seed dell'ITERAZIONE 51 (DBA) ha portato i permessi da 40 a 42 (scans.run/scans.read) ma l'asserzione era rimasta a 40. Allineata a 42 (rinominato test_permissions_catalog_has_42) per riportare la suite a verde. Nessuna altra modifica a test altrui.
+
+Decisioni prese
+- Anti-SSRF: base URL FISSA da config, solo endpoint (allowlist) + query params dal chiamante; redirect disabilitati e Location non propagato.
+- Burst oltre il rate: ATTESA breve (throttle) invece di 429, per rispettare la ToS senza scartare richieste legittime; cache TTL riduce ulteriormente le chiamate upstream.
+- Auth JWT senza permesso RBAC dedicato (la geocodifica e' una utility trasversale): qualsiasi utente Pulse attivo o un servizio con API key. api_key di auth mai inoltrata a Nominatim.
+- Gateway come singleton di processo (throttle/cache condivisi tra richieste); nei test la dependency e' sovrascritta con istanze dedicate.
+
+File creati
+- server/backend/pulse_server/nominatim.py
+- server/backend/pulse_server/routers/nominatim.py
+- server/backend/tests/test_nominatim_gateway.py
+
+File modificati
+- server/backend/pulse_server/config.py (5 settings)
+- server/backend/pulse_server/context.py (get_nominatim_gateway + NominatimGatewayDep)
+- server/backend/pulse_server/main.py (import/registrazione router + tag OpenAPI)
+- server/backend/.env.example, deploy/docker-compose.server.yml, deploy/podman-compose.server.yml (5 variabili)
+- docs/api/DOCUMENTO_API.md (sezione 1.19 + riga tracciabilita')
+- server/backend/tests/test_roles_permissions.py (allineamento asserzione 40 -> 42, fix pre-esistente)
+
+Output consegnati
+- Gateway Nominatim operativo su GET /api/v1/nominatim/{endpoint} (allowlist search/reverse/lookup/status/details), auth duale JWT/X-API-Key, base URL fissa anti-SSRF, throttle ~1 req/s + cache TTL, variabili di config/compose/.env documentate, sezione API 1.19. mypy --strict pulito, coverage 100%, 288 test verdi. La Guida FE la fara' il frontend.
+
+================================================

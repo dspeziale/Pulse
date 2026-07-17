@@ -276,8 +276,12 @@ dichiara `cap_add: [NET_RAW, NET_ADMIN]` per abilitare le scansioni RAW
 
 - **Docker Desktop (Windows/WSL2)**: `cap_add` e `setcap` **sono onorati** (i
   container girano nella VM WSL2). SYN/UDP/OS scan funzionano con le capabilities.
-- **Senza privilegi RAW** funzionano comunque: **connect scan** (`-sT`), `-sV`,
-  **ping** (`-sn`), **NSE** e la scansione delle **porte**.
+- **File-capabilities**: nmap ha `+eip`, quindi il container **deve** essere
+  avviato con `cap_add: [NET_RAW, NET_ADMIN]` (già presenti nei compose) perché
+  nmap sia eseguibile dall'utente non-root; se mancano, il kernel ne blocca
+  l'esecuzione (`nmap_available=false`).
+- Con le caps presenti, **connect scan** (`-sT`), `-sV`, **ping** (`-sn`), **NSE**
+  e la scansione delle **porte** non richiedono root; SYN/UDP/OS usano le caps.
 - **Target instradabili/esterni** sono raggiungibili via NAT della VM.
 - **LAN fisica dell'host Windows**: Docker Desktop **non** espone la LAN
   dell'host al container come su Linux. Per scansionare una rete fisica, installa

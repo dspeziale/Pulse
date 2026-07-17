@@ -19,6 +19,7 @@ from .routers import (
     dashboard,
     health,
     inbound,
+    nominatim,
     notifications,
     observability,
     probe_comm,
@@ -56,6 +57,7 @@ _TAGS_METADATA = [
     {"name": "logs", "description": "Log di sistema."},
     {"name": "config", "description": "Configurazione applicativa."},
     {"name": "health", "description": "Liveness/readiness."},
+    {"name": "nominatim", "description": "Gateway/tunnel GET verso Nominatim (JWT o X-API-Key)."},
 ]
 
 
@@ -92,6 +94,7 @@ def create_app() -> FastAPI:
     app.include_router(observability.logs_router)
     app.include_router(observability.config_router)
     app.include_router(health.router)
+    app.include_router(nominatim.router)
     return app
 
 

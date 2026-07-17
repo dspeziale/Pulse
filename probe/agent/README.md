@@ -148,14 +148,20 @@ Esempio di argv generato (`technique=syn`, `top_ports=100`, `-sV`):
 L'immagine installa `nmap` e applica
 `setcap cap_net_raw,cap_net_admin+eip /usr/bin/nmap`, così l'utente **non-root**
 può eseguire scansioni RAW. Nei compose della Sonda il servizio `probe-agent`
-dichiara `cap_add: [NET_RAW, NET_ADMIN]`.
+dichiara `cap_add: [NET_RAW, NET_ADMIN]`: le due cose insieme abilitano le
+scansioni raw per l'utente non-root.
 
 - **Docker Desktop (Windows)** esegue i container in una VM **WSL2**: `cap_add`
   e `setcap` **sono onorati**, quindi SYN/UDP/OS scan (`-sS`/`-sU`/`-O`)
-  funzionano se le capabilities sono presenti.
-- **Senza** privilegi RAW funzionano comunque: **connect scan** (`-sT`), `-sV`,
-  **ping** (`-sn`), **NSE** e la scansione delle **porte**. SYN/UDP/OS scan
-  falliscono con un errore chiaro ("richiede privilegi/CAP_NET_RAW").
+  funzionano quando le capabilities sono presenti.
+- **Nota sulle file-capabilities**: poiché nmap ha le file-capabilities `+eip`,
+  il container **deve** essere avviato con `cap_add: [NET_RAW, NET_ADMIN]` (come
+  nei compose forniti) affinché nmap sia eseguibile dall'utente non-root; se le
+  caps mancano, il kernel blocca l'esecuzione (il self-check riporta allora
+  `nmap_available=false` e le scansioni terminano con errore chiaro).
+- Con le caps presenti, **connect scan** (`-sT`), `-sV`, **ping** (`-sn`), **NSE**
+  e la scansione delle **porte** non richiedono root; SYN/UDP/OS scan usano in
+  più le capabilities (senza, falliscono con "richiede privilegi/CAP_NET_RAW").
 - **Target instradabili/esterni** (host applicativi, IP pubblici) sono
   raggiungibili dal container tramite il **NAT della VM**.
 - **Scansione della LAN FISICA dell'host Windows**: Docker Desktop **non** espone

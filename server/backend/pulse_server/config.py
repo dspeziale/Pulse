@@ -70,6 +70,21 @@ class Settings(BaseSettings):
     hsts_enabled: bool = False
     hsts_max_age_seconds: int = 63072000  # 2 anni
 
+    # --- Gateway Nominatim (aggiunta su richiesta utente) ---
+    # Proxy GET verso Nominatim con base URL FISSA (anti-SSRF: il chiamante NON
+    # sceglie l'host, solo endpoint in allowlist + query params). Consente a
+    # Sonde/altri servizi che NON raggiungono Nominatim di geocodificare tramite
+    # il Server (che invece lo raggiunge).
+    nominatim_url: str = "https://nominatim.openstreetmap.org"
+    # User-Agent identificativo richiesto dalla ToS di Nominatim.
+    nominatim_user_agent: str = "Pulse/1.0 (+https://pulse.local)"
+    # Chiave per l'accesso da ALTRI SERVIZI senza JWT Pulse (vuota = disabilitata).
+    nominatim_api_key: str = ""
+    # Intervallo minimo tra chiamate upstream (ToS Nominatim ~1 req/s).
+    nominatim_min_interval_ms: int = 1000
+    # Cache in-process (secondi) delle risposte GET per ridurre le chiamate upstream.
+    nominatim_cache_ttl_seconds: int = 300
+
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
