@@ -107,9 +107,11 @@
         {% set a_query = ep.startswith('query.') %}
         {% set a_status = ep.startswith('status.') %}
         <ul class="nav sidebar-menu flex-column" data-lte-toggle="treeview" role="menu">
-          {# ---- MONITORAGGIO ---- #}
-          {{ group_open('bi-speedometer2', 'Monitoraggio', a_dashboard or a_query) }}
+          {# ---- DASHBOARD: sempre PRIMA voce, di primo livello (fuori dai gruppi) ---- #}
           {{ navlink(url_for('dashboard.index'), 'bi-speedometer2', 'Dashboard', a_dashboard) }}
+
+          {# ---- MONITORAGGIO ---- #}
+          {{ group_open('bi-search', 'Monitoraggio', a_query) }}
           {{ navlink(url_for('query.builder'), 'bi-search', 'Query dati', a_query) }}
           {{ group_close() }}
 

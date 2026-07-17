@@ -24,13 +24,16 @@ def test_sidebar_uses_treeview(client, login, fake):
     assert _group_hdr("Sonda") in html
 
 
-def test_active_group_monitoraggio_on_dashboard(client, login, fake):
+def test_dashboard_is_first_toplevel(client, login, fake):
     login()
     _prep_dashboard(fake)
     html = client.get("/dashboard").get_data(as_text=True)
-    assert re.search(r'nav-item menu-open">[\s\S]{0,160}<p>Monitoraggio'
-                     r'<i class="nav-arrow', html)
-    assert html.count("menu-open") == 1
+    # Dashboard e' voce di primo livello, PRIMA del primo gruppo treeview.
+    dash_pos = html.find("<p>Dashboard</p>")
+    tree_pos = html.find("nav-treeview")
+    assert dash_pos != -1 and tree_pos != -1 and dash_pos < tree_pos
+    # su /dashboard nessun gruppo e' aperto (Dashboard e' fuori dai gruppi).
+    assert html.count("menu-open") == 0
 
 
 def test_active_group_sonda_on_status(client, login, fake):

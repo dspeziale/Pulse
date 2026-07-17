@@ -35,8 +35,8 @@ def test_sidebar_uses_treeview(client, login):
 
 
 def test_groups_present_with_permissions(client, login, fake):
-    login(["dashboard.read", "notifications.read", "users.read", "config.read",
-           "scans.read"])
+    login(["dashboard.read", "probes.read", "notifications.read", "users.read",
+           "config.read", "scans.read"])
     _dash(fake)
     html = client.get("/dashboard").get_data(as_text=True)
     for title in ("Monitoraggio", "Notifiche", "Sicurezza", "Amministrazione",
@@ -44,17 +44,20 @@ def test_groups_present_with_permissions(client, login, fake):
         assert _group_hdr(title) in html
 
 
-# -- Auto-apertura del gruppo attivo -----------------------------------------
-def test_active_group_auto_open_monitoraggio(client, login, fake):
-    login(["dashboard.read"])
+# -- Dashboard come prima voce di primo livello (fuori dai gruppi) ------------
+def test_dashboard_is_first_toplevel(client, login, fake):
+    login(["dashboard.read", "probes.read"])
     _dash(fake)
     html = client.get("/dashboard").get_data(as_text=True)
-    # Il gruppo Monitoraggio (pagina corrente Dashboard) e' menu-open + active.
-    assert re.search(r'nav-item menu-open">[\s\S]{0,160}<p>Monitoraggio'
-                     r'<i class="nav-arrow', html)
-    # e la voce figlia Dashboard e' evidenziata.
+    # Dashboard e' voce di primo livello, PRIMA del primo gruppo treeview.
+    dash_pos = html.find("<p>Dashboard</p>")
+    tree_pos = html.find("nav-treeview")
+    assert dash_pos != -1 and tree_pos != -1 and dash_pos < tree_pos
+    # su /dashboard la voce Dashboard e' attiva...
     assert re.search(r'nav-link active"[^>]*>\s*<i class="nav-icon bi '
                      r'bi-speedometer2"></i><p>Dashboard</p>', html)
+    # ...e NESSUN gruppo e' aperto (Dashboard e' fuori dai gruppi collassabili).
+    assert html.count("menu-open") == 0
 
 
 def test_active_group_auto_open_aiuto_on_guida(client, login):
@@ -66,12 +69,21 @@ def test_active_group_auto_open_aiuto_on_guida(client, login):
     assert 'href="/guida" class="nav-link active"' in html
 
 
-def test_only_active_group_is_open(client, login, fake):
-    """Un solo gruppo (quello della pagina) e' aperto alla volta."""
+def test_no_group_open_on_dashboard(client, login, fake):
+    """Su /dashboard la voce e' di primo livello: nessun gruppo aperto."""
     login(["dashboard.read", "users.read"])
     _dash(fake)
     html = client.get("/dashboard").get_data(as_text=True)
+    assert html.count("menu-open") == 0
+
+
+def test_only_active_group_is_open_on_group_page(client, login):
+    """Su una pagina dentro un gruppo (es. Guida), e' aperto un solo gruppo."""
+    login([])
+    html = client.get("/guida").get_data(as_text=True)
     assert html.count("menu-open") == 1
+    assert re.search(r'nav-item menu-open">[\s\S]{0,160}<p>Aiuto / Account'
+                     r'<i class="nav-arrow', html)
 
 
 # -- Gating per permesso ------------------------------------------------------
@@ -83,9 +95,12 @@ def test_group_hidden_without_child_permission(client, login, fake):
     assert _group_hdr("Sistema") not in html
     assert _group_hdr("Notifiche") not in html
     assert _group_hdr("Sicurezza") not in html
-    # Monitoraggio presente (ha Dashboard) e Aiuto sempre presente.
-    assert _group_hdr("Monitoraggio") in html
+    # Monitoraggio ora NON contiene Dashboard: con solo dashboard.read non ha
+    # figli visibili -> gruppo assente. Aiuto sempre presente.
+    assert _group_hdr("Monitoraggio") not in html
     assert _group_hdr("Aiuto / Account") in html
+    # Dashboard resta comunque come voce di primo livello.
+    assert "<p>Dashboard</p>" in html
 
 
 def test_aiuto_group_always_present_without_permissions(client, login):

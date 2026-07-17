@@ -2290,3 +2290,32 @@ Output consegnati
 - Le scansioni RAW (SYN/UDP/OS) ora usano --privileged e funzionano da utente non-root con le capabilities presenti; connect/ping restano invariate. Nessuna modifica a server/frontend/deploy.
 
 ================================================
+
+ITERAZIONE 60
+
+Agente: Orchestratore
+Data: 2026-07-17
+
+Input ricevuti
+- "su server e probe dashboard deve essere il primo menu sempre": la voce Dashboard deve essere SEMPRE la prima voce della sidebar su entrambe le dashboard, di primo livello (fuori dai gruppi collassabili), non annidata in "Monitoraggio".
+
+Lavoro svolto (FE — server/dashboard e probe/dashboard)
+- server/dashboard/templates/base.html: Dashboard estratta come prima voce di primo livello (navlink diretto, gated da dashboard.read); il gruppo "Monitoraggio" non contiene piu' Dashboard e ora si mostra solo se l'utente ha almeno una voce figlia (probes/systems/heartbeats/workflows). (gia' committato in una fase precedente.)
+- probe/dashboard/templates/base.html: Dashboard spostata come prima voce di primo livello (fuori dai gruppi); il gruppo "Monitoraggio" ora contiene solo "Query dati".
+- Test aggiornati:
+  - server/dashboard/tests/test_sidebar.py: aggiunto probes.read dove serve una voce figlia visibile; test_dashboard_is_first_toplevel (Dashboard prima del primo nav-treeview, attiva su /dashboard, nessun menu-open); test_no_group_open_on_dashboard; test_only_active_group_is_open_on_group_page spostato su /guida; test_group_hidden_without_child_permission ora verifica che con solo dashboard.read il gruppo Monitoraggio sia ASSENTE mentre la voce Dashboard di primo livello sia presente.
+  - probe/dashboard/tests/test_sidebar.py: test_dashboard_is_first_toplevel (Dashboard prima del primo gruppo, nessun menu-open su /dashboard); mantenuto test Sonda auto-aperto su /status.
+
+Qualita'
+- Suite FE: server 244 test verdi, Sonda 56 test verdi. Test agent nmap verdi.
+
+File toccati
+- server/dashboard/templates/base.html (fase precedente)
+- probe/dashboard/templates/base.html
+- server/dashboard/tests/test_sidebar.py
+- probe/dashboard/tests/test_sidebar.py
+
+Output consegnati
+- Dashboard e' ora la prima voce della sidebar su Server e Sonda, sempre visibile e di primo livello.
+
+================================================
