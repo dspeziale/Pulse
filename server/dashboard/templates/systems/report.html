@@ -82,7 +82,7 @@
 </div>
 
 {# ===================== KPI ===================== #}
-<div class="pulse-kpi-grid mb-3">
+<div class="pulse-kpi-grid mb-3" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:.5rem;align-items:stretch;">
   {% set _up = o.get('uptime') %}
   {% set _avg = o.get('avg_response_ms') %}
   {% set _min = o.get('min_response_ms') %}
