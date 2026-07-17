@@ -264,3 +264,26 @@ Il `probe_token` ottenuto con l'enrollment e' tenuto **in memoria** dall'agent
   quello Docker, gia' validato con `docker compose config`).
 - Con Podman, se la tua versione rifiuta il campo top-level `name:`, rimuoverlo
   (i nomi espliciti di rete/volume restano validi).
+
+---
+
+## Scansioni NMAP (capabilities e Windows/Docker Desktop)
+
+La Sonda può eseguire scansioni **nmap**. L'immagine installa `nmap` e applica
+`setcap cap_net_raw,cap_net_admin+eip /usr/bin/nmap`; il servizio `probe-agent`
+dichiara `cap_add: [NET_RAW, NET_ADMIN]` per abilitare le scansioni RAW
+(`-sS`/`-sU`/`-O`) all'utente non-root.
+
+- **Docker Desktop (Windows/WSL2)**: `cap_add` e `setcap` **sono onorati** (i
+  container girano nella VM WSL2). SYN/UDP/OS scan funzionano con le capabilities.
+- **Senza privilegi RAW** funzionano comunque: **connect scan** (`-sT`), `-sV`,
+  **ping** (`-sn`), **NSE** e la scansione delle **porte**.
+- **Target instradabili/esterni** sono raggiungibili via NAT della VM.
+- **LAN fisica dell'host Windows**: Docker Desktop **non** espone la LAN
+  dell'host al container come su Linux. Per scansionare una rete fisica, installa
+  la Sonda su un **host Linux nella rete target** (accesso diretto al segmento con
+  `cap_add`/host networking) oppure usa una **rete dedicata** instradabile. È un
+  limite dell'ambiente di rete, non del motore di scansione.
+- Timeout scansione: `PULSE_PROBE_SCAN_TIMEOUT` (default 1800s, max 3600).
+- Verifica disponibilità: `GET /api/v1/status` espone `nmap_available` e
+  `nmap_version` (self-check eseguito all'avvio).

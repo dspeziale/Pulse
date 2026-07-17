@@ -103,6 +103,71 @@ poller e il suo annullamento allo shutdown, e il backend `OpenSearchStore` (che
 richiede un cluster OpenSearch reale; la logica di query è testata al 100% via
 `InMemoryStore`, che ne condivide il motore). `mypy --strict` pulito.
 
+## Scansioni NMAP (eseguite dalla Sonda)
+
+La Sonda può eseguire scansioni **nmap** verso un IP/hostname/subnet e salvare i
+risultati su OpenSearch locale (indice `pulse-nmap-scans`), interrogabili via API.
+
+- `POST /api/v1/scan` avvia una scansione in background e ritorna
+  `{scan_id, status:"running", started_at, target}`.
+- `GET /api/v1/scans?page=&page_size=` elenca le scansioni (riepilogo).
+- `GET /api/v1/scan/{scan_id}` ritorna il dettaglio (host, porte, servizi,
+  script NSE, OS match, hostscript) o **404** se assente.
+
+Contratto opzioni (body `POST /scan`, stesso usato dal FE):
+
+```json
+{ "target": "192.168.1.0/24 10.0.0.5", "timing": "T3",
+  "technique": "connect|syn|udp|ping", "ports": "22,80,443", "top_ports": 100,
+  "service_version": true, "version_intensity": 5, "os_detection": false,
+  "no_ping": false, "scripts": ["default","http-title"], "script_args": "user=x",
+  "min_rate": 100, "max_rate": 1000, "max_retries": 2, "extra": "-A --reason" }
+```
+
+### Sicurezza dell'esecuzione (argv, mai shell)
+
+- nmap è invocato con **argv come lista** (`subprocess.run([...], shell=False)`):
+  nessun input utente raggiunge una shell.
+- Ogni parametro è validato con **whitelist/regex** (target IP/host/CIDR;
+  `ports` `^[0-9,\-]+$`; `technique`/`timing` enum; `scripts` `^[A-Za-z0-9_\-.\*]+$`
+  senza slash/percorsi; `extra` tokenizzato e confrontato con una **allowlist** di
+  flag sicure). Un valore non ammesso → **422**.
+- I **target che iniziano con `-` sono rifiutati** (previene l'argument injection,
+  es. un target `-oX` che nmap interpreterebbe come flag di output su file).
+- L'output XML è **forzato** su stdout (`-oX -`); le flag di output/lettura file
+  (`-oN/-oX/-oG/-oA`, `-iL`, `--datadir`, `-e`, `--interactive`, `--script` con
+  percorsi) **non sono in allowlist** e vengono rifiutate.
+- Timeout per scansione: `PULSE_PROBE_SCAN_TIMEOUT` (default **1800s**, cap 3600).
+  Concorrenza massima: `PULSE_PROBE_SCAN_MAX_CONCURRENCY` (default 2).
+
+Esempio di argv generato (`technique=syn`, `top_ports=100`, `-sV`):
+`["nmap","-sS","-T3","--top-ports","100","-sV","-oX","-","10.0.0.5"]`.
+
+### NMAP in container (Windows/Docker Desktop)
+
+L'immagine installa `nmap` e applica
+`setcap cap_net_raw,cap_net_admin+eip /usr/bin/nmap`, così l'utente **non-root**
+può eseguire scansioni RAW. Nei compose della Sonda il servizio `probe-agent`
+dichiara `cap_add: [NET_RAW, NET_ADMIN]`.
+
+- **Docker Desktop (Windows)** esegue i container in una VM **WSL2**: `cap_add`
+  e `setcap` **sono onorati**, quindi SYN/UDP/OS scan (`-sS`/`-sU`/`-O`)
+  funzionano se le capabilities sono presenti.
+- **Senza** privilegi RAW funzionano comunque: **connect scan** (`-sT`), `-sV`,
+  **ping** (`-sn`), **NSE** e la scansione delle **porte**. SYN/UDP/OS scan
+  falliscono con un errore chiaro ("richiede privilegi/CAP_NET_RAW").
+- **Target instradabili/esterni** (host applicativi, IP pubblici) sono
+  raggiungibili dal container tramite il **NAT della VM**.
+- **Scansione della LAN FISICA dell'host Windows**: Docker Desktop **non** espone
+  la LAN dell'host al container come avviene su Linux (niente `network_mode: host`
+  reale). Per scansionare una rete fisica conviene installare la **Sonda su un
+  host Linux appartenente alla rete target** (dove `cap_add` + host networking
+  danno accesso diretto al segmento), oppure predisporre una **rete dedicata**
+  instradabile verso il container. Questo è un limite dell'ambiente di rete, non
+  del motore di scansione.
+- Il campo `nmap_available` (e `nmap_version`) in `GET /api/v1/status` riporta il
+  **self-check** eseguito all'avvio (nmap presente nel container e sua versione).
+
 ## Sicurezza
 
 - Token del Server verificato in tempo costante (`hmac.compare_digest`).

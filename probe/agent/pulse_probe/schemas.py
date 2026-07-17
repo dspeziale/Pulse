@@ -5,12 +5,22 @@ from __future__ import annotations
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic_core import PydanticCustomError
 
 from . import nmap_scan
 
 
 class _Model(BaseModel):
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
+
+def _to_422(exc: nmap_scan.ScanValidationError) -> PydanticCustomError:
+    """Converte un errore di validazione scansione in un errore Pydantic (422).
+
+    Usa PydanticCustomError (contesto JSON-serializzabile) per non rompere
+    l'handler di RequestValidationError.
+    """
+    return PydanticCustomError("value_error", "{error}", {"error": str(exc)})
 
 
 class HeartbeatList(_Model):
@@ -108,29 +118,49 @@ class ScanRequest(_Model):
     @field_validator("target")
     @classmethod
     def _v_target(cls, value: str) -> str:
-        nmap_scan.validate_target(value)  # solleva -> 422
+        try:
+            nmap_scan.validate_target(value)
+        except nmap_scan.ScanValidationError as exc:
+            raise _to_422(exc) from exc
         return value
 
     @field_validator("ports")
     @classmethod
     def _v_ports(cls, value: str | None) -> str | None:
-        return nmap_scan.validate_ports(value) if value is not None else None
+        if value is None:
+            return None
+        try:
+            return nmap_scan.validate_ports(value)
+        except nmap_scan.ScanValidationError as exc:
+            raise _to_422(exc) from exc
 
     @field_validator("scripts")
     @classmethod
     def _v_scripts(cls, value: list[str]) -> list[str]:
-        return nmap_scan.validate_scripts(value)
+        try:
+            return nmap_scan.validate_scripts(value)
+        except nmap_scan.ScanValidationError as exc:
+            raise _to_422(exc) from exc
 
     @field_validator("script_args")
     @classmethod
     def _v_script_args(cls, value: str | None) -> str | None:
-        return nmap_scan.validate_script_args(value) if value is not None else None
+        if value is None:
+            return None
+        try:
+            return nmap_scan.validate_script_args(value)
+        except nmap_scan.ScanValidationError as exc:
+            raise _to_422(exc) from exc
 
     @field_validator("extra")
     @classmethod
     def _v_extra(cls, value: str | None) -> str | None:
-        if value is not None:
-            nmap_scan.validate_extra(value)  # solleva -> 422
+        if value is None:
+            return None
+        try:
+            nmap_scan.validate_extra(value)
+        except nmap_scan.ScanValidationError as exc:
+            raise _to_422(exc) from exc
         return value
 
 
