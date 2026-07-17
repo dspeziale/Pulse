@@ -28,7 +28,55 @@ DB/OpenSearch). Implementa le pagine **P-01 … P-19** della sezione FRONTEND.
 | P-18 Configurazione | `config_bp` (`/config`) | `GET /config`, `PUT /config` |
 | P-19 Profilo utente | `profile` (`/profile`) | `GET /auth/me`, `POST /auth/change-password` |
 
+| P-nuova Compendio sistema | `report` (`/systems/<id>/report`) | `GET /systems/{id}`, `GET /systems/{id}/checks`, `POST /probes/{probe_id}/query`, `GET /probes/{probe_id}/heartbeats`, `GET /alarms` |
+
 Route infrastrutturali: `/` (redirect login/dashboard), `/healthz` (liveness).
+
+## Compendio sistema + Report PDF (P-nuova)
+
+Dal dettaglio di un Sistema (P-10) il pulsante **Compendio** apre
+`GET /systems/<id>/report`: un riepilogo di ciò che è rilevante nel **periodo**
+selezionato (default **Oggi**; preset come in P-04 — Ultima ora / Oggi / Ultime
+24h / 7 giorni / 30 giorni / intervallo personalizzato). Il periodo è calcolato
+nel fuso configurato (coerente con `localdt`) e convertito in UTC per le query.
+
+Contenuti (solo endpoint esistenti): intestazione (system_id/nome/tipo/Sonda/
+periodo), stato complessivo nel periodo (stato peggiore + distribuzione, con
+LED/badge), KPI (uptime %, response_ms avg/min/max, n. campioni, n. check,
+n. incidenti), tabella **per-check** (ultimo stato, uptime %, avg/min/max ms,
+ultimo contatto — aggregazioni via `POST /probes/{id}/query`), allarmi del
+periodo (`GET /alarms`, best-effort: senza `workflows.read` il resto della
+pagina si rende comunque) e un grafico `response_ms` (riuso di `pulse-charts.js`).
+
+### Export PDF — approccio scelto: **fpdf2** (non WeasyPrint)
+
+Il pulsante **Scarica PDF** genera `GET /systems/<id>/report.pdf`
+(`Content-Type: application/pdf`, `Content-Disposition` con nome file
+significativo `compendio_<system_id>_<da>_<a>.pdf`). Il PDF è prodotto **lato
+server** da `report_pdf.py`.
+
+Il DOCUMENTO richiedeva come approccio preferito WeasyPrint (HTML→PDF); è stato
+invece scelto **fpdf2** perché:
+
+- **puro Python, nessuna libreria di sistema** (WeasyPrint richiede
+  pango/cairo/gdk-pixbuf, che su Windows/CI non sono banali da installare); così
+  il report è generabile e **verificabile davvero** in ogni ambiente, test
+  inclusi (la rotta produce un `%PDF` valido, non isolato/mockato);
+- **coerenza di carattere** con la UI: viene embeddato **PT Sans Narrow** (pesi
+  400/700). I `.ttf` in `static/vendor/fonts/pt-sans-narrow/` (`PTSansNarrow-Regular.ttf`,
+  `PTSansNarrow-Bold.ttf`) sono ottenuti dai `.woff2` già vendorizzati per la UI
+  (conversione `fontTools`, font OFL — ridistribuzione consentita).
+
+Cura estetica: intestazione ripetuta col titolo **“Pulse — Compendio sistema”**,
+nome sistema e periodo; testo ben leggibile (corpo 9.5–11 pt, titoli 12–15 pt,
+niente testo minuscolo); tabelle ordinate a righe alternate dimensionate sulla
+larghezza utile A4 (180 mm, margini 15 mm) con salto pagina e header ripetuto;
+badge di stato colorati (coerenti coi `b-*` della UI); footer con data di
+generazione (fuso locale) e numero di pagina (`Pagina X di N`).
+
+**Dipendenze**: aggiunto `fpdf2` a `requirements.txt` (nessuna dipendenza di
+sistema → **nessuna modifica al Dockerfile**: il `COPY server/dashboard/` porta
+già font e codice, e `pip install -r requirements.txt` installa fpdf2).
 
 ## Autenticazione e RBAC lato UI
 

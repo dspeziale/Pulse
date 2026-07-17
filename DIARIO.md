@@ -1714,3 +1714,51 @@ Output consegnati
 - P-04 ora guida l'operatore: filtri a tendina concatenati (Sonda->Sistema->Check->Stato), periodi rapidi (default Oggi) + intervallo personalizzato, risultati DataTables server-side coi filtri passati via ajax.data e riepilogo del totale, scorciatoia "Solo problemi", query strutturata avanzata collassabile. Nessun CDN, nessuna modifica a backend/probe-agent. Coverage 100%, 290 test verdi.
 
 ================================================
+
+ITERAZIONE 46
+
+Agente: FE
+Data: 2026-07-17
+
+Input ricevuti
+- Richiesta orchestratore (SOLO server/dashboard, eventualmente frontend_common; NIENTE modifiche a backend/probe-agent; SOLO endpoint esistenti; niente CDN): per un SISTEMA monitorato, nuova pagina "Compendio" col riepilogo di cio' che e' rilevante nel PERIODO selezionato (default GIORNO odierno) + export di un REPORT PDF professionale (font PT Sans Narrow, testo ben leggibile, oggetti ben dimensionati).
+
+Lavoro svolto (FE, solo server/dashboard)
+- PAGINA COMPENDIO (nuovo blueprint views/report.py + templates/systems/report.html): raggiungibile dal dettaglio Sistema (pulsante "Compendio") e dalla rotta GET /systems/<id>/report. Selettore PERIODO con preset come in P-04 (Ultima ora, Oggi [DEFAULT], Ultime 24h, 7 giorni, 30 giorni, intervallo personalizzato from/to). from/to calcolati nel fuso configurato (riuso di views.query.time_presets/_current_timezone, stessa fonte di localdt) e convertiti in UTC per le query; intervallo personalizzato (datetime-local) convertito server-side da locale a UTC.
+- CONTENUTO (solo endpoint esistenti): intestazione (system_id/nome, tipo http/tcp, Sonda, periodo in localdt); stato complessivo nel periodo (stato peggiore per severita' + distribuzione stati) con LED/badge; KPI (uptime %, response_ms avg/min/max, n. campioni, n. check, n. incidenti); tabella PER-CHECK (ultimo stato, uptime %, avg/min/max ms, ultimo contatto); allarmi/incidenti del periodo; grafico response_ms (riuso pulse-charts.js).
+- ENDPOINT usati (tutti preesistenti): GET /systems/{id}, GET /systems/{id}/checks, POST /probes/{probe_id}/query (aggregazioni uptime/count/avg/min/max su response_ms; distribuzione stati via count filtrato per stato; per-check via filtro check_id), GET /probes/{probe_id}/heartbeats (campioni per il grafico), GET /alarms?system_id=<uuid>&from&to (incidenti; best-effort: senza workflows.read il resto della pagina si rende comunque grazie a try/except su ApiError/ApiUnavailableError).
+- EXPORT PDF (report_pdf.py, generato LATO SERVER): pulsante "Scarica PDF" -> GET /systems/<id>/report.pdf, Content-Type application/pdf, Content-Disposition con nome file significativo compendio_<system_id>_<da>_<a>.pdf (system_id sanificato). Stessi dati del compendio a schermo per il periodo scelto.
+- APPROCCIO PDF: scelto fpdf2 (puro Python) al posto di WeasyPrint (approccio "preferito" dai requisiti). Motivazione documentata (README §Compendio / Report PDF): WeasyPrint richiede librerie di sistema (pango/cairo/gdk-pixbuf) non banali su Windows/CI, mentre fpdf2 e' puro Python -> il report e' generabile e VERIFICABILE davvero in ogni ambiente (test inclusi), senza isolare/mockare la generazione. Coerenza col resto della UI garantita embeddando PT Sans Narrow (pesi 400/700): i .ttf (PTSansNarrow-Regular.ttf, PTSansNarrow-Bold.ttf) sono stati ottenuti dai .woff2 gia' vendorizzati per la UI via fontTools (font OFL, ridistribuzione consentita) e vendorizzati in static/vendor/fonts/pt-sans-narrow/.
+- ESTETICA/DIMENSIONI curate: intestazione ripetuta col titolo "Pulse — Compendio sistema", nome sistema e periodo; testo ben leggibile (corpo 9.5-11pt, titoli 12-15pt, niente testo minuscolo); pagina A4 verticale con margini 15mm e larghezza utile 180mm; tabelle ordinate a righe alternate con salto pagina e header ripetuto (stanno nella pagina A4); badge di stato colorati coerenti coi b-* della UI; grafico response_ms compatto dimensionato (180x38mm); footer con data di generazione (fuso locale) e numero di pagina "Pagina X di N".
+- Aggiunto pulsante "Compendio" nel dettaglio Sistema (templates/systems/detail.html); registrato il blueprint report in views/__init__.py; aggiunto fpdf2 a requirements.txt.
+
+Qualita'
+- NIENTE CDN: report.html usa solo asset locali (pulse-charts.js) e JS inline; il PDF non richiede rete. NESSUNA modifica a backend/probe-agent. NESSUNA modifica al Dockerfile necessaria (fpdf2 e' puro Python; il COPY server/dashboard/ porta gia' font+codice e pip install -r requirements.txt installa fpdf2) -- documentato nel README.
+- Coverage 100% sul codice applicativo nuovo: report_pdf.py 283/283 100%, views/report.py 120/120 100%; tutti gli altri moduli server/dashboard restano 100%; frontend_common e probe/dashboard invariati e 100%. Esito complessivo: frontend_common 71, server/dashboard 195, probe/dashboard 43 -> 309 test passati, 0 falliti. (Le uniche righe non coperte residue sono in file di TEST -- conftest _Blank/sys.path guard e test_timezone -- non codice applicativo.)
+- Test aggiunti (server/dashboard/tests/test_report.py, 19 test): la pagina compendio rende coi KPI e la tabella per-check (backend mockato); il preset default e' "Oggi" (option today selected); periodo personalizzato e propagazione al link PDF; sistema senza probe -> compendio vuoto; fallback allarmi 403; permesso richiesto (403) e anonimo (302); la rotta PDF restituisce Content-Type application/pdf e corpo non vuoto con header %PDF; nome file con date/sanificato; helper _local_to_utc (varianti/formati/tz non valido) e _worst_status; helper di formato di report_pdf; build PDF completo e a sezioni vuote; rami di impaginazione (_section_title/_table/_line_chart con salto pagina, righe alternate, badge chiaro/scuro).
+- Verifica REALE: pagina compendio resa dall'app Flask reale (test client WSGI) con 200 e contenuti (KPI 99.5%, per-check, canvas grafico); rotta PDF -> file PDF valido salvato su disco (42490 byte, header %PDF-1.3, trailer %%EOF, font PT Sans Narrow embeddati) via report_pdf.build_report_pdf.
+
+File creati
+- server/dashboard/views/report.py
+- server/dashboard/report_pdf.py
+- server/dashboard/templates/systems/report.html
+- server/dashboard/static/vendor/fonts/pt-sans-narrow/PTSansNarrow-Regular.ttf
+- server/dashboard/static/vendor/fonts/pt-sans-narrow/PTSansNarrow-Bold.ttf
+- server/dashboard/tests/test_report.py
+
+File modificati
+- server/dashboard/views/__init__.py (registrazione blueprint report)
+- server/dashboard/templates/systems/detail.html (pulsante "Compendio")
+- server/dashboard/requirements.txt (fpdf2)
+- server/dashboard/README.md (sezione Compendio + motivazione approccio PDF fpdf2)
+
+Decisioni prese
+- PDF con fpdf2 (puro Python) invece di WeasyPrint: verificabilita' reale in ogni ambiente e nessuna dipendenza di sistema; coerenza estetica garantita embeddando PT Sans Narrow (TTF derivati dai woff2 gia' vendorizzati).
+- Periodo default "Oggi" e preset identici a P-04, calcolati server-side nel fuso configurato e convertiti in UTC (deterministici e testabili).
+- Distribuzione stati e per-check ottenute via aggregazioni count/uptime/avg/min/max della query strutturata esistente (nessun endpoint nuovo); stato peggiore per ranking di severita' down>error>warn>unknown>ok.
+- Allarmi in best-effort (try/except): un utente con systems.read ma senza workflows.read vede comunque il compendio.
+
+Output consegnati
+- Nuova pagina Compendio sistema (GET /systems/<id>/report) col riepilogo del periodo selezionato (default Oggi) e rotta PDF (GET /systems/<id>/report.pdf) che produce un report professionale in PT Sans Narrow, ben dimensionato per A4. Solo endpoint esistenti, nessun CDN, nessuna modifica a backend/probe-agent. Coverage 100% sul codice applicativo, 309 test verdi.
+
+================================================

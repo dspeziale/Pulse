@@ -5,6 +5,7 @@
 <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
   <h1 class="h3 mb-0"><i class="bi bi-hdd-stack me-2"></i>{{ system.system_name }}</h1>
   <div class="d-flex gap-2">
+    <a class="btn btn-primary" href="{{ url_for('report.compendio', system_id=system.id) }}"><i class="bi bi-file-earmark-text me-1"></i>Compendio</a>
     {% if can('systems.update') %}<a class="btn btn-outline-secondary" href="{{ url_for('systems.edit_system', system_id=system.id) }}"><i class="bi bi-pencil me-1"></i>Modifica</a>{% endif %}
     {% if can('systems.delete') %}
     <form method="post" action="{{ url_for('systems.delete_system', system_id=system.id) }}" onsubmit="return confirm('Eliminare il sistema {{ system.system_name }}? Gli storici restano su OpenSearch.');">
