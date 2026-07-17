@@ -477,6 +477,7 @@ Formato corpo errore:
 ### PUT /api/v1/config
 - **Descrizione**: aggiorna uno o più parametri. **Permesso**: `config.update`.
 - **Request**: `{ "items": [ { "key": string, "value": any } ] }`. **Response 200**: `{ "updated": [string], "requires_restart": [string] }`. **Errori**: 422 (valore invalido), 401, 403.
+- **Validazione `timezone`** (esteso su richiesta utente): se tra gli item c'e' `key="timezone"`, il valore deve essere un identificatore di fuso orario **IANA** valido (es. `Europe/Rome`, `UTC`, `America/New_York`); un valore non valido restituisce 422 e NESSUN parametro del batch viene salvato. Il parametro serve alla sola visualizzazione lato frontend: i timestamp nelle response API restano in **UTC ISO-8601** (nessuna conversione lato backend).
 
 ---
 

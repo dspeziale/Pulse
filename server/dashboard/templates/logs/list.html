@@ -46,7 +46,7 @@
       <tbody>
       {% for e in data['items'] %}
       <tr>
-        <td class="text-body-secondary text-nowrap">{{ e.timestamp }}</td>
+        <td class="text-body-secondary text-nowrap">{{ e.timestamp|localdt }}</td>
         <td>{{ e.component }}</td>
         <td><span class="badge {{ lvl.get(e.level, 'text-bg-secondary') }}">{{ e.level }}</span></td>
         <td class="text-body-secondary">{{ e.logger }}</td>

@@ -199,7 +199,8 @@ INSERT INTO configuration (key, value, type, sensitive, requires_restart, descri
     ('retention_system_logs_days',          '90',      'int',  false, false, 'Retention log di sistema (DB-06).'),
     ('retention_notification_deliveries_days','180',   'int',  false, false, 'Retention storico invii notifiche (DB-06).'),
     ('retention_inbound_commands_days',     '90',      'int',  false, false, 'Retention log comandi in ingresso (DB-06).'),
-    ('retention_probe_rollups_days',        '7',       'int',  false, false, 'Retention snapshot rollup dashboard (DB-07).')
+    ('retention_probe_rollups_days',        '7',       'int',  false, false, 'Retention snapshot rollup dashboard (DB-07).'),
+    ('timezone',                            '"Europe/Rome"', 'string', false, false, 'Fuso orario IANA per la visualizzazione delle date-ora (es. Europe/Rome, UTC).')
 ON CONFLICT (key) DO NOTHING;
 
 -- =============================================================================

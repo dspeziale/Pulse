@@ -130,7 +130,10 @@ a.btn-ghost, .btn-ghost { color: var(--bs-body-color); }
 
 /* -- Rifiniture generiche -------------------------------------------------- */
 pre { white-space: pre-wrap; word-break: break-word; }
-canvas { max-width: 100%; }
+/* I grafici (pulse-charts.js) leggono clientWidth per disegnare a piena
+   larghezza: display:block + width:100% li fa occupare tutta la card (l'altezza
+   resta fissata dall'attributo height, quindi niente deformazioni). */
+canvas { display: block; width: 100%; max-width: 100%; }
 /* Blocchi <pre> "a scheda" per JSON/dettagli tecnici. */
 .pulse-code {
   background-color: var(--bs-tertiary-bg, rgba(0, 0, 0, 0.03));

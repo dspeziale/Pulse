@@ -11,7 +11,7 @@
   <div class="card-header"><i class="bi bi-info-circle me-1"></i>Dettaglio</div>
   <div class="card-body">
     <dl class="row mb-0">
-      <dt class="col-sm-3 text-body-secondary">Data</dt><dd class="col-sm-9">{{ entry.timestamp }}</dd>
+      <dt class="col-sm-3 text-body-secondary">Data</dt><dd class="col-sm-9">{{ entry.timestamp|localdt }}</dd>
       <dt class="col-sm-3 text-body-secondary">Attore</dt><dd class="col-sm-9">{{ entry.actor_type }} {{ entry.actor_id }}</dd>
       <dt class="col-sm-3 text-body-secondary">Azione</dt><dd class="col-sm-9"><code>{{ entry.action }}</code></dd>
       <dt class="col-sm-3 text-body-secondary">Entità</dt><dd class="col-sm-9">{{ entry.entity_type }} {{ entry.entity_id }}</dd>

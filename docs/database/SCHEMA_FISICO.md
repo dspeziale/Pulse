@@ -229,6 +229,27 @@ PK naturale `key varchar(100)`. `value jsonb` tipizzato (`type` documenta il tip
 logico). `sensitive` per il mascheramento. FK `updated_by`→users `ON DELETE SET
 NULL`. Trigger `updated_at`.
 
+Parametri di default popolati da `deploy/seed.sql` (valori indicativi,
+configurabili in esercizio):
+
+| key | value | type | requires_restart | descrizione |
+|---|---|---|:--:|---|
+| `api_port` | 8443 | int | sì | Porta HTTPS API applicative (utente). |
+| `probe_endpoint_port` | 9443 | int | sì | Porta HTTPS+mTLS endpoint dedicati Probe. |
+| `access_token_ttl_seconds` | 900 | int | no | Durata access token JWT (RF-002). |
+| `refresh_token_ttl_seconds` | 1209600 | int | no | Durata refresh token (RF-002). |
+| `failed_login_threshold` | 5 | int | no | Tentativi falliti prima del blocco account (RF-005). |
+| `probe_offline_timeout_seconds` | 120 | int | no | Timeout oltre il quale una Probe e' offline. |
+| `retention_system_logs_days` | 90 | int | no | Retention log di sistema (DB-06). |
+| `retention_notification_deliveries_days` | 180 | int | no | Retention storico invii notifiche (DB-06). |
+| `retention_inbound_commands_days` | 90 | int | no | Retention log comandi in ingresso (DB-06). |
+| `retention_probe_rollups_days` | 7 | int | no | Retention snapshot rollup dashboard (DB-07). |
+| `timezone` | "Europe/Rome" | string | no | Fuso orario IANA per la visualizzazione delle date-ora (es. Europe/Rome, UTC). |
+
+Il valore `timezone` e' memorizzato come stringa JSON (`"Europe/Rome"`) nella
+colonna `value jsonb`. Su DB gia' esistenti e' aggiunto dalla migrazione
+`deploy/migrations/004_config_timezone.sql` (idempotente, `ON CONFLICT DO NOTHING`).
+
 ### 3.22 sessions / refresh_tokens
 PK `id`. FK `user_id`→users `ON DELETE CASCADE`. `refresh_token_hash` (mai il
 token in chiaro). `revoked_at` per logout/revoca. Indici: `user_id`,

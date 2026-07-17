@@ -55,7 +55,7 @@
 {% if heartbeats %}
 <div class="card mb-3">
   <div class="card-header"><i class="bi bi-graph-up me-1"></i>response_ms</div>
-  <div class="card-body"><canvas id="rt" height="120"></canvas></div>
+  <div class="card-body"><canvas id="rt" class="w-100" height="150"></canvas></div>
 </div>
 <div class="card">
   <div class="card-header"><i class="bi bi-clock-history me-1"></i>Heartbeat</div>
@@ -65,7 +65,7 @@
       <tbody>
       {% for h in heartbeats['items'] %}
       <tr>
-        <td class="text-body-secondary">{{ h['@timestamp'] }}</td>
+        <td class="text-body-secondary">{{ h['@timestamp']|localdt }}</td>
         <td>{{ h.check_name }}</td>
         <td>{{ status_badge(h.status) }}</td>
         <td class="text-end">{{ h.response_ms }}</td>

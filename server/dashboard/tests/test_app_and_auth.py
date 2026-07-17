@@ -147,3 +147,28 @@ def test_login_page_preserves_flash_error(client):
     assert r.status_code == 200
     assert b"Credenziali non valide." in r.data
     assert b'class="alert alert-danger' in r.data
+
+
+def test_login_page_hides_success_and_info_flash(client):
+    # success/info scartati anche sul login (es. "Disconnesso.").
+    with client.session_transaction() as s:
+        s["_flashes"] = [("success", "Disconnesso."),
+                         ("info", "Nota informativa.")]
+    r = client.get("/login")
+    assert r.status_code == 200
+    assert b"Disconnesso." not in r.data
+    assert b"Nota informativa." not in r.data
+    assert b'class="alert alert-success' not in r.data
+    # comunque drenati dalla sessione.
+    with client.session_transaction() as s:
+        assert not s.get("_flashes")
+
+
+def test_logout_then_login_has_no_success_banner(client, login, fake):
+    login(["dashboard.read"])
+    fake.set("POST", "/auth/logout", None)
+    client.post("/logout")  # flasha "Disconnesso." (success)
+    r = client.get("/login")
+    assert r.status_code == 200
+    assert b"Disconnesso." not in r.data
+    assert b'class="alert alert-success' not in r.data

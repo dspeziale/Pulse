@@ -22,7 +22,7 @@
       <dt class="col-sm-3 text-body-secondary">Email</dt><dd class="col-sm-9">{{ user.email }}</dd>
       <dt class="col-sm-3 text-body-secondary">Stato</dt><dd class="col-sm-9"><span class="badge {{ acct.get(user.status, 'b-unknown') }}">{{ user.status }}</span></dd>
       <dt class="col-sm-3 text-body-secondary">Ruoli</dt><dd class="col-sm-9">{{ user.roles|join(', ') or '—' }}</dd>
-      <dt class="col-sm-3 text-body-secondary">Ultimo accesso</dt><dd class="col-sm-9 text-body-secondary">{{ user.last_login_at or '—' }}</dd>
+      <dt class="col-sm-3 text-body-secondary">Ultimo accesso</dt><dd class="col-sm-9 text-body-secondary">{{ user.last_login_at|localdt }}</dd>
     </dl>
   </div>
 </div>

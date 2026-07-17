@@ -72,6 +72,51 @@ def test_config_update_unknown_key_422(client, auth_headers) -> None:
     assert r.status_code == 422
 
 
+def test_config_get_includes_timezone(client, auth_headers) -> None:
+    listed = client.get("/api/v1/config", headers=auth_headers)
+    assert listed.status_code == 200
+    tz = next((i for i in listed.json()["items"] if i["key"] == "timezone"), None)
+    assert tz is not None and tz["value"] == "Europe/Rome"
+
+
+def test_config_update_timezone_valid(client, auth_headers) -> None:
+    for value in ("Europe/Rome", "UTC", "America/New_York"):
+        upd = client.put(
+            "/api/v1/config", headers=auth_headers, json={"items": [{"key": "timezone", "value": value}]}
+        )
+        assert upd.status_code == 200, upd.text
+        assert "timezone" in upd.json()["updated"]
+        got = client.get("/api/v1/config/timezone", headers=auth_headers)
+        assert got.json()["value"] == value
+
+
+def test_config_update_timezone_invalid_422(client, auth_headers) -> None:
+    r = client.put(
+        "/api/v1/config", headers=auth_headers, json={"items": [{"key": "timezone", "value": "Pippo/Baudo"}]}
+    )
+    assert r.status_code == 422
+
+
+def test_config_update_timezone_non_string_422(client, auth_headers) -> None:
+    r = client.put(
+        "/api/v1/config", headers=auth_headers, json={"items": [{"key": "timezone", "value": 123}]}
+    )
+    assert r.status_code == 422
+
+
+def test_config_update_timezone_invalid_does_not_touch_others(client, auth_headers) -> None:
+    """Un timezone non valido nello stesso batch fa fallire tutto (nessun salvataggio)."""
+    before = client.get("/api/v1/config/api_port", headers=auth_headers).json()["value"]
+    r = client.put(
+        "/api/v1/config",
+        headers=auth_headers,
+        json={"items": [{"key": "api_port", "value": 9999}, {"key": "timezone", "value": "Nope/Nope"}]},
+    )
+    assert r.status_code == 422
+    after = client.get("/api/v1/config/api_port", headers=auth_headers).json()["value"]
+    assert after == before
+
+
 def test_health_and_ready(client) -> None:
     assert client.get("/api/v1/health").json() == {"status": "ok"}
     ready = client.get("/api/v1/health/ready")

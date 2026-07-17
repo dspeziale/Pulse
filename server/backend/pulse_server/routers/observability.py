@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import datetime as dt
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy import func, select
@@ -156,6 +157,22 @@ def get_config_item(
     return serializers.config_out(item)
 
 
+def _validate_timezone(value: object) -> None:
+    """Valida che `value` sia un fuso orario IANA valido (esteso su richiesta utente).
+
+    Non converte alcun timestamp: i timestamp delle response restano in UTC
+    ISO-8601. Il parametro serve al frontend per la sola visualizzazione.
+    """
+    if not isinstance(value, str) or not value:
+        raise errors.unprocessable("timezone deve essere una stringa (fuso orario IANA).")
+    try:
+        ZoneInfo(value)
+    except (ZoneInfoNotFoundError, ValueError) as exc:
+        raise errors.unprocessable(
+            f"timezone non valido: '{value}' (atteso un identificatore IANA, es. 'Europe/Rome')."
+        ) from exc
+
+
 @config_router.put("", response_model=schemas.ConfigUpdateResponse)
 def update_config(
     body: schemas.ConfigUpdateRequest,
@@ -165,10 +182,17 @@ def update_config(
 ) -> schemas.ConfigUpdateResponse:
     updated: list[str] = []
     requires_restart: list[str] = []
+    # Pre-pass: esistenza + validazioni per-parametro PRIMA di applicare qualsiasi
+    # modifica, cosi' un valore non valido (es. timezone) non lascia modifiche parziali.
+    resolved: list[tuple[Configuration, schemas.ConfigUpdateItem]] = []
     for change in body.items:
         item = session.get(Configuration, change.key)
         if item is None:
             raise errors.unprocessable(f"Parametro inesistente: {change.key}")
+        if change.key == "timezone":
+            _validate_timezone(change.value)
+        resolved.append((item, change))
+    for item, change in resolved:
         item.value = change.value
         item.updated_by = actor.id
         updated.append(item.key)

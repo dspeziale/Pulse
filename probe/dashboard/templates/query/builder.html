@@ -70,7 +70,7 @@
       <tbody>
       {% for h in result['items'] %}
       <tr>
-        <td class="text-body-secondary">{{ h['@timestamp'] }}</td>
+        <td class="text-body-secondary">{{ h['@timestamp']|localdt }}</td>
         <td>{{ h.system_name }}</td>
         <td>{{ h.check_name }}</td>
         <td>{{ status_badge(h.status) }}</td>

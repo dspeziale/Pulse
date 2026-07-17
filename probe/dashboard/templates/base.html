@@ -111,10 +111,19 @@
            accumularsi in sessione. Il feedback di errore resta solo sul login. #}
         {%- set _ = get_flashed_messages() -%}
 {% else %}
+  {# Solo feedback di errore/avviso sul login: i messaggi success/info
+     (es. "Disconnesso.", "Accesso effettuato.") vengono scartati (ma comunque
+     drenati dalla sessione dalla chiamata a get_flashed_messages). #}
   {% with messages = get_flashed_messages(with_categories=true) %}
-    {% if messages %}
+    {% set alerts = [] %}
+    {% for category, message in messages %}
+      {% if category in ['danger', 'error', 'warning'] %}
+        {% set _ = alerts.append((category, message)) %}
+      {% endif %}
+    {% endfor %}
+    {% if alerts %}
     <div class="position-fixed top-0 start-50 translate-middle-x mt-3" style="z-index:1080;width:24rem;max-width:94vw">
-      {% for category, message in messages %}
+      {% for category, message in alerts %}
         <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show" role="alert">
           {{ message }}
           <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Chiudi"></button>

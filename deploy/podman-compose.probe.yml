@@ -89,6 +89,7 @@ services:
       PULSE_PROBE_SECRET_KEY: ${PULSE_PROBE_SECRET_KEY:-dev-probe-secret}
       PULSE_HTTP_TIMEOUT: ${PULSE_HTTP_TIMEOUT:-10}
       PULSE_VERIFY_TLS: ${PULSE_VERIFY_TLS:-false}
+      PULSE_PROBE_TIMEZONE: ${PULSE_PROBE_TIMEZONE:-Europe/Rome}
     ports:
       - "${PULSE_PROBE_DASH_PORT:-5001}:${PULSE_PROBE_DASH_PORT:-5001}"
     networks: [pulse]

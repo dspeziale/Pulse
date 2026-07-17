@@ -39,7 +39,7 @@
         <td>{{ a.system_id }}</td>
         <td>{{ a.probe_id }}</td>
         <td>{{ status_badge(a.status) }}</td>
-        <td class="text-body-secondary">{{ a.opened_at }}</td>
+        <td class="text-body-secondary">{{ a.opened_at|localdt }}</td>
         <td class="text-end">
           {% if can('commands.execute') and a.status == 'active' %}
           <form method="post" action="{{ url_for('alarms.ack_alarm', alarm_id=a.id) }}" class="d-inline-flex gap-1">

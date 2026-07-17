@@ -94,6 +94,9 @@ class ProbeDashboardConfig:
     session_cookie_name: str = "pulse_probe_session"
     #: Attributo Secure del cookie di sessione (True solo dietro HTTPS).
     session_cookie_secure: bool = False
+    #: Fuso orario (IANA) per la visualizzazione delle date-ora. La dashboard
+    #: Probe non ha accesso alla config del Server, quindi lo legge da env.
+    timezone: str = "Europe/Rome"
 
     @classmethod
     def from_env(cls) -> "ProbeDashboardConfig":
@@ -114,4 +117,5 @@ class ProbeDashboardConfig:
             session_cookie_secure=_get_bool(
                 "PULSE_PROBE_SESSION_COOKIE_SECURE", False
             ),
+            timezone=os.environ.get("PULSE_PROBE_TIMEZONE", "Europe/Rome"),
         )

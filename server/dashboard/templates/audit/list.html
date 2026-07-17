@@ -36,7 +36,7 @@
       <tbody>
       {% for e in data['items'] %}
       <tr>
-        <td><a class="text-decoration-none" href="{{ url_for('audit.detail', entry_id=e.id) }}">{{ e.timestamp }}</a></td>
+        <td><a class="text-decoration-none" href="{{ url_for('audit.detail', entry_id=e.id) }}">{{ e.timestamp|localdt }}</a></td>
         <td class="text-body-secondary">{{ e.actor_type }}:{{ e.actor_id }}</td>
         <td><code>{{ e.action }}</code></td>
         <td>{{ e.entity_type }}</td>

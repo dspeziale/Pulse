@@ -20,8 +20,8 @@
   <div class="card-header"><i class="bi bi-activity me-1"></i>Stato Sonda</div>
   <div class="card-body">
     <dl class="row mb-0">
-      <dt class="col-sm-3 text-body-secondary">Ultimo contatto</dt><dd class="col-sm-3">{{ status.last_seen_at or '—' }}</dd>
-      <dt class="col-sm-3 text-body-secondary">Ultima sync</dt><dd class="col-sm-3">{{ status.last_sync_at or '—' }}</dd>
+      <dt class="col-sm-3 text-body-secondary">Ultimo contatto</dt><dd class="col-sm-3">{{ status.last_seen_at|localdt }}</dd>
+      <dt class="col-sm-3 text-body-secondary">Ultima sync</dt><dd class="col-sm-3">{{ status.last_sync_at|localdt }}</dd>
       <dt class="col-sm-3 text-body-secondary">Versione</dt><dd class="col-sm-3">{{ status.version or '—' }}</dd>
       <dt class="col-sm-3 text-body-secondary">Stato</dt><dd class="col-sm-3">{{ status_badge(status.status) }}</dd>
     </dl>
@@ -50,7 +50,7 @@
 <div class="card mb-3">
   <div class="card-header d-flex justify-content-between">
     <span><i class="bi bi-hdd-stack me-1"></i>Sistemi</span>
-    <span class="text-body-secondary small">{{ overview.generated_at }}</span>
+    <span class="text-body-secondary small">{{ overview.generated_at|localdt }}</span>
   </div>
   <div class="table-responsive">
     <table class="table table-hover align-middle mb-0">
@@ -87,7 +87,7 @@
       <tbody>
       {% for h in heartbeats['items'] %}
       <tr>
-        <td class="text-body-secondary">{{ h['@timestamp'] }}</td>
+        <td class="text-body-secondary">{{ h['@timestamp']|localdt }}</td>
         <td>{{ h.system_name }}</td>
         <td>{{ h.check_name }}</td>
         <td>{{ status_badge(h.status) }}</td>

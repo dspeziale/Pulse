@@ -1,2 +1,5 @@
 Flask>=3.0
 httpx>=0.27
+# Database dei fusi orari IANA per zoneinfo (necessario su Windows e immagini
+# slim prive del tz-database di sistema): usato da pulse_fe_common.datetimes.
+tzdata>=2024.1

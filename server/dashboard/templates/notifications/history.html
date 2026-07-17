@@ -36,7 +36,7 @@
       <tbody>
       {% for h in data['items'] %}
       <tr>
-        <td class="text-body-secondary">{{ h.created_at }}</td>
+        <td class="text-body-secondary">{{ h.created_at|localdt }}</td>
         <td>{{ h.channel_id }}</td>
         <td>{{ h.recipient }}</td>
         <td>{{ status_badge(h.status) }}</td>

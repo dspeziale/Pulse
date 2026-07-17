@@ -42,7 +42,19 @@
             {% endif %}
           </label>
           <div class="input-group">
-            {% if item.sensitive %}
+            {% if item.key == 'timezone' %}
+            {# Fuso orario: <select> dei fusi piu' comuni; se il valore corrente
+               non e' tra questi viene aggiunto come opzione (name invariato). #}
+            <select class="form-select" id="cfg-{{ item.key }}" name="value:{{ item.key }}"
+                    {% if not can('config.update') %}disabled{% endif %}>
+              {% if item.value and item.value not in common_timezones %}
+              <option value="{{ item.value }}" selected>{{ item.value }}</option>
+              {% endif %}
+              {% for tz in common_timezones %}
+              <option value="{{ tz }}" {{ 'selected' if tz == item.value }}>{{ tz }}</option>
+              {% endfor %}
+            </select>
+            {% elif item.sensitive %}
             <input class="form-control" id="cfg-{{ item.key }}" name="value:{{ item.key }}"
                    placeholder="•••• (mascherato)" autocomplete="off"
                    {% if not can('config.update') %}readonly{% endif %}>

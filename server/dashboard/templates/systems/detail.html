@@ -34,7 +34,7 @@
           <dt class="col-sm-4 text-body-secondary">Poll interval</dt><dd class="col-sm-8">{{ system.poll_interval_seconds }} s</dd>
           <dt class="col-sm-4 text-body-secondary">Timeout</dt><dd class="col-sm-8">{{ system.timeout_seconds }} s</dd>
           <dt class="col-sm-4 text-body-secondary">Abilitato</dt><dd class="col-sm-8">{{ bool_badge(system.enabled) }}</dd>
-          <dt class="col-sm-4 text-body-secondary">Creato il</dt><dd class="col-sm-8 text-body-secondary">{{ system.created_at or '—' }}</dd>
+          <dt class="col-sm-4 text-body-secondary">Creato il</dt><dd class="col-sm-8 text-body-secondary">{{ system.created_at|localdt }}</dd>
         </dl>
       </div>
     </div>
@@ -74,7 +74,7 @@
         <td>{{ c.check_id }}</td>
         <td>{{ c.check_name }}</td>
         <td>{{ status_badge(c.last_status) }}</td>
-        <td class="text-body-secondary">{{ c.last_seen_at or '—' }}</td>
+        <td class="text-body-secondary">{{ c.last_seen_at|localdt }}</td>
       </tr>
       {% else %}
       <tr><td colspan="4" class="text-center text-body-secondary py-4">Nessun check ancora scoperto per questo sistema.</td></tr>

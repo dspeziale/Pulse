@@ -79,6 +79,28 @@ def test_login_page_preserves_flash_error(client):
     assert b'class="alert alert-danger' in r.data
 
 
+def test_login_page_hides_success_and_info_flash(client):
+    with client.session_transaction() as s:
+        s["_flashes"] = [("success", "Disconnesso."),
+                         ("info", "Nota informativa.")]
+    r = client.get("/login")
+    assert r.status_code == 200
+    assert b"Disconnesso." not in r.data
+    assert b"Nota informativa." not in r.data
+    assert b'class="alert alert-success' not in r.data
+    with client.session_transaction() as s:
+        assert not s.get("_flashes")
+
+
+def test_logout_then_login_has_no_success_banner(client, login):
+    login()
+    client.post("/logout")  # flasha "Disconnesso." (success)
+    r = client.get("/login")
+    assert r.status_code == 200
+    assert b"Disconnesso." not in r.data
+    assert b'class="alert alert-success' not in r.data
+
+
 def test_internal_pages_have_no_flash_banner(client, login, fake):
     login()
     fake.set("GET", "/status", {"opensearch_healthy": True, "version": "1.0"})
@@ -112,6 +134,43 @@ def test_dashboard_index(client, login, fake):
     r = client.get("/dashboard")
     assert r.status_code == 200
     assert b"Dashboard Probe" in r.data
+
+
+def test_dashboard_localizes_heartbeat_timestamp(client, login, fake):
+    # Il fuso della Sonda arriva da env (default Europe/Rome nel cfg di test):
+    # 12:00 UTC estate -> 14:00 locali.
+    login()
+    fake.set("GET", "/status", {"opensearch_healthy": True, "version": "1.0"})
+    fake.set("GET", "/systems", {"items": []})
+    fake.set("GET", "/query/heartbeats",
+             {"items": [{"@timestamp": "2026-07-16T12:00:00Z", "system_name": "s",
+                         "check_name": "c", "status": "ok", "response_ms": 5}]})
+    r = client.get("/dashboard")
+    assert r.status_code == 200
+    assert b"16/07/2026 14:00:00" in r.data
+
+
+def test_dashboard_timezone_from_env(monkeypatch):
+    # Con PULSE_PROBE_TIMEZONE=UTC il filtro non converte (12:00 resta 12:00).
+    monkeypatch.setenv("PULSE_PROBE_TIMEZONE", "UTC")
+    import app as app_module
+    from pulse_fe_common.config import ProbeDashboardConfig
+    from tests.conftest import FakeApiClient
+
+    application = app_module.create_app(ProbeDashboardConfig.from_env())
+    application.config["TESTING"] = True
+    fake = FakeApiClient()
+    fake.set("GET", "/status", {"opensearch_healthy": True, "version": "1.0"})
+    fake.set("GET", "/systems", {"items": []})
+    fake.set("GET", "/query/heartbeats",
+             {"items": [{"@timestamp": "2026-07-16T12:00:00Z", "system_name": "s",
+                         "check_name": "c", "status": "ok", "response_ms": 5}]})
+    application.config["API_CLIENT"] = fake
+    c = application.test_client()
+    with c.session_transaction() as s:
+        s["probe_user"] = "probe"
+    r = c.get("/dashboard")
+    assert b"16/07/2026 12:00:00" in r.data
 
 
 def test_dashboard_index_with_query_params(client, login, fake):

@@ -84,7 +84,7 @@
       <div class="card-body">
         <dl class="row mb-0 small">
           <dt class="col-5 text-body-secondary">Stato</dt><dd class="col-7">{{ status_badge(probe.status) }}</dd>
-          <dt class="col-5 text-body-secondary">Ultimo contatto</dt><dd class="col-7">{{ probe.last_seen_at or '—' }}</dd>
+          <dt class="col-5 text-body-secondary">Ultimo contatto</dt><dd class="col-7">{{ probe.last_seen_at|localdt }}</dd>
           <dt class="col-5 text-body-secondary">Versione</dt><dd class="col-7">{{ probe.version or '—' }}</dd>
           <dt class="col-5 text-body-secondary">Sistemi</dt><dd class="col-7">{{ probe.systems_count if probe.systems_count is defined else '—' }}</dd>
         </dl>

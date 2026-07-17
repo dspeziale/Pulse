@@ -11,6 +11,7 @@ from typing import Optional
 from flask import Flask, flash, redirect, render_template, url_for
 
 from pulse_fe_common.config import ProbeDashboardConfig
+from pulse_fe_common.datetimes import DEFAULT_FORMAT, format_datetime
 from pulse_fe_common.http_client import (ApiAuthError, ApiError,
                                          ApiUnavailableError, ApiClient)
 
@@ -35,6 +36,14 @@ def create_app(config: Optional[ProbeDashboardConfig] = None) -> Flask:
     )
 
     register_template_helpers(app)
+
+    # Filtro Jinja ``localdt``: la dashboard Probe non ha accesso alla config del
+    # Server, quindi usa il fuso orario configurato via env (PULSE_PROBE_TIMEZONE,
+    # default Europe/Rome). Su fuso non valido si ripiega su Europe/Rome/UTC.
+    @app.template_filter("localdt")
+    def _localdt(value, fmt: str = DEFAULT_FORMAT):
+        return format_datetime(value, cfg.timezone, fmt)
+
     register_blueprints(app)
     _register_error_handlers(app)
 

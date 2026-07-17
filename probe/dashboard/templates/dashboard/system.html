@@ -50,7 +50,7 @@
       <tbody>
       {% for h in heartbeats['items'] %}
       <tr>
-        <td class="text-body-secondary">{{ h['@timestamp'] }}</td>
+        <td class="text-body-secondary">{{ h['@timestamp']|localdt }}</td>
         <td>{{ h.check_name }}</td>
         <td>{{ status_badge(h.status) }}</td>
         <td class="text-end">{{ h.response_ms }}</td>

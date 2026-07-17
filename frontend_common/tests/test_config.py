@@ -40,7 +40,7 @@ def test_probe_defaults(monkeypatch):
               "PULSE_PROBE_DASH_USER", "PULSE_PROBE_DASH_PASSWORD",
               "PULSE_PROBE_SECRET_KEY", "PULSE_PROBE_DASH_PORT",
               "PULSE_PROBE_SESSION_COOKIE_NAME",
-              "PULSE_PROBE_SESSION_COOKIE_SECURE"):
+              "PULSE_PROBE_SESSION_COOKIE_SECURE", "PULSE_PROBE_TIMEZONE"):
         monkeypatch.delenv(k, raising=False)
     cfg = ProbeDashboardConfig.from_env()
     assert cfg.agent_base_url == "http://localhost:8444/api/v1"
@@ -48,6 +48,12 @@ def test_probe_defaults(monkeypatch):
     assert cfg.port == 5001
     assert cfg.session_cookie_name == "pulse_probe_session"
     assert cfg.session_cookie_secure is False
+    assert cfg.timezone == "Europe/Rome"
+
+
+def test_probe_timezone_env_override(monkeypatch):
+    monkeypatch.setenv("PULSE_PROBE_TIMEZONE", "America/New_York")
+    assert ProbeDashboardConfig.from_env().timezone == "America/New_York"
 
 
 def test_probe_session_cookie_env_overrides(monkeypatch):

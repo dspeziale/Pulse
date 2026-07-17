@@ -21,7 +21,16 @@ bp = Blueprint("config_bp", __name__)
 # "Altro" viene mostrata solo se contiene almeno un parametro (i gruppi vuoti
 # non vengono emessi).
 # ---------------------------------------------------------------------------
+# Fusi orari IANA proposti nel <select> della UI (il valore corrente, se diverso,
+# viene comunque aggiunto come opzione dal template così da non perderlo).
+COMMON_TIMEZONES = [
+    "Europe/Rome", "UTC", "Europe/London", "Europe/Paris", "Europe/Berlin",
+    "America/New_York", "America/Los_Angeles", "Asia/Tokyo",
+]
+
 _GROUP_DEFS = [
+    ("localization", "Localizzazione", "bi-globe",
+     frozenset({"timezone"}), None),
     ("network", "Rete & porte", "bi-hdd-network",
      frozenset({"api_port", "probe_endpoint_port"}), None),
     ("auth", "Autenticazione", "bi-shield-lock",
@@ -38,6 +47,7 @@ _GROUP_DEFS = [
 # Etichette leggibili per i parametri noti. Per le key non presenti si ripiega
 # su una versione "prettified" della key tecnica (vedi _prettify).
 _LABELS = {
+    "timezone": "Fuso orario",
     "api_port": "Porta API",
     "probe_endpoint_port": "Porta endpoint sonde",
     "access_token_ttl_seconds": "Durata access token",
@@ -103,7 +113,8 @@ def build_config_groups(items):
 def show_config():
     data = api_get("/config")
     groups = build_config_groups(data.get("items") or [])
-    return render_template("config/list.html", data=data, groups=groups)
+    return render_template("config/list.html", data=data, groups=groups,
+                           common_timezones=COMMON_TIMEZONES)
 
 
 @bp.route("/config", methods=["POST"])

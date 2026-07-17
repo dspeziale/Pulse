@@ -10,11 +10,14 @@ from typing import Optional
 
 from flask import Flask, flash, redirect, render_template, url_for
 
-from pulse_fe_common.auth import clear_session, register_template_helpers
+from pulse_fe_common.auth import (access_token, clear_session,
+                                  register_template_helpers)
 from pulse_fe_common.config import ServerDashboardConfig
+from pulse_fe_common.datetimes import DEFAULT_FORMAT, format_datetime
 from pulse_fe_common.http_client import (ApiAuthError, ApiError,
                                          ApiUnavailableError, ApiClient)
 
+from tzsource import fetch_config_timezone, resolve_timezone
 from views import register_blueprints
 
 
@@ -35,6 +38,7 @@ def create_app(config: Optional[ServerDashboardConfig] = None) -> Flask:
     )
 
     register_template_helpers(app)
+    _register_timezone_filter(app)
     register_blueprints(app)
     _register_error_handlers(app)
 
@@ -52,6 +56,24 @@ def create_app(config: Optional[ServerDashboardConfig] = None) -> Flask:
         return {"status": "ok"}, 200
 
     return app
+
+
+def _register_timezone_filter(app: Flask) -> None:
+    """Registra il filtro Jinja ``localdt`` (fuso orario da /config, con cache).
+
+    Il fuso orario e' letto dalla configurazione del backend e memorizzato in una
+    cache TTL su ``app.config`` (isolata per istanza dell'app). Su qualunque
+    errore si ripiega su Europe/Rome (vedi tzsource.resolve_timezone).
+    """
+    app.config["TZ_CACHE"] = {"value": "Europe/Rome", "exp": 0.0}
+
+    def _tz_fetch():
+        return fetch_config_timezone(app.config["API_CLIENT"], access_token())
+
+    @app.template_filter("localdt")
+    def _localdt(value, fmt: str = DEFAULT_FORMAT):
+        tz = resolve_timezone(app.config["TZ_CACHE"], _tz_fetch)
+        return format_datetime(value, tz, fmt)
 
 
 def _register_error_handlers(app: Flask) -> None:

@@ -130,7 +130,7 @@
           <tr>
             <td>{{ a.system_id }}</td>
             <td>{{ status_badge(a.status) }}</td>
-            <td class="text-body-secondary">{{ a.opened_at }}</td>
+            <td class="text-body-secondary">{{ a.opened_at|localdt }}</td>
           </tr>
           {% else %}
           <tr><td colspan="3" class="text-center text-body-secondary py-4">Nessun allarme attivo.</td></tr>
