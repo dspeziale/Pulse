@@ -8,15 +8,17 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import datetime as dt
 import logging
+import uuid
 from collections.abc import AsyncIterator
 from typing import Any
 
 import httpx
-from fastapi import Depends, FastAPI, Query
+from fastapi import BackgroundTasks, Depends, FastAPI, Query
 from fastapi.responses import JSONResponse
 
-from . import __version__, errors, schemas
+from . import __version__, errors, nmap_scan, schemas, scanner
 from .config import Settings, get_settings
 from .deps import get_state, require_server_token
 from .poller import poll_once
@@ -28,15 +30,21 @@ logger = logging.getLogger("pulse_probe")
 
 
 def bootstrap_state(settings: Settings) -> RuntimeState:
-    """Costruisce lo stato runtime (store + client), senza effettuare rete."""
+    """Costruisce lo stato runtime (store + client), senza effettuare rete.
+
+    Esegue il self-check di nmap (disponibilita'/versione nel container).
+    """
     store = build_store(settings)
     server = ServerClient(settings)
+    nmap_available, nmap_version = scanner.detect_nmap()
     return RuntimeState(
         settings=settings,
         store=store,
         server=server,
         probe_token=settings.probe_token,
         probe_id=settings.probe_id,
+        nmap_available=nmap_available,
+        nmap_version=nmap_version,
     )
 
 
@@ -209,6 +217,83 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             last_poll_at=state.last_poll_at,
             config_version=state.config_version,
             pending_events=state.pending_events,
+            nmap_available=state.nmap_available,
+            nmap_version=state.nmap_version,
+        )
+
+    @app.post("/api/v1/scan", response_model=schemas.ScanStartResponse, tags=["scan"])
+    def start_scan(
+        body: schemas.ScanRequest,
+        background: BackgroundTasks,
+        state: RuntimeState = Depends(get_state),
+        _: None = Depends(require_server_token),
+    ) -> schemas.ScanStartResponse:
+        # Costruzione argv sicura (lista, mai shell; sempre -oX -). Il body e' gia'
+        # validato dallo schema (target/opzioni/extra su whitelist -> 422 altrimenti).
+        argv = nmap_scan.build_nmap_argv(body)
+        scan_id = str(uuid.uuid4())
+        started_at = dt.datetime.now(dt.timezone.utc).isoformat()
+        state.store.index_scan(
+            {
+                "scan_id": scan_id,
+                "target": body.target,
+                "options": body.model_dump(),
+                "status": "running",
+                "started_at": started_at,
+                "finished_at": None,
+                "error": None,
+                "summary": None,
+                "hosts": [],
+            }
+        )
+        # Esecuzione in background: il TestClient attende i BackgroundTasks (deterministico).
+        background.add_task(scanner.execute_scan, state, scan_id, argv)
+        return schemas.ScanStartResponse(
+            scan_id=scan_id, status="running", started_at=started_at, target=body.target
+        )
+
+    @app.get("/api/v1/scans", response_model=schemas.ScanList, tags=["scan"])
+    def list_scans(
+        state: RuntimeState = Depends(get_state),
+        _: None = Depends(require_server_token),
+        page: int = Query(1, ge=1),
+        page_size: int = Query(20, ge=1, le=200),
+    ) -> schemas.ScanList:
+        items, total = state.store.search_scans(page=page, page_size=page_size)
+        return schemas.ScanList(
+            items=[
+                schemas.ScanListItem(
+                    scan_id=it["scan_id"],
+                    target=it["target"],
+                    status=it["status"],
+                    started_at=it["started_at"],
+                    finished_at=it.get("finished_at"),
+                    summary=it.get("summary"),
+                )
+                for it in items
+            ],
+            total=total,
+        )
+
+    @app.get("/api/v1/scan/{scan_id}", response_model=schemas.ScanDetail, tags=["scan"])
+    def get_scan(
+        scan_id: str,
+        state: RuntimeState = Depends(get_state),
+        _: None = Depends(require_server_token),
+    ) -> schemas.ScanDetail:
+        doc = state.store.get_scan(scan_id)
+        if doc is None:
+            raise errors.not_found("Scansione inesistente.")
+        return schemas.ScanDetail(
+            scan_id=doc["scan_id"],
+            target=doc["target"],
+            options=doc.get("options", {}),
+            status=doc["status"],
+            started_at=doc["started_at"],
+            finished_at=doc.get("finished_at"),
+            error=doc.get("error"),
+            summary=doc.get("summary"),
+            hosts=doc.get("hosts", []),
         )
 
     @app.get("/api/v1/health", tags=["health"])

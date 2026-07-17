@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+from . import nmap_scan
 
 
 class _Model(BaseModel):
@@ -72,3 +74,100 @@ class ProbeStatusOut(_Model):
     last_poll_at: str | None
     config_version: str | None
     pending_events: int
+    # Self-check: nmap disponibile nel container e relativa versione.
+    nmap_available: bool = False
+    nmap_version: str | None = None
+
+
+# ============================ Scansioni NMAP ==============================
+
+
+class ScanRequest(_Model):
+    """Opzioni di una scansione NMAP (stesso contratto usato dal FE).
+
+    Ogni campo e' validato con whitelist/regex; le stringhe non raggiungono mai
+    una shell (l'esecuzione usa argv come lista).
+    """
+
+    target: str
+    timing: Literal["T0", "T1", "T2", "T3", "T4", "T5"] = "T3"
+    technique: Literal["connect", "syn", "udp", "ping"] = "connect"
+    ports: str | None = None
+    top_ports: int | None = Field(default=None, ge=1, le=65535)
+    service_version: bool = False
+    version_intensity: int | None = Field(default=None, ge=0, le=9)
+    os_detection: bool = False
+    no_ping: bool = False
+    scripts: list[str] = Field(default_factory=list)
+    script_args: str | None = None
+    min_rate: int | None = Field(default=None, ge=1)
+    max_rate: int | None = Field(default=None, ge=1)
+    max_retries: int | None = Field(default=None, ge=0, le=20)
+    extra: str | None = None
+
+    @field_validator("target")
+    @classmethod
+    def _v_target(cls, value: str) -> str:
+        nmap_scan.validate_target(value)  # solleva -> 422
+        return value
+
+    @field_validator("ports")
+    @classmethod
+    def _v_ports(cls, value: str | None) -> str | None:
+        return nmap_scan.validate_ports(value) if value is not None else None
+
+    @field_validator("scripts")
+    @classmethod
+    def _v_scripts(cls, value: list[str]) -> list[str]:
+        return nmap_scan.validate_scripts(value)
+
+    @field_validator("script_args")
+    @classmethod
+    def _v_script_args(cls, value: str | None) -> str | None:
+        return nmap_scan.validate_script_args(value) if value is not None else None
+
+    @field_validator("extra")
+    @classmethod
+    def _v_extra(cls, value: str | None) -> str | None:
+        if value is not None:
+            nmap_scan.validate_extra(value)  # solleva -> 422
+        return value
+
+
+class ScanStartResponse(_Model):
+    scan_id: str
+    status: str
+    started_at: str
+    target: str
+
+
+class ScanSummary(_Model):
+    hosts_up: int
+    hosts_total: int
+    ports_open: int
+
+
+class ScanListItem(_Model):
+    scan_id: str
+    target: str
+    status: str
+    started_at: str
+    finished_at: str | None = None
+    summary: dict[str, Any] | None = None
+
+
+class ScanList(_Model):
+    items: list[ScanListItem]
+    total: int
+
+
+class ScanDetail(_Model):
+    scan_id: str
+    target: str
+    options: dict[str, Any]
+    status: str
+    started_at: str
+    finished_at: str | None = None
+    error: str | None = None
+    summary: dict[str, Any] | None = None
+    hosts: list[dict[str, Any]] = Field(default_factory=list)

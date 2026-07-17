@@ -59,6 +59,24 @@ EVENTS_MAPPING: dict[str, Any] = {
     }
 }
 
+# Mapping dell'indice delle scansioni NMAP (risultati salvati sulla Probe).
+NMAP_SCAN_MAPPING: dict[str, Any] = {
+    "mappings": {
+        "properties": {
+            "scan_id": {"type": "keyword"},
+            "target": {"type": "keyword"},
+            "status": {"type": "keyword"},
+            "started_at": {"type": "date"},
+            "finished_at": {"type": "date"},
+            "error": {"type": "text"},
+            # opzioni/hosts/summary sono strutture ricche: object non indicizzato a fondo
+            "options": {"type": "object", "enabled": False},
+            "summary": {"type": "object"},
+            "hosts": {"type": "object", "enabled": False},
+        }
+    }
+}
+
 
 class Store(Protocol):
     def index_heartbeats(self, docs: list[dict[str, Any]]) -> None: ...
@@ -77,6 +95,14 @@ class Store(Protocol):
         page_size: int | None = None,
     ) -> tuple[list[dict[str, Any]], int, dict[str, Any]]: ...
 
+    def index_scan(self, scan: dict[str, Any]) -> None: ...
+
+    def get_scan(self, scan_id: str) -> dict[str, Any] | None: ...
+
+    def search_scans(
+        self, *, page: int = 1, page_size: int = 20
+    ) -> tuple[list[dict[str, Any]], int]: ...
+
     def healthy(self) -> bool: ...
 
 
@@ -86,6 +112,7 @@ class InMemoryStore:
     def __init__(self) -> None:
         self._heartbeats: list[dict[str, Any]] = []
         self._events: list[dict[str, Any]] = []
+        self._scans: dict[str, dict[str, Any]] = {}
 
     def index_heartbeats(self, docs: list[dict[str, Any]]) -> None:
         self._heartbeats.extend(docs)
@@ -115,6 +142,24 @@ class InMemoryStore:
             page_size=page_size,
         )
 
+    def index_scan(self, scan: dict[str, Any]) -> None:
+        # upsert per scan_id (avvio 'running' e successivo aggiornamento a fine scansione)
+        self._scans[scan["scan_id"]] = dict(scan)
+
+    def get_scan(self, scan_id: str) -> dict[str, Any] | None:
+        found = self._scans.get(scan_id)
+        return dict(found) if found is not None else None
+
+    def search_scans(
+        self, *, page: int = 1, page_size: int = 20
+    ) -> tuple[list[dict[str, Any]], int]:
+        items = sorted(
+            self._scans.values(), key=lambda s: s.get("started_at") or "", reverse=True
+        )
+        total = len(items)
+        start = (max(1, page) - 1) * page_size
+        return [dict(s) for s in items[start : start + page_size]], total
+
     def healthy(self) -> bool:
         return True
 
@@ -134,10 +179,15 @@ class OpenSearchStore:  # pragma: no cover - richiede un cluster OpenSearch real
         self._client = client
         self._hb = settings.heartbeat_index
         self._ev = settings.events_index
+        self._scan = settings.nmap_scan_index
         self._ensure_indices()
 
     def _ensure_indices(self) -> None:
-        for name, mapping in ((self._hb, HEARTBEAT_MAPPING), (self._ev, EVENTS_MAPPING)):
+        for name, mapping in (
+            (self._hb, HEARTBEAT_MAPPING),
+            (self._ev, EVENTS_MAPPING),
+            (self._scan, NMAP_SCAN_MAPPING),
+        ):
             if not self._client.indices.exists(index=name):
                 self._client.indices.create(index=name, body=mapping)
 
@@ -177,6 +227,34 @@ class OpenSearchStore:  # pragma: no cover - richiede un cluster OpenSearch real
             page=page,
             page_size=page_size,
         )
+
+    def index_scan(self, scan: dict[str, Any]) -> None:
+        # id = scan_id -> upsert (avvio 'running' e aggiornamento finale)
+        self._client.index(index=self._scan, id=scan["scan_id"], body=scan)
+        self._client.indices.refresh(index=self._scan)
+
+    def get_scan(self, scan_id: str) -> dict[str, Any] | None:
+        if not self._client.exists(index=self._scan, id=scan_id):
+            return None
+        resp = self._client.get(index=self._scan, id=scan_id)
+        source: dict[str, Any] = resp.get("_source", {})
+        return source
+
+    def search_scans(
+        self, *, page: int = 1, page_size: int = 20
+    ) -> tuple[list[dict[str, Any]], int]:
+        start = (max(1, page) - 1) * page_size
+        body = {
+            "from": start,
+            "size": page_size,
+            "sort": [{"started_at": {"order": "desc"}}],
+            "query": {"match_all": {}},
+        }
+        resp = self._client.search(index=self._scan, body=body)
+        hits = resp.get("hits", {})
+        items = [hit["_source"] for hit in hits.get("hits", [])]
+        total = int(hits.get("total", {}).get("value", len(items)))
+        return items, total
 
     def healthy(self) -> bool:
         try:

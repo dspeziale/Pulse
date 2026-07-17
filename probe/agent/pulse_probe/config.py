@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from functools import lru_cache
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -39,6 +40,7 @@ class Settings(BaseSettings):
     opensearch_verify_certs: bool = False
     heartbeat_index: str = "pulse-heartbeats"
     events_index: str = "pulse-events"
+    nmap_scan_index: str = "pulse-nmap-scans"
 
     # --- Poller ---
     poll_default_interval_seconds: int = 30
@@ -53,8 +55,25 @@ class Settings(BaseSettings):
     tls_client_key_path: str | None = None
     http_verify: bool = False
 
+    # --- Scansioni NMAP (eseguite dalla Probe) ---
+    # Timeout per singola scansione in secondi (default 1800, cap 3600).
+    scan_timeout: int = 1800
+    # Numero massimo di scansioni concorrenti.
+    scan_max_concurrency: int = 2
+
     # --- Logging ---
     log_level: str = "info"
+
+    @field_validator("scan_timeout")
+    @classmethod
+    def _cap_scan_timeout(cls, value: int) -> int:
+        """Clamp del timeout di scansione a [1, 3600] secondi."""
+        return max(1, min(value, 3600))
+
+    @field_validator("scan_max_concurrency")
+    @classmethod
+    def _floor_concurrency(cls, value: int) -> int:
+        return max(1, value)
 
 
 @lru_cache(maxsize=1)

@@ -12,6 +12,16 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
+# nmap + libcap2-bin (setcap) per le scansioni eseguite dalla Sonda.
+# setcap cap_net_raw,cap_net_admin consente le scansioni RAW (-sS/-sU/-O) all'utente
+# NON-root. Installato PRIMA di passare a USER non-root.
+# Su Docker Desktop (Windows/WSL2) le capabilities sono onorate se il compose
+# aggiunge cap_add: [NET_RAW, NET_ADMIN] al servizio.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends nmap libcap2-bin \
+    && setcap cap_net_raw,cap_net_admin+eip /usr/bin/nmap \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 

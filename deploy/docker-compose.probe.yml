@@ -54,6 +54,12 @@ services:
     image: pulse-probe-agent:latest
     container_name: pulse-probe-agent
     restart: unless-stopped
+    # Capabilities per le scansioni NMAP RAW (-sS/-sU/-O). Onorate anche su
+    # Docker Desktop (Windows/WSL2). Senza queste, connect scan (-sT)/-sV/ping/NSE
+    # funzionano ugualmente; SYN/UDP/OS scan falliscono con errore "richiede privilegi".
+    cap_add:
+      - NET_RAW
+      - NET_ADMIN
     depends_on:
       opensearch:
         condition: service_healthy
@@ -66,6 +72,7 @@ services:
       PULSE_PROBE_OPENSEARCH_URL: http://opensearch:9200
       PULSE_PROBE_HTTP_VERIFY: ${PULSE_PROBE_HTTP_VERIFY:-false}
       PULSE_PROBE_LOG_LEVEL: ${PULSE_PROBE_LOG_LEVEL:-info}
+      PULSE_PROBE_SCAN_TIMEOUT: ${PULSE_PROBE_SCAN_TIMEOUT:-1800}
     ports:
       - "${PULSE_PROBE_API_PORT:-8444}:${PULSE_PROBE_API_PORT:-8444}"
     networks: [pulse, shared]

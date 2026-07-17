@@ -30,6 +30,10 @@ def bad_request(message: str, details: dict[str, Any] | None = None) -> ApiError
     return ApiError(400, "BAD_REQUEST", message, details)
 
 
+def not_found(message: str = "Risorsa inesistente.") -> ApiError:
+    return ApiError(404, "NOT_FOUND", message)
+
+
 def service_unavailable(message: str) -> ApiError:
     return ApiError(503, "SERVICE_UNAVAILABLE", message)
 
