@@ -58,7 +58,7 @@
           <dt class="col-sm-4 text-body-secondary">Tipo</dt>
           <dd class="col-sm-8"><span class="badge {{ 'b-unknown' if skind == 'tcp' else 'b-ok' }}">{{ 'Connettività TCP' if skind == 'tcp' else 'HTTP heartbeat' }}</span></dd>
           <dt class="col-sm-4 text-body-secondary">Sonda</dt>
-          <dd class="col-sm-8">{% if can('probes.read') %}<a href="{{ url_for('probes.detail', probe_id=system.probe_id) }}">{{ system.probe_id }}</a>{% else %}{{ system.probe_id }}{% endif %}</dd>
+          <dd class="col-sm-8">{% if can('probes.read') %}<a href="{{ url_for('probes.detail', probe_id=system.probe_id) }}" title="{{ system.probe_id }}">{{ system.probe_id|probe_name }}</a>{% else %}{{ system.probe_id|probe_name }}{% endif %}</dd>
         </dl>
       </div>
     </div>

@@ -100,7 +100,7 @@
            title="Apri il dettaglio della Sonda{{ ' (check in stato ' ~ p.drill ~ ')' if p.drill else '' }}">
           {{ led(p.led) }}
           <div class="flex-grow-1 text-truncate">
-            <div class="fw-semibold text-truncate" title="{{ p.probe_id }}">{{ p.probe_id }}</div>
+            <div class="fw-semibold text-truncate" title="{{ p.probe_id }}">{{ p.probe_id|probe_name }}</div>
             <div class="text-body-secondary small">
               {{ p.systems_total }} sistemi · {{ p.systems_down }} down · {{ status_badge(p.status) }}
             </div>
@@ -127,7 +127,7 @@
           {% for p in probe_rows %}
           <tr>
             <td class="text-center">{{ led(p.led) }}</td>
-            <td><a class="text-decoration-none" href="{{ url_for('probes.detail', probe_id=p.probe_id, status=(p.drill or none), window=window) }}">{{ p.probe_id }}</a></td>
+            <td><a class="text-decoration-none" href="{{ url_for('probes.detail', probe_id=p.probe_id, status=(p.drill or none), window=window) }}" title="{{ p.probe_id }}">{{ p.probe_id|probe_name }}</a></td>
             <td>{{ status_badge(p.status) }}</td>
             <td class="text-end">{{ p.systems_total }}</td>
             <td class="text-end">{{ p.systems_down }}</td>

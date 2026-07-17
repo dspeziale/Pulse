@@ -35,6 +35,11 @@ def _localdt(value: Any) -> str:
     return current_app.jinja_env.filters["localdt"](value)
 
 
+def _probe_name(value: Any) -> str:
+    """Risolve un probe_id nel nome Sonda col filtro ``probe_name`` (con cache)."""
+    return current_app.jinja_env.filters["probe_name"](value)
+
+
 def _link(endpoint: str, text: Any, *, bold: bool = True, **params) -> Markup:
     from flask import url_for
 
@@ -204,7 +209,7 @@ def _systems_table() -> DTTable:
             DTColumn("kind", _systems_kind, sort="kind", title="Tipo"),
             DTColumn("target", _systems_target, title="Endpoint / Target",
                      class_="text-body-secondary"),
-            DTColumn("probe_id", lambda s: _muted(s.get("probe_id")),
+            DTColumn("probe_id", lambda s: _probe_name(s.get("probe_id")),
                      title="Sonda"),
             DTColumn("enabled", lambda s: bool_badge(s.get("enabled")),
                      sort="enabled", title="Abilitato"),
@@ -360,7 +365,7 @@ def _alarms_table() -> DTTable:
         columns=[
             DTColumn("system_id", lambda a: _muted(a.get("system_id")),
                      title="Sistema"),
-            DTColumn("probe_id", lambda a: _muted(a.get("probe_id")),
+            DTColumn("probe_id", lambda a: _probe_name(a.get("probe_id")),
                      title="Sonda"),
             DTColumn("status", lambda a: status_badge(a.get("status")),
                      sort="status", title="Stato"),

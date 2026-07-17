@@ -18,6 +18,7 @@ from pulse_fe_common.http_client import (ApiAuthError, ApiError,
                                          ApiUnavailableError, ApiClient)
 
 import dt as dt_adapter
+from probesource import fetch_probe_names, probe_name, resolve_probe_names
 from tzsource import fetch_config_timezone, resolve_timezone
 from views import register_blueprints
 
@@ -40,6 +41,7 @@ def create_app(config: Optional[ServerDashboardConfig] = None) -> Flask:
 
     register_template_helpers(app)
     _register_timezone_filter(app)
+    _register_probe_name_filter(app)
     register_blueprints(app)
     app.register_blueprint(dt_adapter.bp)
     dt_adapter.register_template_globals(app)
@@ -77,6 +79,24 @@ def _register_timezone_filter(app: Flask) -> None:
     def _localdt(value, fmt: str = DEFAULT_FORMAT):
         tz = resolve_timezone(app.config["TZ_CACHE"], _tz_fetch)
         return format_datetime(value, tz, fmt)
+
+
+def _register_probe_name_filter(app: Flask) -> None:
+    """Registra il filtro Jinja ``probe_name`` (probe_id -> nome, con cache).
+
+    La mappa {id: name} e' letta da GET /probes e memorizzata in una cache TTL su
+    ``app.config`` (isolata per istanza). Su qualunque errore (permesso assente,
+    backend giu', id non in mappa) ripiega sul probe_id stesso (vedi probesource).
+    """
+    app.config["PROBE_CACHE"] = {"value": {}, "exp": 0.0}
+
+    def _fetch():
+        return fetch_probe_names(app.config["API_CLIENT"], access_token())
+
+    @app.template_filter("probe_name")
+    def _probe_name(value):
+        names = resolve_probe_names(app.config["PROBE_CACHE"], _fetch)
+        return probe_name(names, value)
 
 
 def _register_error_handlers(app: Flask) -> None:

@@ -1876,3 +1876,52 @@ Output consegnati
 - KPI del Compendio allineati.
 
 ================================================
+
+ITERAZIONE 50
+
+Agente: FE
+Data: 2026-07-17
+
+Input ricevuti
+- Richiesta orchestratore (solo server/dashboard + probe/dashboard + frontend_common se serve; NON toccare backend/probe-agent; niente CDN): DAPPERTUTTO, quando si referenzia una Sonda, mostrare il NOME della Sonda, non il codice (UUID/probe_id). Approccio FE-only con resolver cached probe_id->nome (pattern tzsource) e filtro Jinja probe_name; gli URL continuano a usare il probe_id.
+
+Lavoro svolto (FE)
+- RESOLVER (server/dashboard/probesource.py, stesso pattern di tzsource.py): fetch_probe_names(client, token) costruisce la mappa {probe_id: name} da GET /api/v1/probes (page_size=200, token di sessione; name assente -> id); resolve_probe_names(cache, fetch, ttl=60) con cache per-processo TTL breve su app.config["PROBE_CACHE"] (isolata per istanza), fallback a mappa vuota su qualsiasi errore (permesso probes.read assente, backend giu'); probe_name(names, probe_id) -> nome, con ripiego sul probe_id stesso se non in mappa (mai crash), "—" se vuoto/None.
+- FILTRO Jinja probe_name registrato in app.py (_register_probe_name_filter, accanto a localdt): {{ probe_id|probe_name }} nei template. In dt.py helper _probe_name(value) che usa il filtro (cache condivisa) per le celle DataTables.
+- PUNTI AGGIORNATI (testo = nome, URL/valori = probe_id invariati):
+  Template server:
+  * dashboard/index.html: card "Riepilogo per Sonda" (nome + title=probe_id) e tabella "Sonde" (link testo=nome, href con probe_id, title=probe_id).
+  * systems/detail.html: campo "Sonda" (link testo=nome, href con probe_id; ramo senza probes.read -> nome).
+  * systems/report.html (Compendio): campo "Sonda" (idem).
+  Celle DataTables server-side (dt.py):
+  * SISTEMI (/dt/systems): colonna "Sonda" -> nome.
+  * ALLARMI (/dt/alarms): colonna "Sonda" -> nome.
+  (LOG: il probe_id NON e' mostrato come testo nella tabella log -> nessuna modifica; nei workflow/notifiche il probe_id compare solo in esempi JSON/placeholder e in campi form value/name -> NON toccati, come da vincolo. Tutti i probe_id in url_for/value/name/hidden/ajax/option restano id.)
+- PROBE DASHBOARD: le sue viste NON mostrano il probe_id come testo (grep sui template: nessuna occorrenza; /status espone solo il probe_id, non il name). Decisione documentata: nessuna modifica lato Sonda e NESSUNA chiamata inventata al Server (la Sonda non conosce il proprio nome). La priorita' (piu' Sonde referenziate) e' il server dashboard, dove il resolver e' applicato.
+
+Qualita'
+- NIENTE CDN: nessun asset nuovo; solo un modulo Python + filtro Jinja. Nessun riferimento esterno.
+- Coverage 100% sul codice applicativo: server/dashboard probesource.py 32/32, app.py 76/76, dt.py 137/137 (+ tutte le views/tzsource/sdk); frontend_common e probe/dashboard invariati e 100%. Esito: frontend_common 75, server/dashboard 212, probe/dashboard 53 -> 340 test passati, 0 falliti.
+- Test aggiunti (server/dashboard/tests/test_probe_names.py): unita' resolver (mappa da /probes con page_size=200; id mancante saltato; name assente -> id; cache hit; fetch+cache con exp; errore -> mappa vuota; lookup + fallback all'id + "—"); filtro Jinja probe_name integrato; celle DataTables Sistemi/Allarmi mostrano il nome (+ fallback all'id con mappa vuota); systems/detail e dashboard mostrano il nome come testo mantenendo il probe_id nell'URL. Nessun test preesistente rotto.
+- Verifica REALE (app Flask reale + backend simulato) con probe_id UUID "3f2504e0-...": /dt/systems e /dt/alarms mostrano "probe-locale-01" nella colonna Sonda; systems/detail mostra il nome come testo con href="/probes/<uuid>" e NESSUN UUID come testo nudo; dashboard mostra il nome con link che conserva l'UUID.
+
+File creati
+- server/dashboard/probesource.py
+- server/dashboard/tests/test_probe_names.py
+
+File modificati
+- server/dashboard/app.py (import probesource + _register_probe_name_filter + wiring)
+- server/dashboard/dt.py (helper _probe_name; colonne Sonda di Sistemi e Allarmi -> nome)
+- server/dashboard/templates/dashboard/index.html (card + tabella Sonde)
+- server/dashboard/templates/systems/detail.html (campo Sonda)
+- server/dashboard/templates/systems/report.html (campo Sonda)
+
+Decisioni prese
+- Resolver cached (TTL 60s) invece di risolvere a ogni richiesta: al rename di una Sonda il nuovo nome e' raccolto entro il TTL. Fallback robusto all'id su ogni errore/permesso mancante (nessun crash, nessun logout).
+- Solo il TESTO mostrato viene tradotto: gli URL (url_for), i value/name dei form, le option dei select, gli hidden e i parametri ajax continuano a usare il probe_id (necessario per il routing/salvataggio).
+- Probe dashboard non modificata (non mostra il proprio id come testo e non conosce il proprio nome; nessuna chiamata al Server).
+
+Output consegnati
+- Ovunque nel server dashboard la Sonda e' referenziata come testo ora appare il NOME (dashboard riepilogo/tabella, dettaglio e compendio sistema, colonne DataTables Sistemi e Allarmi), con ripiego sul codice se il nome non e' risolvibile; gli URL mantengono il probe_id. Nessuna modifica a backend/probe-agent, nessun CDN. Coverage 100%, 340 test verdi.
+
+================================================
