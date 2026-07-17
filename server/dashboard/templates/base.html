@@ -245,6 +245,12 @@
   <script src="{{ url_for('static', filename='vendor/datatables/js/dataTables.min.js') }}"></script>
   <script src="{{ url_for('static', filename='vendor/datatables/js/dataTables.bootstrap5.min.js') }}"></script>
   <script src="{{ url_for('static', filename='js/pulse-datatables.js') }}"></script>
+  {# Tracker globale delle scansioni NMAP in corso: persiste in localStorage e
+     mostra un widget su ogni pagina, cosi' si puo' cambiare pagina e riprendere
+     una scansione ancora in corso. Solo per chi puo' leggere le scansioni. #}
+  {% if is_authenticated and can('scans.read') %}
+  <script src="{{ url_for('static', filename='js/pulse-scan-tracker.js') }}"></script>
+  {% endif %}
   {% block body_extra %}{% endblock %}
 </body>
 </html>

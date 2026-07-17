@@ -13,8 +13,13 @@
 
 {# Contenitore di polling: se in corso, pulse-scans.js interroga il JSON e
    ricarica la pagina al termine (done/failed). #}
-<div data-scan-poll
+<div data-scan-poll data-scan-track
      data-poll-url="{{ url_for('scans.detail_json', probe_id=probe_id, scan_id=scan_id) }}"
+     data-detail-url="{{ url_for('scans.detail', probe_id=probe_id, scan_id=scan_id) }}"
+     data-probe-id="{{ probe_id }}"
+     data-probe-name="{{ probe_id|probe_name }}"
+     data-scan-id="{{ scan_id }}"
+     data-target="{{ scan.target or scan_id }}"
      data-running="{{ 'true' if running else 'false' }}">
 
 <div class="card mb-3">

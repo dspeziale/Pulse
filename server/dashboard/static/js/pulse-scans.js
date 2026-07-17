@@ -14,6 +14,8 @@
   "use strict";
 
   var POLL_MS = 4000;
+  var LIST_REFRESH_MS = 5000;   // auto-refresh elenco mentre ci sono scansioni in corso
+  var LAST_PROBE_KEY = "pulse-scans-last-probe";
 
   function initList() {
     var root = document.querySelector("[data-scans-app]");
@@ -23,6 +25,21 @@
     var urlTmpl = root.getAttribute("data-dt-url");
     var colsEl = document.getElementById("scan-columns");
     var columns = JSON.parse((colsEl && colsEl.textContent) || "[]");
+    var refreshTimer = null;
+
+    function hasRunning(json) {
+      // L'elenco e' renderizzato server-side: lo stato "running" compare come
+      // testo del badge. Rileva se serve continuare l'auto-refresh.
+      try { return JSON.stringify(json.data || []).indexOf("running") !== -1; }
+      catch (e) { return false; }
+    }
+    function scheduleRefresh(json) {
+      if (refreshTimer) { window.clearTimeout(refreshTimer); refreshTimer = null; }
+      if (probe && probe.value && hasRunning(json)) {
+        refreshTimer = window.setTimeout(function () { table.ajax.reload(null, false); },
+                                         LIST_REFRESH_MS);
+      }
+    }
 
     function updateSummary(json) {
       if (!summary) { return; }
@@ -49,13 +66,29 @@
         window.jQuery.ajax({
           url: urlTmpl.replace("__PID__", encodeURIComponent(pid)),
           data: data, dataType: "json"
-        }).done(function (json) { callback(json); updateSummary(json); })
+        }).done(function (json) { callback(json); updateSummary(json); scheduleRefresh(json); })
           .fail(function () { callback(empty); updateSummary(empty); });
       }
     });
 
     if (probe) {
-      probe.addEventListener("change", function () { table.ajax.reload(); });
+      probe.addEventListener("change", function () {
+        try {
+          if (probe.value) { window.localStorage.setItem(LAST_PROBE_KEY, probe.value); }
+          else { window.localStorage.removeItem(LAST_PROBE_KEY); }
+        } catch (e) { /* storage negato: ignora */ }
+        table.ajax.reload();
+      });
+      // Ripristina l'ultima Sonda selezionata se la pagina non ne impone una
+      // (cosi', tornando alle Scansioni, si rivedono subito le sue scansioni).
+      if (!probe.value) {
+        var last = null;
+        try { last = window.localStorage.getItem(LAST_PROBE_KEY); } catch (e) { last = null; }
+        if (last && probe.querySelector('option[value="' + (window.CSS && CSS.escape ? CSS.escape(last) : last) + '"]')) {
+          probe.value = last;
+          table.ajax.reload();
+        }
+      }
     }
     updateSummary(null);
   }

@@ -168,6 +168,33 @@ def test_detail_running_enables_poll_and_shows_error(client, login, fake):
     assert "js/pulse-scans.js" in html
 
 
+def test_detail_registers_scan_tracker(client, login, fake):
+    """Il dettaglio espone i dati per il tracker globale (riprendi da altra pagina)."""
+    login(["scans.read"])
+    _probes(fake)
+    fake.set("GET", "/probes/p1/scan/sc2", {
+        "scan_id": "sc2", "status": "running", "target": "10.0.0.0/24",
+        "error": None, "hosts": []})
+    html = client.get("/scans/p1/sc2").get_data(as_text=True)
+    assert "data-scan-track" in html
+    assert 'data-scan-id="sc2"' in html
+    assert 'data-probe-id="p1"' in html
+    assert 'data-probe-name="probe-milano"' in html      # nome, non UUID
+    assert 'data-target="10.0.0.0/24"' in html
+    assert 'data-detail-url="/scans/p1/sc2"' in html
+
+
+def test_scan_tracker_script_loaded_with_scans_read(client, login, fake):
+    login(["scans.read"])
+    _probes(fake)
+    assert "js/pulse-scan-tracker.js" in client.get("/scans").get_data(as_text=True)
+
+
+def test_scan_tracker_script_absent_without_scans_read(client, login):
+    login(["dashboard.read"])
+    assert "js/pulse-scan-tracker.js" not in client.get("/guida").get_data(as_text=True)
+
+
 def test_detail_shows_error(client, login, fake):
     login(["scans.read"])
     _probes(fake)
