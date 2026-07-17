@@ -10,7 +10,8 @@
   <h1 class="h3 mb-0"><i class="bi bi-file-earmark-text me-2"></i>Compendio — {{ system.system_name }}</h1>
   <div class="d-flex gap-2">
     <a class="btn btn-outline-secondary" href="{{ url_for('systems.detail', system_id=system.id) }}"><i class="bi bi-arrow-left me-1"></i>Sistema</a>
-    <a class="btn btn-primary" href="{{ url_for('report.compendio_pdf', system_id=system.id, **pdf_args) }}"><i class="bi bi-file-earmark-pdf me-1"></i>Scarica PDF</a>
+    <a class="btn btn-primary" target="_blank" rel="noopener" href="{{ url_for('report.compendio_pdf', system_id=system.id, **pdf_args) }}"><i class="bi bi-file-earmark-pdf me-1"></i>Apri PDF</a>
+    <a class="btn btn-outline-primary" href="{{ url_for('report.compendio_pdf', system_id=system.id, download=1, **pdf_args) }}"><i class="bi bi-download me-1"></i>Scarica</a>
   </div>
 </div>
 

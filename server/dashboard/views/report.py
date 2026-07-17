@@ -219,11 +219,14 @@ def compendio_pdf(system_id: str):
     period = _resolve_period(_current_timezone())
     data = _gather(system, checks, period["from"], period["to"])
     pdf_bytes = build_report_pdf(system, checks, period, data)
+    # Default: apertura INLINE nel browser (via http) -> nessuna origine file://
+    # e nessun warning del visualizzatore. Con ?download=1 si forza il download.
+    disposition = "attachment" if request.args.get("download") else "inline"
     return Response(
         pdf_bytes,
         mimetype="application/pdf",
         headers={
             "Content-Disposition":
-                f'attachment; filename="{_filename(system, period)}"',
+                f'{disposition}; filename="{_filename(system, period)}"',
         },
     )

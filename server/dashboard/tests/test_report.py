@@ -167,8 +167,18 @@ def test_pdf_route_returns_pdf(client, login, fake):
     assert body[:5] == b"%PDF-"
     assert len(body) > 1000
     cd = r.headers["Content-Disposition"]
-    assert cd.startswith("attachment; filename=")
+    # Default: apertura inline nel browser (evita l'origine file:// e il warning).
+    assert cd.startswith("inline; filename=")
     assert "compendio_crm-prod_" in cd
+
+
+def test_pdf_route_download_forces_attachment(client, login, fake):
+    _wire(fake)
+    login(permissions=["systems.read"])
+    r = client.get("/systems/sys1/report.pdf", query_string={"download": "1"})
+    assert r.status_code == 200
+    assert r.get_data()[:5] == b"%PDF-"
+    assert r.headers["Content-Disposition"].startswith("attachment; filename=")
 
 
 def test_pdf_route_custom_period(client, login, fake):
