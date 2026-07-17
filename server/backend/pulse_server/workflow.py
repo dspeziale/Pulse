@@ -271,6 +271,23 @@ def _send_first_step(
                 error=error,
             )
         )
+        audit.write_system_log(
+            session,
+            component="server",
+            level="info" if status == "sent" else "error",
+            logger="notifications",
+            message=(
+                f"Notifica {status} sul canale {channel.type} "
+                f"per il sistema {event.get('system_id')}."
+            ),
+            context={
+                "channel": channel.type,
+                "recipient": str(recipient),
+                "system_id": event.get("system_id"),
+                "status": status,
+                "error": error,
+            },
+        )
 
 
 def process_event(

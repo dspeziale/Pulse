@@ -10,15 +10,12 @@ import probesource
 
 # -- Unita': resolver ---------------------------------------------------------
 class _FakeClient:
-    def __init__(self, items, exc=None):
+    def __init__(self, items):
         self._items = items
-        self._exc = exc
         self.params = None
 
     def get(self, path, token=None, params=None):
         self.params = params
-        if self._exc:
-            raise self._exc
         return {"items": self._items}
 
 
@@ -41,7 +38,7 @@ def test_resolve_probe_names_cache_hit():
     cache = {"value": {"a": "cached"}, "exp": 100.0}
     calls = []
 
-    def fetch():
+    def fetch():  # pragma: no cover - non deve essere chiamata (cache valida)
         calls.append(1)
         return {"a": "fresh"}
 

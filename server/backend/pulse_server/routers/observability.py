@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy import func, select
 
 from .. import errors, schemas, serializers
-from ..audit import write_audit
+from ..audit import write_audit, write_system_log
 from ..deps import CurrentUser, SessionDep, client_ip, require_permission
 from ..models import AuditLog, Configuration, SystemLog
 from ._helpers import clamp_pagination, offset, parse_uuid, sort_clause
@@ -231,6 +231,14 @@ def update_config(
         entity_id=None,
         ip=client_ip(request),
         details={"keys": updated},
+    )
+    write_system_log(
+        session,
+        component="server",
+        level="info",
+        logger="config",
+        message=f"Configurazione aggiornata: {', '.join(updated)}",
+        context={"keys": updated},
     )
     session.commit()
     return schemas.ConfigUpdateResponse(updated=updated, requires_restart=requires_restart)

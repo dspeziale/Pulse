@@ -5,7 +5,7 @@ from flask import Flask
 
 from . import (alarms, audit, auth, config_bp, dashboard, guida, identities,
                logs, notifications, permissions, probes, profile, query,
-               report, roles, systems, users, workflows)
+               report, roles, scans, systems, users, workflows)
 
 _BLUEPRINTS = [
     auth.bp,
@@ -13,6 +13,7 @@ _BLUEPRINTS = [
     probes.bp,
     systems.bp,
     report.bp,
+    scans.bp,
     users.bp,
     roles.bp,
     permissions.bp,

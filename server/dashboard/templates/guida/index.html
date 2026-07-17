@@ -30,6 +30,8 @@
         <a class="list-group-item list-group-item-action py-1" href="#sec-config">10. Configurazione</a>
         <a class="list-group-item list-group-item-action py-1" href="#sec-report">11. Report / Compendio</a>
         <a class="list-group-item list-group-item-action py-1" href="#sec-tabelle">12. Tabelle</a>
+        <a class="list-group-item list-group-item-action py-1" href="#sec-scansioni">13. Scansioni NMAP</a>
+        <a class="list-group-item list-group-item-action py-1" href="#sec-nominatim">14. Gateway Nominatim</a>
         <a class="list-group-item list-group-item-action py-1" href="#sec-faq">FAQ / Risoluzione problemi</a>
       </nav>
     </div>
@@ -416,6 +418,85 @@
               <strong>paginazione</strong> e scelta del numero di <strong>righe per pagina</strong>.
               I filtri specifici della pagina (Sonda, sistema, stato, periodo…) si combinano con la
               ricerca della tabella.</p>
+          </div>
+        </div>
+      </div>
+
+      {# ---------- 13. SCANSIONI NMAP ---------- #}
+      <div class="accordion-item" id="sec-scansioni">
+        <h2 class="accordion-header">
+          <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#c-scansioni">
+            <i class="bi bi-radar me-2"></i>13. Scansioni NMAP
+          </button>
+        </h2>
+        <div id="c-scansioni" class="accordion-collapse collapse" data-bs-parent="#guida-acc">
+          <div class="accordion-body">
+            <p>Dal menu <strong>Sicurezza &rarr; Scansioni NMAP</strong> puoi lanciare una scansione di rete
+              eseguita da una <strong>Sonda</strong> e consultarne i risultati. Serve il permesso
+              <code>scans.run</code> per avviarle e <code>scans.read</code> per consultarle.</p>
+            <h3 class="h6 mt-3">Come lanciarne una</h3>
+            <ol class="small">
+              <li><strong>Sonda</strong>: chi esegue la scansione (dalla sua rete).</li>
+              <li><strong>Target</strong>: IP, hostname o subnet CIDR (es. <code>10.88.2.0/24</code>).</li>
+              <li><strong>Effort (timing)</strong>: da <code>T0</code> (Paranoid, lentissimo/elusivo) a
+                <code>T5</code> (Insane, rapidissimo). Default <code>T3</code> (Normale).</li>
+              <li><strong>Tecnica</strong>: <code>connect</code> (default, senza privilegi),
+                <code>syn</code>, <code>udp</code>, <code>ping</code> (solo host discovery).</li>
+              <li><strong>Porte</strong> (es. <code>22,80,443</code> o <code>1-1000</code>) oppure
+                <strong>Top porte</strong>; opzioni <code>-sV</code> (servizio/versione), <code>-O</code>
+                (sistema operativo), <code>-Pn</code> (salta il ping, consigliato ON).</li>
+              <li><strong>NSE</strong>: categorie di script (default, safe, discovery, vuln, …) e/o script
+                specifici, con eventuali argomenti; timing fine (min/max-rate, retries) e flag extra.</li>
+            </ol>
+            <h3 class="h6 mt-3">Privilegi</h3>
+            <p class="small mb-2"><code>connect</code>, <code>-sV</code>, <code>ping</code> e gli script
+              <strong>NSE funzionano senza privilegi</strong>. Le tecniche <strong>SYN/UDP</strong> e il
+              <strong>rilevamento OS</strong> richiedono privilegi: le <em>capabilities</em> del container sono
+              gia' configurate (su Windows/Docker Desktop sono onorate in WSL2). Se mancano, la scansione
+              riporta un <strong>errore</strong> visibile nel dettaglio.</p>
+            <h3 class="h6 mt-3">Risultati e limiti</h3>
+            <ul class="small mb-0">
+              <li>Le scansioni in corso mostrano lo stato <em>running</em> e la pagina di dettaglio si
+                <strong>aggiorna automaticamente</strong> al termine (poll ~4s).</li>
+              <li>I risultati (host, porte, servizi/versioni, output NSE, ipotesi OS) sono <strong>salvati su
+                OpenSearch della Sonda</strong>.</li>
+              <li><strong>Limite di rete</strong>: per scansionare una LAN fisica serve una Sonda
+                <em>dentro</em> la rete target.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      {# ---------- 14. GATEWAY NOMINATIM ---------- #}
+      <div class="accordion-item" id="sec-nominatim">
+        <h2 class="accordion-header">
+          <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#c-nominatim">
+            <i class="bi bi-geo-alt me-2"></i>14. Gateway Nominatim
+          </button>
+        </h2>
+        <div id="c-nominatim" class="accordion-collapse collapse" data-bs-parent="#guida-acc">
+          <div class="accordion-body">
+            <p>Il Server fa da <strong>tunnel a Nominatim</strong> (geocodifica OpenStreetMap) per le Sonde e
+              gli altri servizi interni che non raggiungono direttamente Internet/Nominatim.</p>
+            <h3 class="h6 mt-3">Endpoint</h3>
+            <p class="small mb-1">Base: <code>GET /api/v1/nominatim/{search|reverse|lookup|status|details}?&lt;query&gt;</code></p>
+            <ul class="small">
+              <li><code>search</code> — geocodifica diretta (indirizzo &rarr; coordinate).</li>
+              <li><code>reverse</code> — geocodifica inversa (coordinate &rarr; indirizzo).</li>
+              <li><code>lookup</code> / <code>details</code> — dettagli per identificativi OSM.</li>
+              <li><code>status</code> — stato del servizio.</li>
+            </ul>
+            <h3 class="h6 mt-3">Autenticazione e limiti</h3>
+            <ul class="small">
+              <li><strong>JWT Pulse</strong> (sessione) <strong>oppure</strong> header
+                <code>X-API-Key</code> (valore <code>PULSE_NOMINATIM_API_KEY</code>).</li>
+              <li><strong>Rate-limit</strong> ~1 richiesta/secondo con <strong>cache</strong> delle risposte.</li>
+            </ul>
+            <h3 class="h6 mt-3">Esempio</h3>
+            <pre class="pulse-code mb-2">curl -H "X-API-Key: &lt;chiave&gt;" \
+  "http://&lt;server&gt;:8443/api/v1/nominatim/search?q=Roma&amp;format=json"</pre>
+            <p class="small mb-0">Utile per la <strong>geocodifica da servizi interni</strong> (es. una Sonda che
+              deve risolvere un indirizzo senza accesso diretto a Nominatim).</p>
           </div>
         </div>
       </div>

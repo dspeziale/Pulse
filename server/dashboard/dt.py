@@ -403,6 +403,63 @@ def _heartbeats_table() -> DTTable:
     )
 
 
+# -- scansioni NMAP (elenco per Sonda: /probes/{id}/scans) --------------------
+_SCAN_STATUS = {
+    "running": "b-warn", "pending": "b-off", "queued": "b-off",
+    "done": "b-ok", "completed": "b-ok", "success": "b-ok",
+    "failed": "b-error", "error": "b-error",
+}
+
+
+def _scan_summary(s: Mapping) -> str:
+    """Riepilogo compatto della scansione (host attivi / porte aperte)."""
+    summ = s.get("summary")
+    if isinstance(summ, Mapping):
+        up = summ.get("hosts_up", summ.get("up", summ.get("hosts")))
+        ports = summ.get("open_ports", summ.get("ports_open", summ.get("ports")))
+        parts = []
+        if up is not None:
+            parts.append(f"{up} host attivi")
+        if ports is not None:
+            parts.append(f"{ports} porte aperte")
+        return " · ".join(parts) if parts else "—"
+    return str(summ) if summ else "—"
+
+
+def _scans_columns(probe_id: str) -> list:
+    """Colonne della tabella scansioni; il link Dettaglio usa il probe_id."""
+    def _detail(s: Mapping) -> Markup:
+        return _link("scans.detail", s.get("target") or s.get("scan_id"),
+                     probe_id=probe_id, scan_id=s.get("scan_id"))
+
+    def _actions(s: Mapping) -> Markup:
+        return _icon_btn("scans.detail", "bi-eye", "Dettaglio",
+                         probe_id=probe_id, scan_id=s.get("scan_id"))
+
+    return [
+        DTColumn("status", lambda s: badge(s.get("status"),
+                                           _SCAN_STATUS.get(s.get("status"),
+                                                            "b-unknown")),
+                 title="Stato"),
+        DTColumn("target", _detail, title="Target"),
+        DTColumn("started_at", lambda s: _localdt(s.get("started_at")),
+                 title="Avvio", class_="text-body-secondary"),
+        DTColumn("finished_at", lambda s: _localdt(s.get("finished_at")),
+                 title="Fine", class_="text-body-secondary"),
+        DTColumn("summary", _scan_summary, title="Riepilogo",
+                 class_="text-body-secondary"),
+        DTColumn("actions", _actions, title="Azioni", th_class="text-end",
+                 class_="text-end"),
+    ]
+
+
+def _scans_table() -> DTTable:
+    # I render qui non sono usati (solo thead + columnsJs per il template).
+    # Nessuna colonna ordinabile: l'ordinamento e' disabilitato nell'init JS.
+    return DTTable(columns=_scans_columns(""), order=(0, "asc"),
+                   default_length=25, searching=False)
+
+
 # --------------------------------------------------------------------------- #
 # Registro risorse per la rotta generica /dt/<resource>
 # --------------------------------------------------------------------------- #
@@ -440,6 +497,7 @@ _RESOURCES: dict[str, _Resource] = {
 #: Tabelle esposte ai template per costruire thead + init JS (include heartbeats).
 _TABLES: dict[str, DTTable] = {name: r.table for name, r in _RESOURCES.items()}
 _TABLES["heartbeats"] = _heartbeats_table()
+_TABLES["scans"] = _scans_table()
 
 
 def table_meta(resource: str) -> dict:
@@ -492,6 +550,20 @@ def dt_heartbeats(probe_id: str):
         fetch=lambda params: api_get(f"/probes/{probe_id}/heartbeats",
                                      params=params),
         extra_filters=filters,
+    )
+    return jsonify(payload)
+
+
+@bp.route("/dt/scans/<probe_id>")
+def dt_scans(probe_id: str):
+    """Adattatore elenco scansioni NMAP per Sonda (/probes/{id}/scans)."""
+    if not is_authenticated():
+        abort(401)
+    if not has_any(user_permissions(), ("scans.read",)):
+        abort(403)
+    payload = serve(
+        request.args, _scans_columns(probe_id),
+        fetch=lambda params: api_get(f"/probes/{probe_id}/scans", params=params),
     )
     return jsonify(payload)
 

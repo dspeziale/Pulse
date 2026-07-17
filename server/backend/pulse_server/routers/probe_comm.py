@@ -15,7 +15,7 @@ from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from .. import errors, schemas
-from ..audit import write_audit
+from ..audit import write_audit, write_system_log
 from ..context import SecretBoxDep
 from ..deps import AuthedProbeDep, SessionDep, SettingsDep, client_ip
 from ..models import (
@@ -78,6 +78,15 @@ def register(
         entity_id=str(probe.id),
         ip=client_ip(request),
         details={"hostname": body.hostname, "version": body.version},
+    )
+    write_system_log(
+        session,
+        component="probe",
+        level="info",
+        logger="enrollment",
+        message=f"Sonda registrata: hostname={body.hostname}, probe_id={probe.id}.",
+        probe_id=probe.id,
+        context={"hostname": body.hostname, "version": body.version},
     )
     session.commit()
     return schemas.ProbeRegisterResponse(

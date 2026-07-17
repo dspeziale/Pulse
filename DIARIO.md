@@ -5,7 +5,7 @@ Formato obbligatorio per ogni iterazione; una riga vuota tra un'iterazione e la 
 
 ================================================
 
-ITERAZIONE 0
+ITERAZIONE 1
 
 Agente: ORCHESTRATORE
 Data: 2026-07-15
@@ -37,7 +37,7 @@ Output consegnati
 
 ================================================
 
-ITERAZIONE 1
+ITERAZIONE 2
 
 Agente: ANALISTA
 Data: 2026-07-15
@@ -85,7 +85,7 @@ Output consegnati
 
 ================================================
 
-ITERAZIONE 2
+ITERAZIONE 3
 
 Agente: DBA
 Data: 2026-07-15
@@ -137,7 +137,7 @@ Output consegnati
 
 ================================================
 
-ITERAZIONE 3
+ITERAZIONE 4
 
 Agente: BE
 Data: 2026-07-15
@@ -185,7 +185,7 @@ Output consegnati
 
 ================================================
 
-ITERAZIONE 4
+ITERAZIONE 5
 
 Agente: FE
 Data: 2026-07-15
@@ -241,7 +241,7 @@ Output consegnati
 
 ================================================
 
-ITERAZIONE 5
+ITERAZIONE 6
 
 Agente: QA
 Data: 2026-07-15
@@ -286,7 +286,7 @@ Output consegnati
 
 ================================================
 
-ITERAZIONE 6
+ITERAZIONE 7
 
 Agente: BE
 Data: 2026-07-16
@@ -326,7 +326,7 @@ Output consegnati
 
 ================================================
 
-ITERAZIONE 7
+ITERAZIONE 8
 
 Agente: ANALISTA
 Data: 2026-07-16
@@ -361,7 +361,7 @@ Output consegnati
 
 ================================================
 
-ITERAZIONE 8
+ITERAZIONE 9
 
 Agente: QA
 Data: 2026-07-16
@@ -396,7 +396,7 @@ Output consegnati
 ================================================
 
 
-ITERAZIONE 9
+ITERAZIONE 10
 
 Agente: DBA
 Data: 2026-07-16
@@ -423,7 +423,7 @@ Output consegnati
 - deploy/seed.sql corretto e ri-validato su Postgres 16 (applica pulito). OSS-01 chiuso lato artefatti DBA.
 
 ================================================
-ITERAZIONE 10
+ITERAZIONE 11
 
 Agente: ORCHESTRATORE
 Data: 2026-07-16
@@ -452,7 +452,7 @@ Output consegnati
 
 ================================================
 
-ITERAZIONE 11
+ITERAZIONE 12
 
 Agente: ORCHESTRATORE
 Data: 2026-07-16
@@ -481,7 +481,7 @@ Output consegnati
 
 ================================================
 
-ITERAZIONE 12
+ITERAZIONE 13
 
 Agente: ORCHESTRATORE
 Data: 2026-07-16
@@ -511,7 +511,7 @@ Output consegnati
 
 ================================================
 
-ITERAZIONE 13
+ITERAZIONE 14
 
 Agente: FE
 Data: 2026-07-16
@@ -548,7 +548,7 @@ Output consegnati
 
 ================================================
 
-ITERAZIONE 14
+ITERAZIONE 15
 
 Agente: FE
 Data: 2026-07-16
@@ -588,7 +588,7 @@ Output consegnati
 
 ================================================
 
-ITERAZIONE 15
+ITERAZIONE 16
 
 Agente: FE
 Data: 2026-07-16
@@ -620,7 +620,7 @@ Output consegnati
 
 ================================================
 
-ITERAZIONE 16
+ITERAZIONE 17
 
 Agente: BE
 Data: 2026-07-16
@@ -659,7 +659,7 @@ Output consegnati
 
 ================================================
 
-ITERAZIONE 17
+ITERAZIONE 18
 
 Agente: FE
 Data: 2026-07-16
@@ -693,7 +693,7 @@ Output consegnati
 
 ================================================
 
-ITERAZIONE 18
+ITERAZIONE 19
 
 Agente: BE
 Data: 2026-07-16
@@ -726,7 +726,7 @@ Output consegnati
 
 ================================================
 
-ITERAZIONE 19
+ITERAZIONE 20
 
 Agente: BE
 Data: 2026-07-16
@@ -762,7 +762,7 @@ Output consegnati
 
 ================================================
 
-ITERAZIONE 20
+ITERAZIONE 21
 
 Agente: DBA
 Data: 2026-07-16
@@ -798,7 +798,7 @@ Output consegnati
 
 ================================================
 
-ITERAZIONE 21
+ITERAZIONE 22
 
 Agente: FE
 Data: 2026-07-16
@@ -834,7 +834,7 @@ Output consegnati
 ================================================
 
 
-ITERAZIONE 22
+ITERAZIONE 23
 
 Agente: FE
 Data: 2026-07-16
@@ -887,7 +887,7 @@ Output consegnati
 
 ================================================
 
-ITERAZIONE 23
+ITERAZIONE 24
 
 Agente: BE
 Data: 2026-07-16
@@ -939,7 +939,7 @@ Output consegnati
 ================================================
 
 
-ITERAZIONE 24
+ITERAZIONE 25
 
 Agente: FE
 Data: 2026-07-16
@@ -979,7 +979,7 @@ Decisioni prese
 
 ================================================
 
-ITERAZIONE 25
+ITERAZIONE 26
 
 Agente: BE
 Data: 2026-07-16
@@ -1014,7 +1014,7 @@ Output consegnati
 ================================================
 
 
-ITERAZIONE 26
+ITERAZIONE 27
 
 Agente: FE
 Data: 2026-07-16
@@ -1048,7 +1048,7 @@ Decisioni prese
 
 ================================================
 
-ITERAZIONE 27
+ITERAZIONE 28
 
 Agente: BE
 Data: 2026-07-16
@@ -1077,7 +1077,7 @@ Output consegnati
 ================================================
 
 
-ITERAZIONE 28
+ITERAZIONE 29
 
 Agente: FE
 Data: 2026-07-16
@@ -1109,7 +1109,7 @@ Decisioni prese
 ================================================
 
 
-ITERAZIONE 29
+ITERAZIONE 30
 
 Agente: FE
 Data: 2026-07-16
@@ -1152,7 +1152,7 @@ Decisioni prese
 
 ================================================
 
-ITERAZIONE 30
+ITERAZIONE 31
 
 Agente: FE
 Data: 2026-07-16
@@ -1190,7 +1190,7 @@ Output consegnati
 
 ================================================
 
-ITERAZIONE 31
+ITERAZIONE 32
 
 Agente: DBA
 Data: 2026-07-16
@@ -1224,7 +1224,7 @@ Output consegnati
 
 ================================================
 
-ITERAZIONE 32
+ITERAZIONE 33
 
 Agente: DEPLOY
 Data: 2026-07-16
@@ -1258,7 +1258,7 @@ Output consegnati
 
 ================================================
 
-ITERAZIONE 33
+ITERAZIONE 34
 
 Agente: FE
 Data: 2026-07-16
@@ -1293,7 +1293,7 @@ Output consegnati
 
 ================================================
 
-ITERAZIONE 34
+ITERAZIONE 35
 
 Agente: BE
 Data: 2026-07-16
@@ -1329,7 +1329,7 @@ Output consegnati
 
 ================================================
 
-ITERAZIONE 35
+ITERAZIONE 36
 
 Agente: FE
 Data: 2026-07-16
@@ -1367,7 +1367,7 @@ Output consegnati
 
 ================================================
 
-ITERAZIONE 36
+ITERAZIONE 37
 
 Agente: BE
 Data: 2026-07-16
@@ -1394,7 +1394,7 @@ Output consegnati
 
 ================================================
 
-ITERAZIONE 37
+ITERAZIONE 38
 
 Agente: FE
 Data: 2026-07-17
@@ -1427,7 +1427,7 @@ Output consegnati
 
 ================================================
 
-ITERAZIONE 38
+ITERAZIONE 39
 
 Agente: FE
 Data: 2026-07-17
@@ -1452,7 +1452,7 @@ Output consegnati
 
 ================================================
 
-ITERAZIONE 39
+ITERAZIONE 40
 
 Agente: DBA
 Data: 2026-07-17
@@ -1487,7 +1487,7 @@ Output consegnati
 
 ================================================
 
-ITERAZIONE 40
+ITERAZIONE 41
 
 Agente: BE
 Data: 2026-07-17
@@ -1519,7 +1519,7 @@ Output consegnati
 
 ================================================
 
-ITERAZIONE 41
+ITERAZIONE 42
 
 Agente: FE
 Data: 2026-07-17
@@ -1556,7 +1556,7 @@ Output consegnati
 
 ================================================
 
-ITERAZIONE 42
+ITERAZIONE 43
 
 Agente: FE (recuperata dall'ORCHESTRATORE dopo interruzione dell'agente)
 Data: 2026-07-17
@@ -1583,7 +1583,7 @@ Output consegnati
 
 ================================================
 
-ITERAZIONE 43
+ITERAZIONE 44
 
 Agente: BE
 Data: 2026-07-17
@@ -1620,7 +1620,7 @@ Output consegnati
 
 ================================================
 
-ITERAZIONE 44
+ITERAZIONE 45
 
 Agente: FE
 Data: 2026-07-17
@@ -1666,7 +1666,7 @@ Output consegnati
 
 ================================================
 
-ITERAZIONE 45
+ITERAZIONE 46
 
 Agente: FE
 Data: 2026-07-17
@@ -1715,7 +1715,7 @@ Output consegnati
 
 ================================================
 
-ITERAZIONE 46
+ITERAZIONE 47
 
 Agente: FE
 Data: 2026-07-17
@@ -1763,7 +1763,7 @@ Output consegnati
 
 ================================================
 
-ITERAZIONE 47
+ITERAZIONE 48
 
 Agente: FE
 Data: 2026-07-17
@@ -1802,7 +1802,7 @@ Output consegnati
 
 ================================================
 
-ITERAZIONE 48
+ITERAZIONE 49
 
 Agente: FE
 Data: 2026-07-17
@@ -1852,7 +1852,7 @@ Output consegnati
 
 ================================================
 
-ITERAZIONE 49
+ITERAZIONE 50
 
 Agente: ORCHESTRATORE
 Data: 2026-07-17
@@ -1877,7 +1877,7 @@ Output consegnati
 
 ================================================
 
-ITERAZIONE 50
+ITERAZIONE 51
 
 Agente: FE
 Data: 2026-07-17
@@ -1926,7 +1926,7 @@ Output consegnati
 
 ================================================
 
-ITERAZIONE 51
+ITERAZIONE 52
 
 Agente: DBA
 Data: 2026-07-17
@@ -1963,7 +1963,7 @@ Output consegnati
 
 ================================================
 
-ITERAZIONE 52
+ITERAZIONE 53
 
 Agente: BE
 Data: 2026-07-17
@@ -2012,7 +2012,7 @@ File toccati
 ================================================
 
 
-ITERAZIONE 53
+ITERAZIONE 54
 
 Agente: BE
 Data: 2026-07-17
@@ -2060,7 +2060,7 @@ Output consegnati
 ================================================
 
 
-ITERAZIONE 54
+ITERAZIONE 55
 
 Agente: BE
 Data: 2026-07-17
@@ -2103,5 +2103,159 @@ File modificati
 
 Output consegnati
 - Proxy Server->Probe per NMAP: POST /probes/{id}/scan (scans.run, con audit), GET /probes/{id}/scans (scans.read), GET /probes/{id}/scan/{scan_id} (scans.read). RBAC applicato, audit scans.run scritto, errori mappati (401/403/404/503). mypy --strict pulito, coverage 100%, 301 test verdi.
+
+================================================
+
+ITERAZIONE 56
+
+Agente: FE
+Data: 2026-07-17
+
+Input ricevuti
+- Richiesta orchestratore (solo server/dashboard, eventualmente frontend_common; NON toccare backend/probe; niente CDN): creare il menu "Scansioni NMAP" (voce sidebar + pagina con form nuova scansione, elenco e dettaglio con polling, rotte proxy) e aggiornare la Guida con due sezioni ("Scansioni NMAP" e "Gateway Nominatim"). Contratto backend gia' pronto (POST /probes/{id}/scan scans.run; GET /probes/{id}/scans e /probes/{id}/scan/{scan_id} scans.read).
+
+Lavoro svolto (FE)
+- VOCE MENU + ROTTA: nuova sezione sidebar "Sicurezza" (base.html) con voce "Scansioni NMAP" (icona bi-radar) visibile se can('scans.read') OR can('scans.run'), evidenziata quando attiva (ep.startswith('scans.')). Blueprint views/scans.py (registrato in views/__init__.py) con rotte: GET /scans (elenco+form, scans.read), POST /scans/run (scans.run), GET /scans/<probe_id>/<scan_id> (dettaglio, scans.read), GET /scans/<probe_id>/<scan_id>.json (stato per polling, scans.read).
+- FORM "Nuova scansione" (mostrato solo con scans.run; in sola lettura resta il selettore Sonda) con AIUTI per ogni campo: Sonda (<select> da GET /probes), Target (ip/hostname/CIDR, es. 10.88.2.0/24), Effort/timing (<select> T0 Paranoid ... T3 Normale default ... T5 Insane, etichette IT), Tecnica (connect default senza privilegi / syn / udp / ping, con nota sui privilegi), Porte (es. 22,80,443 o 1-1000) oppure Top porte, -sV service/version + version_intensity 0-9, -O os_detection, -Pn no_ping (default ON, consigliato). Sezione "Opzioni avanzate" collassabile: NSE (multi-select categorie default/safe/discovery/version/vuln/auth/brute/exploit/intrusive/malware + script specifici + script_args), timing fine (min_rate/max_rate/max_retries) e campo "extra" (flag validate lato server). Submit -> POST /scans/run.
+- ROTTE PROXY: /scans/run costruisce il body opzioni dal form (invia solo i campi valorizzati; booleani espliciti; unisce categorie NSE + script specifici) e inoltra a POST /probes/{id}/scan col token di sessione; su successo redirige al DETTAGLIO della scansione (o all'elenco se manca scan_id). Validazioni FE: Sonda obbligatoria, target obbligatorio (altrimenti flash + redirect, nessuna chiamata). detail_json ritorna {status, running} per il polling.
+- ELENCO: tabella DataTables SERVER-SIDE via nuovo adattatore /dt/scans/<probe_id> (dt.py) verso GET /probes/{id}/scans; colonne Stato (badge colorato per running/pending/done/failed), Target (link al dettaglio con probe_id+scan_id), Avvio/Fine (localdt), Riepilogo (host attivi / porte aperte, tollerante a chiavi diverse), Azioni (icona dettaglio). Ordinamento disabilitato (l'endpoint non espone sort), searching off. La Sonda si sceglie dal <select> del form: pulse-scans.js costruisce l'URL /dt/scans/<probe> e ricarica al cambio Sonda (pattern __PID__).
+- DETTAGLIO: metadati (target, Sonda risolta a NOME, avvio/fine, opzioni usate), alert di errore se presente (es. privilegi mancanti), e per ogni host: porte con protocollo/stato/servizio/prodotto/versione + output degli script NSE, ipotesi OS (name+accuracy) e hostscripts. POLL: se status in running/pending/queued, pulse-scans.js interroga il JSON ogni ~4s e RICARICA la pagina al termine (done/failed) mostrando i risultati completi.
+- JS pulse-scans.js (authored, vendorizzato, no CDN): gestisce sia l'init dell'elenco DataTables (URL Sonda dinamico) sia il polling del dettaglio; usa jQuery (gia' presente) per l'ajax DataTables e fetch per il polling.
+- GUIDA (templates/guida/index.html): due nuove voci nell'indice + due accordion:
+  * "13. Scansioni NMAP": come lanciarle (Sonda, target, effort, tecnica, porte/opzioni, NSE), significato di effort/tecniche, che connect/-sV/ping/NSE funzionano SENZA privilegi mentre SYN/UDP/OS richiedono le capabilities (gia' configurate; su Windows/Docker Desktop onorate in WSL2), che i risultati sono salvati su OpenSearch della Sonda e il limite di rete (serve una Sonda nella rete target per scansionare la LAN fisica).
+  * "14. Gateway Nominatim": il Server fa da tunnel a Nominatim per Sonde/servizi interni; endpoint GET /api/v1/nominatim/{search|reverse|lookup|status|details}?<query>; autenticazione JWT Pulse OPPURE header X-API-Key (PULSE_NOMINATIM_API_KEY); rate-limit ~1 req/s + cache; esempio curl con X-API-Key; utile per la geocodifica da servizi interni.
+
+Qualita'
+- NIENTE CDN: nuovi asset solo locali (js/pulse-scans.js); grep finale senza src/href http(s) esterni (l'URL http://<server>:8443 nella Guida e' testo di esempio in un <pre>, non un asset). Coerenza AdminLTE/Bootstrap/tema/compattezza.
+- Coverage 100% sul codice applicativo: server/dashboard views/scans.py 75/75, dt.py 167/167 (+ app/probesource/tzsource/tutte le views); frontend_common e probe/dashboard invariati e 100%. Esito: frontend_common 75, server/dashboard 236, probe/dashboard 53 -> 364 test passati, 0 falliti.
+- Test aggiunti (server/dashboard/tests/test_scans.py, 22 test): voce menu presente solo con scans.read/scans.run (segnale = link nav href="/scans"); index con form (scans.run) vs sola lettura; 403 senza scans.read; /scans/run inoltra tutte le opzioni (target/timing/technique/porte/top_ports/intensity/rate/retries/script_args/extra/booleani/scripts categorie+specifici) e redirige al dettaglio; varianti minimali (skip campi vuoti/invalidi), senza scan_id, senza probe, senza target, 403 senza scans.run; dettaglio rende host/porte/NSE/OS + nome Sonda, error, polling (data-running true/false, URL .json); detail_json; adattatore /dt/scans (righe, badge, link, riepilogo + fallback "—", 403/401); due sezioni Guida presenti (+ /api/v1/nominatim + X-API-Key). Puliti anche rami morti nell'helper di test_probe_names.
+- Verifica REALE (app Flask reale + backend simulato): /scans?probe_id=p1 rende form + tabella + selettore; /dt/scans/p1 -> riga con badge b-ok, link "/scans/p1/sc1" e riepilogo "3 host attivi · 12 porte aperte"; POST /scans/run -> 302 verso /scans/p1/scNEW; dettaglio mostra host 10.88.2.10, porta 443, script ssl-cert, OS Linux e nome Sonda; /guida contiene sec-scansioni, sec-nominatim, X-API-Key e il link di menu.
+
+File creati
+- server/dashboard/views/scans.py
+- server/dashboard/templates/scans/index.html, server/dashboard/templates/scans/detail.html
+- server/dashboard/static/js/pulse-scans.js
+- server/dashboard/tests/test_scans.py
+
+File modificati
+- server/dashboard/views/__init__.py (registra scans.bp)
+- server/dashboard/templates/base.html (sezione sidebar "Sicurezza" + voce Scansioni NMAP)
+- server/dashboard/dt.py (adattatore /dt/scans/<probe_id> + tabella scans + badge stati + riepilogo)
+- server/dashboard/templates/guida/index.html (indice + sezioni 13 Scansioni NMAP e 14 Gateway Nominatim)
+- server/dashboard/tests/test_probe_names.py (pulizia rami morti dell'helper)
+
+Decisioni prese
+- Elenco via DataTables server-side (coerente col resto): la Sonda pilota l'URL /dt/scans/<probe> (dinamico lato JS), ordinamento disabilitato perche' l'endpoint scans non espone sort.
+- Polling del dettaglio con ricarica pagina al termine (semplice e robusto: nessun re-render client-side degli host).
+- Body opzioni inviato "sparso" (solo campi valorizzati) per non forzare default; booleani checkbox espliciti; categorie NSE + script specifici uniti in `scripts`. Le flag "extra" sono passate come stringa (validate lato server, come da contratto).
+- Nome Sonda mostrato nel dettaglio via il filtro probe_name (ITERAZIONE 50); gli URL mantengono il probe_id.
+- Probe dashboard non toccata (feature solo server, dove si orchestrano piu' Sonde).
+
+Output consegnati
+- Menu "Scansioni NMAP" (sezione Sicurezza) + pagina con form guidato completo, elenco DataTables server-side per Sonda, dettaglio con host/porte/servizi/NSE/OS e polling automatico delle scansioni in corso, rotte proxy protette per avvio/lettura; Guida aggiornata con "Scansioni NMAP" e "Gateway Nominatim". Nessun CDN, nessuna modifica a backend/probe. Coverage 100%, 364 test verdi.
+
+================================================
+
+
+ITERAZIONE 57
+
+Agente: BE
+Data: 2026-07-17
+
+Input ricevuti
+- BUG: il "Log di sistema" (system_logs, GET /logs) e' SEMPRE VUOTO perche' audit.write_system_log() esiste ma NON viene MAI chiamata (0 righe, nessun chiamante). Istrumentarla sugli eventi operativi chiave del Server. Modificare SOLO server/backend.
+
+Vincolo DB rilevato (importante)
+- Il CHECK di schema.sql su system_logs.component ammette SOLO {'server','probe'} (e level in debug/info/warning/error/critical). Non posso modificare lo schema (deploy/, dominio DBA). DECISIONE: component sempre in {server, probe}; la CATEGORIA operativa richiesta (auth/config/notifications/scans/enrollment/rotate/startup) e' riportata nel campo `logger` (query-abile via /logs?q= o filtro). Usati SOLO valori validi per component e level -> nessuna violazione di CHECK/FK, il logging non rompe mai l'operazione principale.
+
+Lavoro svolto (7 punti istrumentati, riusando session+commit gia' presenti)
+- Avvio applicazione (pulse_server/main.py): aggiunto lifespan asincrono che chiama _emit_startup_log() -> write_system_log(component="server", level="info", logger="startup", "Avvio del server Pulse."). Best-effort: se il DB non e' raggiungibile all'avvio, try/except -> l'app parte comunque (non bloccante).
+- Enrollment Probe (routers/probe_comm.register): component="probe", level="info", logger="enrollment", probe_id valorizzato, messaggio con hostname+probe_id, context {hostname,version}.
+- Rotazione credenziali Probe (routers/probes.rotate_credentials): component="probe", level="warning", logger="rotate", probe_id valorizzato.
+- Blocco account (routers/auth.login): SOLO alla transizione a "locked" (raggiunta failed_login_threshold), NON a ogni tentativo -> niente spam. component="server", level="warning", logger="auth", "Account <username> bloccato per troppi tentativi di accesso.".
+- Aggiornamento configurazione (routers/observability.update_config): component="server", level="info", logger="config", "Configurazione aggiornata: <chiavi>".
+- Esito consegna notifica (workflow._send_first_step, per ogni delivery registrata): component="server", level="info" se inviata / "error" se fallita, logger="notifications", messaggio con canale+sistema, context {channel,recipient,system_id,status,error}.
+- Avvio scansione NMAP (routers/dashboard.start_scan, dopo l'audit): component="probe", level="info", logger="scans", probe_id valorizzato, "Scansione avviata su '<probe>' target <target>".
+- Ogni punto ha gia' (o mantiene) un session.commit() successivo -> le righe persistono.
+
+Livelli usati: info (startup, enrollment, config, notifica inviata, scan), warning (rotate, lockout), error (notifica fallita). Tutti nel set del CHECK.
+
+Qualita'
+- mypy --strict: Success, no issues (33 source files).
+- Coverage 100% su server/backend (TOTAL 3208 stmts / 636 branch, 0 miss): main.py 49/0 100% (lifespan + _emit_startup_log successo+except), auth.py/probes.py/probe_comm.py/observability.py/dashboard.py/workflow.py aggiornati 100%.
+- Test: 311 passed, 0 failed. Nuovo tests/test_system_logs.py (10 test): startup log scritto (factory monkeypatchata) + startup non solleva se DB giu'; dopo enrollment -> riga component=probe logger=enrollment (probe_id, hostname nel messaggio); dopo rotate -> component=probe level=warning; dopo 5 login errati -> UNA riga component=server level=warning logger=auth (verifica no-spam); dopo PUT /config -> component=server logger=config con la chiave; dopo POST scan (ProbeClient mockato) -> component=probe logger=scans con target; dopo delivery notifica (notifier mock) -> component=server logger=notifications level=info; delivery fallita -> level=error; verifica anche via GET /logs?component=server.
+
+Problemi trovati
+- Il CHECK di system_logs.component (server/probe) e' piu' stretto dei nomi-categoria richiesti dall'orchestratore (auth/config/notifications/scans). Reconciliato usando `logger` per la categoria (vedi Decisione). Se in futuro si volesse component granulare, serve un intervento DBA sul CHECK (fuori dal mio ambito server/backend).
+
+Decisioni prese
+- component in {server, probe} + categoria in logger (vincolo DB, zero rischio di rottura).
+- Startup log non bloccante (try/except) per non impedire l'avvio se il DB e' momentaneamente irraggiungibile.
+- Lockout loggato solo alla transizione (una riga), non per ogni tentativo -> evita spam nel system log.
+- probe_id valorizzato solo dove esiste una Probe reale (enrollment/rotate/scan); per notifiche il probe dell'evento e' messo in context (evita FK verso id non-Probe).
+
+File creati
+- server/backend/tests/test_system_logs.py
+
+File modificati
+- server/backend/pulse_server/main.py (lifespan + _emit_startup_log)
+- server/backend/pulse_server/routers/probe_comm.py (enrollment)
+- server/backend/pulse_server/routers/probes.py (rotate)
+- server/backend/pulse_server/routers/auth.py (lockout)
+- server/backend/pulse_server/routers/observability.py (config)
+- server/backend/pulse_server/routers/dashboard.py (scan)
+- server/backend/pulse_server/workflow.py (delivery notifica)
+
+Output consegnati
+- system_logs ora popolato sugli eventi operativi chiave (startup, enrollment, rotate, lockout, config, notifiche, scan). GET /logs non e' piu' vuoto. component/level coerenti col CHECK del DB, categoria in logger, commit garantito, logging non bloccante. mypy --strict pulito, coverage 100%, 311 test verdi.
+
+================================================
+
+ITERAZIONE 58
+
+Agente: FE
+Data: 2026-07-17
+
+Input ricevuti
+- Richiesta orchestratore (solo server/dashboard e probe/dashboard, base.html + eventuale CSS; NON toccare backend/probe; niente CDN): compattare la sidebar trasformando le sezioni piatte (nav-header) in MENU/SOTTOMENU COLLASSABILI (treeview AdminLTE 4), con auto-apertura del gruppo attivo e gating dei permessi invariato.
+
+Lavoro svolto (FE)
+- GRUPPI TREEVIEW (server/dashboard/templates/base.html): nuove macro group_open(icon, title, active)/group_close() che generano la struttura AdminLTE 4:
+  <li class="nav-item[ menu-open]"><a href="#" class="nav-link[ active]"><i class="nav-icon bi ..."></i><p>Titolo<i class="nav-arrow bi bi-chevron-right"></i></p></a><ul class="nav nav-treeview">...figli...</ul></li>.
+  Le voci figlie usano la macro navlink esistente (nav-item > nav-link con bi + evidenziazione). La <ul class="sidebar-menu"> conserva data-lte-toggle="treeview" e adminlte.min.js e' gia' caricato: le frecce ruotano all'apertura (comportamento standard).
+- GRUPPI SERVER creati (icona -> figli):
+  * Monitoraggio (bi-speedometer2): Dashboard, Sonde, Sistemi monitorati, Query dati, Grafici, Allarmi
+  * Sicurezza (bi-shield-lock): Scansioni NMAP
+  * Notifiche (bi-bell): Canali, Workflow, Storico invii, Identita' canali
+  * Amministrazione (bi-people): Utenti, Ruoli, Permessi
+  * Sistema (bi-gear): Audit log, Log di sistema, Configurazione
+  * Aiuto / Account (bi-question-circle): Profilo, Guida
+- GATING PERMESSI: ogni gruppo e' reso solo se l'utente ha almeno una voce figlia visibile (stesse condizioni can('...') di prima); ogni voce figlia mantiene il proprio controllo permesso. Il gruppo "Aiuto / Account" e' sempre presente (Guida non e' condizionata da permessi).
+- AUTO-APERTURA: introdotti flag "voce attiva" per figlio (a_dashboard, a_probes, ... a_guida) calcolati da request.endpoint come per l'evidenziazione; il gruppo che contiene la pagina corrente riceve menu-open + nav-link active sul parent, e il figlio corrente resta active. Un solo gruppo aperto alla volta.
+- PROBE (probe/dashboard/templates/base.html): stesso pattern in scala ridotta: gruppo "Monitoraggio" (bi-speedometer2: Dashboard, Query dati) e "Sonda" (bi-hdd-network: Stato), con auto-apertura del gruppo attivo. Macro group_open/group_close identiche al server.
+- Compattezza/tema: nessun asset nuovo, nessun CSS aggiunto (l'indentazione dei sotto-item e le frecce sono gestite dallo stile nav-treeview di AdminLTE gia' presente); padding compatti invariati; nessun CDN.
+
+Qualita'
+- NIENTE CDN: modifiche solo a base.html (href dei gruppi = "#"); nessun riferimento esterno introdotto.
+- Coverage 100% sul codice applicativo: nessun modulo Python toccato (solo template); frontend_common/server/probe restano 100%. Esito: frontend_common 75, server/dashboard 243, probe/dashboard 56 -> 374 test passati, 0 falliti. I test RBAC del menu esistenti (voci gated per href) continuano a passare invariati.
+- Test aggiunti: server/dashboard/tests/test_sidebar.py (treeview: data-lte-toggle, nav-treeview, nav-arrow, href="#"; presenza dei 6 gruppi con permessi; auto-apertura Monitoraggio su /dashboard e Aiuto su /guida con figlio attivo; un solo menu-open; gruppo assente senza permessi figli; Aiuto sempre presente anche senza permessi). probe/dashboard/tests/test_sidebar.py (treeview + gruppi Monitoraggio/Sonda; auto-apertura Monitoraggio su /dashboard e Sonda su /status).
+- Verifica REALE (app Flask reale + backend simulato): /dashboard con tutti i permessi rende 6 gruppi treeview [Monitoraggio, Sicurezza, Notifiche, Amministrazione, Sistema, Aiuto / Account], 6 blocchi nav-treeview, un solo menu-open (Monitoraggio, gruppo della pagina), figli Monitoraggio corretti [Dashboard, Sonde, Sistemi monitorati, Query dati, Grafici, Allarmi] e Dashboard evidenziata.
+
+File modificati
+- server/dashboard/templates/base.html (macro group_open/group_close + conversione a treeview + flag attivi)
+- probe/dashboard/templates/base.html (idem, gruppi Monitoraggio/Sonda)
+
+File creati
+- server/dashboard/tests/test_sidebar.py
+- probe/dashboard/tests/test_sidebar.py
+
+Decisioni prese
+- Gruppi generati da macro (group_open/group_close) per coerenza e minor duplicazione; figli via la navlink esistente.
+- Auto-apertura calcolata server-side (menu-open sul parent del gruppo attivo) cosi' da non dipendere da stato JS/localStorage: la pagina corrente e' sempre espansa al primo render.
+- Nessun CSS custom: si usa lo stile nav-treeview di AdminLTE (indentazione + rotazione freccia) gia' vendorizzato.
+- Profilo mantenuto senza gate esplicito (comportamento preesistente) dentro il gruppo Aiuto / Account.
+
+Output consegnati
+- Sidebar compatta a treeview collassabile su entrambe le dashboard: 6 gruppi (server) e 2 (Sonda) con icona + freccia, sotto-item indentati, gruppo della pagina corrente auto-aperto ed evidenziato, gating dei permessi invariato. Nessun CDN, nessuna modifica a backend/probe. Coverage 100%, 374 test verdi.
 
 ================================================

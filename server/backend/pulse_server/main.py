@@ -9,6 +9,9 @@ Avvio locale:
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 
 from . import __version__
@@ -62,6 +65,32 @@ _TAGS_METADATA = [
 ]
 
 
+def _emit_startup_log() -> None:
+    """Registra un system_log di avvio del Server. Non e' bloccante: se il DB
+    non e' raggiungibile all'avvio, l'app parte comunque (log best-effort)."""
+    from .audit import write_system_log
+    from .db import get_session_factory
+
+    try:
+        with get_session_factory()() as session:
+            write_system_log(
+                session,
+                component="server",
+                level="info",
+                logger="startup",
+                message="Avvio del server Pulse.",
+            )
+            session.commit()
+    except Exception:  # noqa: BLE001 - il logging di avvio non deve rompere lo startup
+        pass
+
+
+@asynccontextmanager
+async def _lifespan(_: FastAPI) -> AsyncIterator[None]:
+    _emit_startup_log()
+    yield
+
+
 def create_app() -> FastAPI:
     """Factory dell'app (usata da uvicorn e dai test)."""
     app = FastAPI(
@@ -72,6 +101,7 @@ def create_app() -> FastAPI:
         openapi_url="/api/v1/openapi.json",
         docs_url="/api/v1/docs",
         redoc_url="/api/v1/redoc",
+        lifespan=_lifespan,
     )
     register_exception_handlers(app)
     app.middleware("http")(security_headers_middleware)

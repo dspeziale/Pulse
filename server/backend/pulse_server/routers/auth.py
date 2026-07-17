@@ -8,7 +8,7 @@ from fastapi import APIRouter, Request, Response
 from sqlalchemy import select
 
 from .. import errors, schemas
-from ..audit import write_audit
+from ..audit import write_audit, write_system_log
 from ..deps import (
     CurrentUser,
     CurrentUserDep,
@@ -54,6 +54,14 @@ def login(
             user.failed_login_count += 1
             if user.failed_login_count >= settings.failed_login_threshold and user.status == "active":
                 user.status = "locked"
+                write_system_log(
+                    session,
+                    component="server",
+                    level="warning",
+                    logger="auth",
+                    message=f"Account {user.username} bloccato per troppi tentativi di accesso.",
+                    context={"username": user.username, "failed_login_count": user.failed_login_count},
+                )
             write_audit(
                 session,
                 actor_type="user",

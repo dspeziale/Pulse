@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, Query, Request, Response
 from sqlalchemy import func, or_, select
 
 from .. import errors, schemas, serializers
-from ..audit import write_audit
+from ..audit import write_audit, write_system_log
 from ..deps import CurrentUser, SessionDep, SettingsDep, client_ip, require_permission
 from ..models import EnrollmentToken, MonitoredSystem, Probe
 from ..security import generate_opaque_token, hash_token
@@ -234,6 +234,14 @@ def rotate_credentials(
         entity_type="probe",
         entity_id=str(probe.id),
         ip=client_ip(request),
+    )
+    write_system_log(
+        session,
+        component="probe",
+        level="warning",
+        logger="rotate",
+        message=f"Credenziali della Sonda '{probe.name}' ruotate; richiesto nuovo enrollment.",
+        probe_id=probe.id,
     )
     session.commit()
     return schemas.EnrollmentInfo(enrollment_token=token, enrollment_expires_at=expires)

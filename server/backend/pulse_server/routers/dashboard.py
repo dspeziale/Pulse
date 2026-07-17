@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy import func, select
 
 from .. import errors, schemas, serializers
-from ..audit import write_audit
+from ..audit import write_audit, write_system_log
 from ..context import ProbeClientDep
 from ..deps import CurrentUser, SessionDep, SettingsDep, client_ip, require_permission
 from ..models import Alarm, MonitoredSystem, Probe, ProbeRollup
@@ -216,6 +216,15 @@ def start_scan(
         entity_id=probe_id,
         ip=client_ip(request),
         details={"target": body.target, "technique": body.technique, "timing": body.timing},
+    )
+    write_system_log(
+        session,
+        component="probe",
+        level="info",
+        logger="scans",
+        message=f"Scansione avviata su '{probe.name}' target {body.target}.",
+        probe_id=probe.id,
+        context={"target": body.target, "technique": body.technique, "timing": body.timing},
     )
     session.commit()
     return schemas.ScanStartOut.model_validate(data)

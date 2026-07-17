@@ -38,6 +38,21 @@
     </a>
   </li>
 {%- endmacro -%}
+{# Apertura gruppo treeview AdminLTE 4: item di primo livello collassabile.
+   ``active`` (contiene la pagina corrente) => menu-open + nav-link active +
+   freccia ruotata (comportamento standard AdminLTE). #}
+{%- macro group_open(icon, title, active) -%}
+  <li class="nav-item{{ ' menu-open' if active else '' }}">
+    <a href="#" class="nav-link{{ ' active' if active else '' }}">
+      <i class="nav-icon bi {{ icon }}"></i>
+      <p>{{ title }}<i class="nav-arrow bi bi-chevron-right"></i></p>
+    </a>
+    <ul class="nav nav-treeview">
+{%- endmacro -%}
+{%- macro group_close() -%}
+    </ul>
+  </li>
+{%- endmacro -%}
 <div class="app-wrapper">
 
   {# ===================== Top navbar ===================== #}
@@ -89,51 +104,83 @@
     </div>
     <div class="sidebar-wrapper">
       <nav class="mt-2">
+        {# Flag "voce attiva" per figlio: usati sia per evidenziare la voce sia
+           per auto-aprire (menu-open) il gruppo che contiene la pagina corrente. #}
+        {% set a_dashboard = ep == 'dashboard.index' %}
+        {% set a_probes = ep.startswith('probes.') %}
+        {% set a_systems = ep.startswith('systems.') %}
+        {% set a_query = ep == 'query.builder' %}
+        {% set a_charts = ep == 'query.charts' %}
+        {% set a_alarms = ep.startswith('alarms.') %}
+        {% set a_scans = ep.startswith('scans.') %}
+        {% set a_channels = ep.startswith('notifications.') and ep != 'notifications.history' %}
+        {% set a_workflows = ep.startswith('workflows.') %}
+        {% set a_history = ep == 'notifications.history' %}
+        {% set a_identities = ep.startswith('identities.') %}
+        {% set a_users = ep.startswith('users.') %}
+        {% set a_roles = ep.startswith('roles.') %}
+        {% set a_perms = ep.startswith('permissions.') %}
+        {% set a_audit = ep.startswith('audit.') %}
+        {% set a_logs = ep.startswith('logs.') %}
+        {% set a_config = ep.startswith('config_bp.') %}
+        {% set a_profile = ep.startswith('profile.') %}
+        {% set a_guida = ep.startswith('guida.') %}
         <ul class="nav sidebar-menu flex-column" data-lte-toggle="treeview" role="menu">
 
           {# ---- MONITORAGGIO ---- #}
           {% if can('dashboard.read') or can('probes.read') or can('systems.read') or can('heartbeats.query') or can('heartbeats.read') or can('workflows.read') %}
-          <li class="nav-header">Monitoraggio</li>
-          {% if can('dashboard.read') %}{{ navlink(url_for('dashboard.index'), 'bi-speedometer2', 'Dashboard', ep == 'dashboard.index') }}{% endif %}
-          {% if can('probes.read') %}{{ navlink(url_for('probes.list_probes'), 'bi-hdd-network', 'Sonde', ep.startswith('probes.')) }}{% endif %}
-          {% if can('systems.read') %}{{ navlink(url_for('systems.list_systems'), 'bi-hdd-stack', 'Sistemi monitorati', ep.startswith('systems.')) }}{% endif %}
-          {% if can('heartbeats.query') %}{{ navlink(url_for('query.builder'), 'bi-search', 'Query dati', ep == 'query.builder') }}{% endif %}
-          {% if can('heartbeats.read') %}{{ navlink(url_for('query.charts'), 'bi-graph-up', 'Grafici', ep == 'query.charts') }}{% endif %}
-          {% if can('workflows.read') %}{{ navlink(url_for('alarms.list_alarms'), 'bi-exclamation-triangle', 'Allarmi', ep.startswith('alarms.')) }}{% endif %}
+          {{ group_open('bi-speedometer2', 'Monitoraggio',
+             a_dashboard or a_probes or a_systems or a_query or a_charts or a_alarms) }}
+          {% if can('dashboard.read') %}{{ navlink(url_for('dashboard.index'), 'bi-speedometer2', 'Dashboard', a_dashboard) }}{% endif %}
+          {% if can('probes.read') %}{{ navlink(url_for('probes.list_probes'), 'bi-hdd-network', 'Sonde', a_probes) }}{% endif %}
+          {% if can('systems.read') %}{{ navlink(url_for('systems.list_systems'), 'bi-hdd-stack', 'Sistemi monitorati', a_systems) }}{% endif %}
+          {% if can('heartbeats.query') %}{{ navlink(url_for('query.builder'), 'bi-search', 'Query dati', a_query) }}{% endif %}
+          {% if can('heartbeats.read') %}{{ navlink(url_for('query.charts'), 'bi-graph-up', 'Grafici', a_charts) }}{% endif %}
+          {% if can('workflows.read') %}{{ navlink(url_for('alarms.list_alarms'), 'bi-exclamation-triangle', 'Allarmi', a_alarms) }}{% endif %}
+          {{ group_close() }}
+          {% endif %}
+
+          {# ---- SICUREZZA ---- #}
+          {% if can('scans.read') or can('scans.run') %}
+          {{ group_open('bi-shield-lock', 'Sicurezza', a_scans) }}
+          {{ navlink(url_for('scans.index'), 'bi-radar', 'Scansioni NMAP', a_scans) }}
+          {{ group_close() }}
           {% endif %}
 
           {# ---- NOTIFICHE ---- #}
           {% if can('notifications.read') or can('workflows.read') or can('commands.execute') %}
-          <li class="nav-header">Notifiche</li>
-          {% if can('notifications.read') %}{{ navlink(url_for('notifications.list_channels'), 'bi-broadcast', 'Canali', ep.startswith('notifications.') and ep != 'notifications.history') }}{% endif %}
-          {% if can('workflows.read') %}{{ navlink(url_for('workflows.list_workflows'), 'bi-diagram-3', 'Workflow', ep.startswith('workflows.')) }}{% endif %}
-          {% if can('notifications.read') %}{{ navlink(url_for('notifications.history'), 'bi-clock-history', 'Storico invii', ep == 'notifications.history') }}{% endif %}
-          {% if can('commands.execute') %}{{ navlink(url_for('identities.list_identities'), 'bi-key', 'Identità canali', ep.startswith('identities.')) }}{% endif %}
+          {{ group_open('bi-bell', 'Notifiche',
+             a_channels or a_workflows or a_history or a_identities) }}
+          {% if can('notifications.read') %}{{ navlink(url_for('notifications.list_channels'), 'bi-broadcast', 'Canali', a_channels) }}{% endif %}
+          {% if can('workflows.read') %}{{ navlink(url_for('workflows.list_workflows'), 'bi-diagram-3', 'Workflow', a_workflows) }}{% endif %}
+          {% if can('notifications.read') %}{{ navlink(url_for('notifications.history'), 'bi-clock-history', 'Storico invii', a_history) }}{% endif %}
+          {% if can('commands.execute') %}{{ navlink(url_for('identities.list_identities'), 'bi-key', 'Identità canali', a_identities) }}{% endif %}
+          {{ group_close() }}
           {% endif %}
 
           {# ---- AMMINISTRAZIONE ---- #}
           {% if can('users.read') or can('roles.read') or can('permissions.read') %}
-          <li class="nav-header">Amministrazione</li>
-          {% if can('users.read') %}{{ navlink(url_for('users.list_users'), 'bi-people', 'Utenti', ep.startswith('users.')) }}{% endif %}
-          {% if can('roles.read') %}{{ navlink(url_for('roles.list_roles'), 'bi-person-badge', 'Ruoli', ep.startswith('roles.')) }}{% endif %}
-          {% if can('permissions.read') %}{{ navlink(url_for('permissions.list_permissions'), 'bi-shield-lock', 'Permessi', ep.startswith('permissions.')) }}{% endif %}
+          {{ group_open('bi-people', 'Amministrazione', a_users or a_roles or a_perms) }}
+          {% if can('users.read') %}{{ navlink(url_for('users.list_users'), 'bi-people', 'Utenti', a_users) }}{% endif %}
+          {% if can('roles.read') %}{{ navlink(url_for('roles.list_roles'), 'bi-person-badge', 'Ruoli', a_roles) }}{% endif %}
+          {% if can('permissions.read') %}{{ navlink(url_for('permissions.list_permissions'), 'bi-shield-lock', 'Permessi', a_perms) }}{% endif %}
+          {{ group_close() }}
           {% endif %}
 
           {# ---- SISTEMA ---- #}
           {% if can('audit.read') or can('syslog.read') or can('config.read') %}
-          <li class="nav-header">Sistema</li>
-          {% if can('audit.read') %}{{ navlink(url_for('audit.list_audit'), 'bi-journal-text', 'Audit log', ep.startswith('audit.')) }}{% endif %}
-          {% if can('syslog.read') %}{{ navlink(url_for('logs.list_logs'), 'bi-terminal', 'Log di sistema', ep.startswith('logs.')) }}{% endif %}
-          {% if can('config.read') %}{{ navlink(url_for('config_bp.show_config'), 'bi-gear', 'Configurazione', ep.startswith('config_bp.')) }}{% endif %}
+          {{ group_open('bi-gear', 'Sistema', a_audit or a_logs or a_config) }}
+          {% if can('audit.read') %}{{ navlink(url_for('audit.list_audit'), 'bi-journal-text', 'Audit log', a_audit) }}{% endif %}
+          {% if can('syslog.read') %}{{ navlink(url_for('logs.list_logs'), 'bi-terminal', 'Log di sistema', a_logs) }}{% endif %}
+          {% if can('config.read') %}{{ navlink(url_for('config_bp.show_config'), 'bi-gear', 'Configurazione', a_config) }}{% endif %}
+          {{ group_close() }}
           {% endif %}
 
-          {# ---- ACCOUNT ---- #}
-          <li class="nav-header">Account</li>
-          {{ navlink(url_for('profile.show_profile'), 'bi-person-circle', 'Profilo', ep.startswith('profile.')) }}
-
-          {# ---- GUIDA (visibile a tutti gli utenti autenticati) ---- #}
-          <li class="nav-header">Aiuto</li>
-          {{ navlink(url_for('guida.index'), 'bi-question-circle', 'Guida', ep.startswith('guida.')) }}
+          {# ---- AIUTO / ACCOUNT (Guida visibile a tutti gli autenticati) ---- #}
+          {{ group_open('bi-question-circle', 'Aiuto / Account', a_profile or a_guida) }}
+          {{ navlink(url_for('profile.show_profile'), 'bi-person-circle', 'Profilo', a_profile) }}
+          {{ navlink(url_for('guida.index'), 'bi-question-circle', 'Guida', a_guida) }}
+          {{ group_close() }}
         </ul>
       </nav>
     </div>

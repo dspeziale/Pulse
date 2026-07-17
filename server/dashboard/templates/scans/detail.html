@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+{% from "_macros.html" import status_badge %}
+{% block title %}Scansione {{ scan.target or scan_id }} — Pulse{% endblock %}
+{% set _sb = {'running':'b-warn','pending':'b-off','queued':'b-off','done':'b-ok','completed':'b-ok','success':'b-ok','failed':'b-error','error':'b-error'} %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <h1 class="h3 mb-0"><i class="bi bi-radar me-2"></i>Scansione
+    <span class="text-body-secondary fs-5">{{ scan.target or scan_id }}</span>
+  </h1>
+  <a class="btn btn-outline-secondary" href="{{ url_for('scans.index', probe_id=probe_id) }}">
+    <i class="bi bi-arrow-left me-1"></i>Torna all'elenco</a>
+</div>
+
+{# Contenitore di polling: se in corso, pulse-scans.js interroga il JSON e
+   ricarica la pagina al termine (done/failed). #}
+<div data-scan-poll
+     data-poll-url="{{ url_for('scans.detail_json', probe_id=probe_id, scan_id=scan_id) }}"
+     data-running="{{ 'true' if running else 'false' }}">
+
+<div class="card mb-3">
+  <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+    <span><i class="bi bi-info-circle me-1"></i>Riepilogo</span>
+    <span class="badge {{ _sb.get(scan.status, 'b-unknown') }}">{{ scan.status or '—' }}</span>
+  </div>
+  <div class="card-body">
+    {% if running %}
+    <div class="alert alert-info d-flex align-items-center gap-2 mb-3" role="alert">
+      <span class="spinner-border spinner-border-sm"></span>
+      Scansione in corso: la pagina si aggiornera' automaticamente al termine.
+    </div>
+    {% endif %}
+    {% if scan.error %}
+    <div class="alert alert-danger mb-3"><i class="bi bi-exclamation-octagon me-1"></i>{{ scan.error }}</div>
+    {% endif %}
+    <dl class="row mb-0">
+      <dt class="col-sm-3 text-body-secondary">Target</dt><dd class="col-sm-3">{{ scan.target or '—' }}</dd>
+      <dt class="col-sm-3 text-body-secondary">Sonda</dt><dd class="col-sm-3">{{ probe_id|probe_name }}</dd>
+      <dt class="col-sm-3 text-body-secondary">Avvio</dt><dd class="col-sm-3 text-body-secondary">{{ scan.started_at|localdt }}</dd>
+      <dt class="col-sm-3 text-body-secondary">Fine</dt><dd class="col-sm-3 text-body-secondary">{{ scan.finished_at|localdt }}</dd>
+    </dl>
+    {% if scan.options %}
+    <details class="mt-3">
+      <summary class="text-body-secondary">Opzioni usate</summary>
+      <pre class="pulse-code mb-0 mt-2">{{ scan.options|tojson(indent=2) }}</pre>
+    </details>
+    {% endif %}
+  </div>
+</div>
+
+{% for host in scan.hosts or [] %}
+<div class="card mb-3">
+  <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+    <span><i class="bi bi-hdd-network me-1"></i>{{ host.ip }}{% if host.hostname %} <span class="text-body-secondary">({{ host.hostname }})</span>{% endif %}</span>
+    {{ status_badge(host.state) }}
+  </div>
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead><tr><th>Porta</th><th>Proto</th><th>Stato</th><th>Servizio</th><th>Prodotto</th><th>Versione</th></tr></thead>
+      <tbody>
+      {% for p in host.ports or [] %}
+      <tr>
+        <td class="fw-semibold">{{ p.port }}</td>
+        <td>{{ p.protocol }}</td>
+        <td>{{ status_badge(p.state) }}</td>
+        <td>{{ p.service or '—' }}</td>
+        <td>{{ p.product or '—' }}</td>
+        <td>{{ p.version or '—' }}</td>
+      </tr>
+      {% if p.scripts %}
+      <tr class="table-active">
+        <td></td>
+        <td colspan="5">
+          {% for sc in p.scripts %}
+          <div class="mb-1"><code>{{ sc.id }}</code>
+            <pre class="pulse-code mb-1 mt-1">{{ sc.output }}</pre></div>
+          {% endfor %}
+        </td>
+      </tr>
+      {% endif %}
+      {% else %}
+      <tr><td colspan="6" class="text-center text-body-secondary py-3">Nessuna porta rilevata.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if host.os %}
+  <div class="card-body pt-2">
+    <h2 class="h6 text-body-secondary"><i class="bi bi-cpu me-1"></i>Sistema operativo (ipotesi)</h2>
+    <ul class="list-unstyled small mb-0">
+      {% for o in host.os %}<li>{{ o.name }}{% if o.accuracy is defined %} <span class="text-body-secondary">({{ o.accuracy }}%)</span>{% endif %}</li>{% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+  {% if host.hostscripts %}
+  <div class="card-body pt-2">
+    <h2 class="h6 text-body-secondary"><i class="bi bi-braces me-1"></i>Script host</h2>
+    {% for sc in host.hostscripts %}
+    <div class="mb-1"><code>{{ sc.id }}</code><pre class="pulse-code mb-1 mt-1">{{ sc.output }}</pre></div>
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>
+{% else %}
+{% if not running %}
+<div class="card"><div class="card-body text-center text-body-secondary py-4">
+  <i class="bi bi-search fs-2 d-block mb-2"></i>Nessun host rilevato per questa scansione.
+</div></div>
+{% endif %}
+{% endfor %}
+
+</div>
+{% endblock %}
+
+{% block body_extra %}
+<script src="{{ url_for('static', filename='js/pulse-scans.js') }}"></script>
+{% endblock %}
