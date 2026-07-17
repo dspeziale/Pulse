@@ -146,6 +146,13 @@ canvas { display: block; width: 100%; max-width: 100%; }
 /* Numeri grandi nelle card di riepilogo (KPI). */
 .pulse-kpi-value { font-size: 2rem; font-weight: 700; line-height: 1.1; }
 
+/* Tile/righe cliccabili (drill-down dashboard): feedback al passaggio del mouse. */
+.pulse-tile-link { cursor: pointer; transition: box-shadow 0.12s ease, transform 0.12s ease; }
+.pulse-tile-link:hover {
+  box-shadow: 0 0.25rem 0.75rem rgba(0, 0, 0, 0.12);
+  transform: translateY(-1px);
+}
+
 /* -- Layout compatto (densita' uniforme) -----------------------------------
  * Riduzione misurata (~25-35%) dei padding rispetto ai default Bootstrap,
  * applicata tramite le variabili CSS native dei componenti così da restare

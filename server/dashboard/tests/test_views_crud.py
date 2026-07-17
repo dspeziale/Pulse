@@ -41,7 +41,7 @@ def test_dashboard_overall_ok(client, login, fake):
                    "systems_down": 0}])
     r = client.get("/dashboard")
     assert b'data-overall-status="ok"' in r.data
-    assert b"Tutto OK" in r.data
+    assert b"Tutto regolare" in r.data
     assert b"led-ok" in r.data
 
 
@@ -50,7 +50,7 @@ def test_dashboard_overall_warn(client, login, fake):
     _dash(fake, summary={"ok": 2, "warn": 3, "error": 0, "down": 0, "unknown": 0})
     r = client.get("/dashboard")
     assert b'data-overall-status="warn"' in r.data
-    assert b"Attenzione" in r.data
+    assert b"3 in warning" in r.data
 
 
 def test_dashboard_overall_error_by_status(client, login, fake):
@@ -58,14 +58,29 @@ def test_dashboard_overall_error_by_status(client, login, fake):
     _dash(fake, summary={"ok": 1, "warn": 0, "error": 2, "down": 0, "unknown": 0})
     r = client.get("/dashboard")
     assert b'data-overall-status="error"' in r.data
+    # Label esplicita col conteggio, non piu' generica.
+    assert b"2 in errore, 0 non raggiungibili" in r.data
 
 
-def test_dashboard_overall_error_by_alarms(client, login, fake):
+def test_dashboard_overall_error_by_down_only(client, login, fake):
     login(["dashboard.read"])
-    _dash(fake, summary={"ok": 1, "warn": 0, "error": 0, "down": 0, "unknown": 0},
-          active_alarms=1)
+    _dash(fake, summary={"ok": 1, "warn": 0, "error": 0, "down": 3, "unknown": 0})
     r = client.get("/dashboard")
     assert b'data-overall-status="error"' in r.data
+    assert b"0 in errore, 3 non raggiungibili" in r.data
+
+
+def test_dashboard_alarms_do_not_color_led(client, login, fake):
+    # Allarmi attivi ma nessun check problematico -> LED VERDE (colore = check).
+    login(["dashboard.read"])
+    _dash(fake, summary={"ok": 4, "warn": 0, "error": 0, "down": 0, "unknown": 0},
+          active_alarms=5)
+    r = client.get("/dashboard")
+    assert b'data-overall-status="ok"' in r.data
+    assert b"Tutto regolare" in r.data
+    # Gli allarmi restano visibili come voce separata.
+    assert b"Allarmi attivi" in r.data
+    assert b"incidenti" in r.data
 
 
 def test_dashboard_probe_leds(client, login, fake):
@@ -126,6 +141,7 @@ def test_build_context_counts():
     assert k["probes_online"] == 1
     assert k["probes_offline"] == 1
     assert ctx["overall"] == "error"
+    assert ctx["overall_target_status"] == "error"
 
 
 def test_build_context_defensive_non_numeric():
@@ -136,6 +152,104 @@ def test_build_context_defensive_non_numeric():
         None, None)
     assert ctx["kpis"]["systems_total"] == 0
     assert ctx["overall"] == "ok"
+    assert ctx["overall_target_status"] is None
+
+
+def test_build_context_overall_ignores_alarms():
+    # Allarmi > 0 ma nessun check problematico -> overall verde.
+    ctx = _build_context(
+        {"systems_summary": {"ok": 3, "warn": 0, "error": 0, "down": 0, "unknown": 0},
+         "active_alarms": 9, "probes": []},
+        {"items": []}, {"items": []})
+    assert ctx["overall"] == "ok"
+    assert ctx["overall_label"] == "Tutto regolare"
+
+
+def test_build_context_target_down_when_only_down():
+    ctx = _build_context(
+        {"systems_summary": {"ok": 0, "warn": 0, "error": 0, "down": 2, "unknown": 0},
+         "active_alarms": 0, "probes": []},
+        {"items": []}, {"items": []})
+    assert ctx["overall_target_status"] == "down"
+    assert ctx["overall_label"] == "0 in errore, 2 non raggiungibili"
+
+
+def test_build_context_target_warn():
+    ctx = _build_context(
+        {"systems_summary": {"ok": 0, "warn": 5, "error": 0, "down": 0, "unknown": 0},
+         "active_alarms": 0, "probes": []},
+        {"items": []}, {"items": []})
+    assert ctx["overall_target_status"] == "warn"
+
+
+def test_build_context_single_probe_drill():
+    ctx = _build_context(
+        {"systems_summary": {"ok": 0, "warn": 0, "error": 1, "down": 0, "unknown": 0},
+         "active_alarms": 0,
+         "probes": [{"probe_id": "solo", "status": "online",
+                     "systems_total": 3, "systems_down": 0}]},
+        {"items": []}, {"items": []})
+    assert ctx["single_probe_id"] == "solo"
+    assert ctx["drill_probe_id"] == "solo"
+
+
+def test_build_context_multi_probe_drill_first_problem():
+    ctx = _build_context(
+        {"systems_summary": {"ok": 0, "warn": 0, "error": 0, "down": 1, "unknown": 0},
+         "active_alarms": 0,
+         "probes": [
+             {"probe_id": "ok1", "status": "online", "systems_total": 2, "systems_down": 0},
+             {"probe_id": "bad", "status": "online", "systems_total": 2, "systems_down": 1},
+         ]},
+        {"items": []}, {"items": []})
+    assert ctx["single_probe_id"] is None
+    assert ctx["drill_probe_id"] == "bad"           # prima Sonda interessata
+    # La riga per-Sonda con sistemi down punta ai check 'down'.
+    rows = {r["probe_id"]: r for r in ctx["probe_rows"]}
+    assert rows["bad"]["drill"] == "down"
+    assert rows["ok1"]["drill"] == ""
+
+
+def test_build_context_multi_probe_all_ok_no_drill():
+    ctx = _build_context(
+        {"systems_summary": {"ok": 4, "warn": 0, "error": 0, "down": 0, "unknown": 0},
+         "active_alarms": 0,
+         "probes": [
+             {"probe_id": "a", "status": "online", "systems_total": 2, "systems_down": 0},
+             {"probe_id": "b", "status": "online", "systems_total": 2, "systems_down": 0},
+         ]},
+        {"items": []}, {"items": []})
+    assert ctx["single_probe_id"] is None
+    assert ctx["drill_probe_id"] is None
+
+
+# -- Drill-down link nella pagina (single vs multi probe) ---------------------
+def test_dashboard_tiles_link_single_probe(client, login, fake):
+    login(["dashboard.read", "probes.read"])
+    _dash(fake, summary={"ok": 1, "warn": 0, "error": 1, "down": 0, "unknown": 0},
+          probes=[{"probe_id": "P1", "status": "online", "systems_total": 2,
+                   "systems_down": 0}])
+    r = client.get("/dashboard")
+    # La tile Error linka al dettaglio della sola Sonda filtrato per status=error.
+    assert b"/probes/P1?status=error" in r.data
+    # Il LED complessivo punta allo stesso target.
+    assert b'data-overall-status="error"' in r.data
+
+
+def test_dashboard_tiles_not_linked_multi_probe(client, login, fake):
+    login(["dashboard.read", "probes.read"])
+    _dash(fake, summary={"ok": 0, "warn": 0, "error": 2, "down": 0, "unknown": 0},
+          probes=[
+              {"probe_id": "PA", "status": "online", "systems_total": 2, "systems_down": 1},
+              {"probe_id": "PB", "status": "online", "systems_total": 2, "systems_down": 0},
+          ])
+    r = client.get("/dashboard")
+    # Con piu' Sonde la tile globale NON e' un link diretto ai check...
+    assert b"Vedi il dettaglio per singola Sonda" in r.data
+    # ...ma il LED complessivo punta alla prima Sonda interessata (PA con down).
+    assert b"/probes/PA?status=error" in r.data
+    # e la mini-card per-Sonda con sistemi down linka a status=down.
+    assert b"/probes/PA?status=down" in r.data
 
 
 # -- P-06 Utenti --------------------------------------------------------------
