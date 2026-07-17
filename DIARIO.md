@@ -1665,3 +1665,52 @@ Output consegnati
 - Tutte le tabelle di lista e heartbeat delle due dashboard sono DataTables server-side, con jQuery/DataTables vendorizzati (jQuery 3.7.1, DataTables 2.1.8 + integrazione Bootstrap 5), adattatore /dt/<resource> (+ heartbeat) che preserva badge/azioni/date/RBAC, filtri via ajax.data, ricerca->q e ordinamento->sort, lingua IT locale, nessun CDN. Coverage 100%, 278 test verdi.
 
 ================================================
+
+ITERAZIONE 45
+
+Agente: FE
+Data: 2026-07-17
+
+Input ricevuti
+- Richiesta orchestratore (solo server/dashboard, eventualmente frontend_common; NIENTE modifiche a backend/probe-agent; niente CDN): rendere "Interrogazione dati" (Query dati, P-04) piu' FRIENDLY. Filtri guidati (Sonda -> Sistema -> Check -> Stato, testo opzionale), periodo con preset rapidi (default Oggi) + intervallo personalizzato, risultati come tabella DataTables server-side coi filtri via ajax.data, riepilogo conteggi/totale, scorciatoia "solo problemi", query strutturata (JSON) spostata in sezione "Avanzato" collassabile (non rimuovere funzionalita'). Usare SOLO endpoint backend esistenti.
+
+Lavoro svolto (FE, solo server/dashboard)
+- FILTRI GUIDATI (views/query.py + templates/query/builder.html + static/js/pulse-query.js):
+  - Sonda: <select> (#q-probe). Al cambio auto-popola i Sistemi via il proxy esistente /systems-by-probe.
+  - Sistema: <select> (#q-system) popolato dalla Sonda scelta (value = system_id di business), opzione "Tutti i sistemi".
+  - Check: <select> (#q-check) popolato dai check del sistema scelto tramite NUOVO proxy dashboard /checks-by-system, opzione "Tutti i check".
+  - Stato: <select> (#q-status) con Tutti / ok / warn / error / down / unknown.
+- NUOVO proxy /checks-by-system (views/query.py, permesso heartbeats.query): delega al backend esistente GET /checks (accetta system_id di business + probe_id opzionale, permesso backend checks.read) e ritorna [{check_id, check_name}]. Senza system_id -> lista vuota; errori backend (es. checks.read assente) -> lista vuota (populate best-effort, mai bloccante); risposta non-dict -> lista vuota. Nessun nuovo endpoint FastAPI.
+- PERIODO con PRESET rapidi (#q-preset): Ultima ora, Oggi (DEFAULT), Ultime 24 ore, Ultimi 7 giorni, Ultimi 30 giorni, Intervallo personalizzato (datetime-local from/to, mostrato solo su "custom"). I preset sono calcolati SERVER-SIDE (views/query.py:time_presets) nel fuso orario configurato (stessa fonte del filtro localdt: tzsource.resolve_timezone su /config con cache) e convertiti in UTC ISO-8601 (suffisso Z): "Oggi" parte dalla mezzanotte locale, le finestre mobili terminano ad ora. L'intervallo personalizzato e' convertito da datetime-local a UTC lato client usando lo scostamento del fuso (data-tz-offset in minuti) passato dal server.
+- RISULTATI: tabella DataTables SERVER-SIDE (#q-results) verso l'adattatore esistente /dt/heartbeats/<probe_id> creato nell'ITERAZIONE 44; pulse-query.js inizializza la tabella con una funzione ajax che (a) usa la Sonda selezionata nell'URL, (b) aggiunge i filtri correnti ad ajax.data (system_id, check_id, status, from, to), (c) se nessuna Sonda e' selezionata mostra tabella vuota senza chiamare il backend. Colonne leggibili: timestamp (localdt), sistema, check, stato (badge b-*), response_ms e NUOVA colonna Messaggio (aggiunta alla DTTable heartbeats condivisa in dt.py, quindi visibile anche nel dettaglio Sonda). Riepilogo (#q-summary) aggiornato ad ogni draw col totale (recordsTotal) o "Nessun heartbeat"/"Seleziona una Sonda".
+- SCORCIATOIA "Solo problemi" (#q-only-problems): imposta lo Stato su "error" (l'endpoint heartbeat filtra un solo stato: si punta all'anomalia piu' grave; warn/down restano selezionabili dal filtro Stato) e ricarica.
+- AVANZATO collassabile: l'intera query strutturata preesistente (probe select con auto-popolamento /systems-by-probe, from/to ISO, textarea Filtri/Aggregazioni JSON, esempi pronti, elenco "Sistemi della Sonda", POST /query e blocco risultati server-side) e' conservata invariata dentro un <div class="collapse" id="advanced-query"> apribile da header. Nessuna funzionalita' rimossa.
+- Testo libero: NON aggiunto un campo di ricerca testuale sui risultati perche' l'endpoint heartbeat (/query/heartbeats) non supporta `q`; i filtri guidati Sistema/Check/Stato sono i criteri effettivi (searching:false sulla tabella heartbeat, coerente con l'ITERAZIONE 44).
+- run_query (POST avanzato) aggiornato per passare anch'esso presets/tz_offset_min al template (la sezione guidata resta funzionante dopo una query strutturata).
+
+Qualita'
+- NIENTE CDN: builder.html e pulse-query.js referenziano solo asset locali (jquery/datatables gia' vendorizzati + js/pulse-systems.js + js/pulse-query.js); grep finale senza src/href http(s) esterni sui file autorati.
+- Coverage 100% sul codice applicativo: server/dashboard views/query.py 96/96 100%, dt.py 135/135 100% (colonna Messaggio inclusa); frontend_common e probe/dashboard invariati e 100%. Esito: frontend_common 71, server/dashboard 176, probe/dashboard 43 -> 290 test passati, 0 falliti.
+- Test aggiunti (server/dashboard/tests/test_query_builder.py): time_presets (chiavi, "Oggi" = mezzanotte locale -> UTC, offset estate/inverno, fuso non valido -> ripiego Europe/Rome); rendering filtri guidati (data-query-app, /systems-by-probe, /checks-by-system, /dt/heartbeats/__PID__, controlli q-*, preset default Oggi, JSON presets/columns, colonna Messaggio, pulse-query.js); conservazione della sezione Avanzato (filters/aggregations, /systems-by-probe, pulse-systems.js); Sonda preselezionata; proxy /checks-by-system (items, con/senza probe_id, senza system_id, errore backend -> vuoto, non-dict -> vuoto, 403 senza permesso); adattatore heartbeat con colonna Messaggio (presente/assente).
+- Verifica REALE (app Flask reale + backend simulato): GET /query rende i filtri guidati con preset "Oggi" (es. today.from = mezzanotte locale in UTC, today.to = ora corrente), colonne risultati [@timestamp, system_name, check_name, status, response_ms, message], data-query-app e js/pulse-query.js presenti; GET /checks-by-system?system_id=&probe_id= ritorna [{check_id,check_name}] col forward dei parametri; GET /dt/heartbeats/<probe>?status=error ritorna righe con badge di stato e cella Messaggio.
+
+File creati
+- server/dashboard/static/js/pulse-query.js
+- server/dashboard/tests/test_query_builder.py
+
+File modificati
+- server/dashboard/views/query.py (time_presets + _current_timezone/_zone, proxy /checks-by-system, builder/run_query passano presets+tz_offset_min)
+- server/dashboard/templates/query/builder.html (sezione guidata primaria + risultati DataTables + Avanzato collassabile)
+- server/dashboard/dt.py (colonna Messaggio nella DTTable heartbeats condivisa)
+
+Decisioni prese
+- Preset calcolati server-side nel fuso configurato (deterministici e testabili) invece che in JS; intervallo personalizzato convertito lato client con l'offset del fuso passato dal server.
+- Check popolati via GET /checks (accetta system_id di business + probe_id): nessun bisogno dell'UUID del sistema, coerente col value del <select> Sistema.
+- "Solo problemi" -> stato "error" (l'endpoint heartbeat filtra un singolo stato; non e' possibile un OR error+down+warn in una sola richiesta senza toccare il backend).
+- Campo testo libero omesso sui risultati heartbeat (q non supportato dall'endpoint) per non offrire un controllo inefficace; guida basata su Sistema/Check/Stato.
+- Query strutturata JSON conservata integralmente nella sezione Avanzato collassabile.
+
+Output consegnati
+- P-04 ora guida l'operatore: filtri a tendina concatenati (Sonda->Sistema->Check->Stato), periodi rapidi (default Oggi) + intervallo personalizzato, risultati DataTables server-side coi filtri passati via ajax.data e riepilogo del totale, scorciatoia "Solo problemi", query strutturata avanzata collassabile. Nessun CDN, nessuna modifica a backend/probe-agent. Coverage 100%, 290 test verdi.
+
+================================================

@@ -390,6 +390,8 @@ def _heartbeats_table() -> DTTable:
             DTColumn("response_ms", lambda h: h.get("response_ms"),
                      sort="response_ms", title="ms", th_class="text-end",
                      class_="text-end"),
+            DTColumn("message", lambda h: h.get("message") or "",
+                     title="Messaggio", class_="text-body-secondary"),
         ],
         order=(0, "desc"), default_length=50, searching=False,
     )

@@ -1,18 +1,24 @@
 """P-04 Interrogazione OpenSearch (query builder) e P-05 Grafici/Analisi.
 
 REST: POST /probes/{id}/query, GET /probes/{id}/heartbeats,
-GET /systems?probe_id=..., GET /systems/{id}/checks, GET /probes.
+GET /systems?probe_id=..., GET /systems/{id}/checks, GET /checks, GET /probes.
+La ricerca guidata mostra i risultati come tabella DataTables server-side
+(adattatore /dt/heartbeats/<probe_id>) coi filtri passati via ajax.data.
 """
 from __future__ import annotations
 
 import json
+from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 
-from flask import (Blueprint, flash, redirect, render_template, request,
-                   url_for)
+from flask import (Blueprint, current_app, flash, jsonify, redirect,
+                   render_template, request, url_for)
 
-from pulse_fe_common.auth import permission_required
+from pulse_fe_common.auth import access_token, permission_required
+from pulse_fe_common.datetimes import DEFAULT_TIMEZONE
 
-from sdk import api_get, api_post
+from sdk import api_get, api_post, client
+from tzsource import fetch_config_timezone, resolve_timezone
 
 bp = Blueprint("query", __name__)
 
@@ -22,6 +28,49 @@ def _json_or(default, raw: str):
     if not raw:
         return default
     return json.loads(raw)
+
+
+def _current_timezone() -> str:
+    """Fuso orario configurato (stessa fonte del filtro ``localdt``)."""
+    return resolve_timezone(
+        current_app.config["TZ_CACHE"],
+        lambda: fetch_config_timezone(client(), access_token()),
+    )
+
+
+def _zone(tz_name: str) -> ZoneInfo:
+    try:
+        return ZoneInfo(tz_name)
+    except Exception:  # tz sconosciuto -> ripiego sul default
+        return ZoneInfo(DEFAULT_TIMEZONE)
+
+
+def time_presets(tz_name: str, now: datetime | None = None) -> tuple[dict, int]:
+    """Preset di periodo (from/to in UTC ISO-8601) calcolati nel fuso ``tz_name``.
+
+    Ritorna ``(presets, offset_min)`` dove ``presets`` mappa la chiave del preset
+    a ``{"from", "to"}`` (stringhe UTC con suffisso 'Z') e ``offset_min`` e' lo
+    scostamento corrente del fuso rispetto a UTC in minuti (usato lato client per
+    convertire l'intervallo personalizzato in UTC). "Oggi" parte dalla mezzanotte
+    locale; le finestre mobili terminano ad ``now``.
+    """
+    tz = _zone(tz_name)
+    local = (now.astimezone(tz) if now else datetime.now(tz))
+
+    def _iso(dt: datetime) -> str:
+        return dt.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    to = _iso(local)
+    midnight = local.replace(hour=0, minute=0, second=0, microsecond=0)
+    presets = {
+        "last_hour": {"from": _iso(local - timedelta(hours=1)), "to": to},
+        "today": {"from": _iso(midnight), "to": to},
+        "last_24h": {"from": _iso(local - timedelta(hours=24)), "to": to},
+        "last_7d": {"from": _iso(local - timedelta(days=7)), "to": to},
+        "last_30d": {"from": _iso(local - timedelta(days=30)), "to": to},
+    }
+    offset = local.utcoffset() or timedelta(0)
+    return presets, int(offset.total_seconds() // 60)
 
 
 # -- P-04 query builder --------------------------------------------------------
@@ -37,9 +86,39 @@ def builder():
     system_id = request.args.get("system_id", "")
     if system_id:
         checks = api_get(f"/systems/{system_id}/checks")
+    presets, tz_offset_min = time_presets(_current_timezone())
     return render_template("query/builder.html", probes=probes, systems=systems,
                            checks=checks, probe_id=probe_id, system_id=system_id,
+                           presets=presets, tz_offset_min=tz_offset_min,
                            result=None)
+
+
+@bp.route("/checks-by-system", methods=["GET"])
+@permission_required("heartbeats.query")
+def checks_by_system():
+    """Proxy JSON: elenca i check di un sistema (per il <select> Check guidato).
+
+    Delega al backend GET /checks (accetta il ``system_id`` di business e,
+    opzionalmente, il ``probe_id``) col token di sessione. Senza ``system_id``
+    ritorna lista vuota. Gli errori del backend (es. permesso checks.read
+    assente) NON rompono la pagina: si ripiega su lista vuota (il <select> resta
+    su "Tutti i check"). Risposta minimale [{check_id, check_name}].
+    """
+    system_id = (request.args.get("system_id") or "").strip()
+    if not system_id:
+        return jsonify({"items": []}), 200
+    params = {"system_id": system_id}
+    probe_id = (request.args.get("probe_id") or "").strip()
+    if probe_id:
+        params["probe_id"] = probe_id
+    try:
+        data = api_get("/checks", params=params)
+    except Exception:  # noqa: BLE001 - populate best-effort, mai bloccante
+        return jsonify({"items": []}), 200
+    items = data.get("items", []) if isinstance(data, dict) else []
+    out = [{"check_id": c.get("check_id"), "check_name": c.get("check_name")}
+           for c in items]
+    return jsonify({"items": out}), 200
 
 
 @bp.route("/query", methods=["POST"])
@@ -61,8 +140,10 @@ def run_query():
         return redirect(url_for("query.builder", probe_id=probe_id))
     result = api_post(f"/probes/{probe_id}/query", json=body)
     probes = api_get("/probes")
+    presets, tz_offset_min = time_presets(_current_timezone())
     return render_template("query/builder.html", probes=probes, systems=None,
                            checks=None, probe_id=probe_id, system_id="",
+                           presets=presets, tz_offset_min=tz_offset_min,
                            result=result)
 
 
