@@ -462,6 +462,24 @@
                 OpenSearch della Sonda</strong>.</li>
               <li><strong>Limite di rete</strong>: per scansionare una LAN fisica serve una Sonda
                 <em>dentro</em> la rete target.</li>
+              <li><strong>Riprendi da altra pagina</strong>: quando avvii una scansione compare in basso a
+                destra un <strong>indicatore</strong> (su ogni pagina) che elenca le scansioni in corso; puoi
+                cambiare pagina e cliccare <em>Riprendi</em> per riaprire quella ancora attiva.</li>
+            </ul>
+            <h3 class="h6 mt-3">Scansioni raw su Windows (proxy nmap)</h3>
+            <p class="small mb-2">Se la Sonda gira in <strong>Docker Desktop su Windows</strong>, il container
+              e' dietro NAT (WSL2) e <strong>non</strong> vede la LAN fisica: le scansioni raw
+              (<code>-sS</code>/<code>-sU</code>/<code>-O</code>) e la discovery della subnet locale non
+              funzionano dal container. La soluzione e' il <strong>proxy nmap</strong> che gira
+              <strong>nativo sull'host</strong> (Npcap): l'agent gli delega nmap in automatico.</p>
+            <ul class="small mb-0">
+              <li>Installazione automatica (PowerShell admin sull'host della Sonda):
+                <code>probe\nmap-proxy\install-windows.ps1</code> (installa nmap+Npcap, genera mTLS+token,
+                registra il servizio, configura l'agent).</li>
+              <li>Canale <strong>mTLS + token</strong>; l'argv e' ri-validato con la stessa whitelist dell'agent.</li>
+              <li>Stato del backend nmap in uso: <code>GET /status</code> della Sonda &rarr;
+                <code>scan_backend</code> = <code>proxy</code> oppure <code>local</code> (fallback automatico
+                se il proxy non e' raggiungibile).</li>
             </ul>
           </div>
         </div>

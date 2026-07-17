@@ -12,3 +12,5 @@ htmlcov/
 .mypy_cache/
 deploy/.env.probe
 deploy/.env.server
+# Certificati/segreti mTLS del proxy nmap (generati dall'installer sull'host).
+deploy/certs/

@@ -2319,3 +2319,71 @@ Output consegnati
 - Dashboard e' ora la prima voce della sidebar su Server e Sonda, sempre visibile e di primo livello.
 
 ================================================
+
+ITERAZIONE 61
+
+Agente: Orchestratore
+Data: 2026-07-17
+
+Input ricevuti
+- "quando parte una scansione devi poter cambiare pagina e poter riprendere la scansione che ancora deve finire".
+
+Lavoro svolto (FE — server/dashboard)
+- Motore async gia' presente lato agent (POST /scan ritorna subito scan_id; esecuzione in BackgroundTask; stato running->done persistito). Il gap era ritrovare/riprendere una scansione dopo aver cambiato pagina.
+- Nuovo pulse-scan-tracker.js: widget GLOBALE (fisso in basso a destra) presente su ogni pagina, che persiste in localStorage le scansioni avviate/aperte, ne fa polling e permette di riaprirle (Riprendi) finche' in corso; mostra anche quelle completate con "Pulisci". Caricato in base.html solo per chi ha scans.read; il dettaglio scansione espone i dati via data-scan-track.
+- pulse-scans.js: l'elenco Scansioni ora auto-aggiorna mentre ci sono scansioni running e ricorda l'ultima Sonda selezionata (localStorage).
+- Test: aggiunti a test_scans.py (registrazione tracker dal dettaglio; script caricato/assente per permesso). Suite FE verde.
+
+File toccati
+- server/dashboard/static/js/pulse-scan-tracker.js (nuovo), pulse-scans.js, templates/base.html, templates/scans/detail.html, tests/test_scans.py
+
+Output consegnati
+- Si puo' avviare una scansione, cambiare pagina e riprenderla dall'indicatore globale; l'elenco si aggiorna da solo.
+
+================================================
+
+ITERAZIONE 62
+
+Agente: Orchestratore
+Data: 2026-07-17
+
+Input ricevuti
+- "nella sonda Sistemi monitorati non viene popolato !!!".
+
+Diagnosi
+- L'agent riportava probe_id=null, config_version=null, systems_polled=0: la Sonda NON era piu' enrollata. I rebuild del probe-agent (fix --privileged) avevano azzerato il probe_token in memoria e il token di enrollment (monouso) era gia' consumato -> ri-registrazione fallita -> nessun pull della config -> 0 sistemi. Sul Server la Sonda 'probe-locale-01' aveva regolarmente 3 sistemi assegnati.
+
+Lavoro svolto (deploy/runtime)
+- Ri-registrazione via API sanzionata: login admin -> POST /probes/{id}/rotate-credentials -> nuovo enrollment token; recreate del probe-agent: enrollment OK (probe_id valorizzato, systems_polled=3).
+- Fix DUREVOLE: ottenuto un probe_token stabile (rotate + /probe/register) e persistito in deploy/.env.probe come PULSE_PROBE_PROBE_TOKEN. Ha precedenza sull'enrollment monouso: i futuri rebuild/recreate del container NON richiedono piu' una nuova registrazione e i sistemi restano popolati. Verificato dopo force-recreate: probe_id presente, systems_polled=3.
+
+Output consegnati
+- "Sistemi monitorati" sulla Sonda torna popolato (3 sistemi) e resta stabile ai riavvii/rebuild.
+
+================================================
+
+ITERAZIONE 63
+
+Agente: Orchestratore
+Data: 2026-07-17
+
+Input ricevuti
+- "puoi progettare il sistema che se il docker gira su una macchina windows per nmap si usa un proxy esterno al container. tutto deve avvenire in automatico".
+- Scelte utente: auto-installer completo; sicurezza mTLS (oltre a token + bind).
+
+Problema
+- Su Docker Desktop (Windows/WSL2) il container e' dietro NAT e non e' sul segmento L2 fisico: scansioni raw (-sS/-sU/-O) e discovery della subnet locale non funzionano dal container.
+
+Lavoro svolto
+- AGENT (probe/agent): astrazione runner nmap gia' presente (state.scan_runner). Nuovo proxy_runner.ProxyScanRunner (httpx mTLS + Bearer, non solleva mai: errori -> tupla failed con messaggio). Selezione automatica del backend all'avvio (_select_scan_backend): se PULSE_PROBE_NMAP_PROXY_URL e' configurato e /health risponde -> backend "proxy", altrimenti fallback "local". Nuovi settings PULSE_PROBE_NMAP_PROXY_*; /status espone scan_backend. nmap_scan.assert_safe_argv: ri-validazione whitelist di un argv gia' costruito (usata dal proxy).
+- COMPONENTE (probe/nmap-proxy): FastAPI (/health, /scan) con Bearer + mTLS (uvicorn ssl CERT_REQUIRED); ogni argv ri-validato con pulse_probe.nmap_scan.assert_safe_argv (unica fonte di verita', niente drift), binario reale sostituito ad argv[0]. gen_certs.py (cryptography): CA + server (SAN host.docker.internal) + client. pyproject/requirements; README.
+- INSTALLER (Windows, PowerShell): install-windows.ps1 idempotente e auto-elevante: installa nmap+Npcap (winget), crea venv + installa agent+proxy, genera mTLS+token, scrive config, registra Scheduled Task ad avvio (SYSTEM, elevata, restart), regola firewall, copia CA+client in deploy/certs/nmap-proxy/ e valorizza deploy/.env.probe; verifica /health. uninstall-windows.ps1 speculare.
+- DEPLOY: docker-compose.probe.yml — extra_hosts host.docker.internal, volume ./certs/nmap-proxy:ro, passthrough env PULSE_PROBE_NMAP_PROXY_*. .env.probe.example aggiornato; .gitignore esclude deploy/certs/. Guida (sec-scansioni): sezione "Scansioni raw su Windows (proxy nmap)".
+
+Qualita'
+- agent: 164 test verdi, mypy --strict pulito (aggiunto py.typed). proxy: 11 test verdi (auth, ri-validazione argv, timeout/oserror, health, gen_certs), mypy pulito.
+
+Output consegnati
+- Su Windows, installato il proxy, l'agent usa in automatico nmap nativo dell'host per le scansioni raw/LAN (scan_backend=proxy), con mTLS+token; su Linux/senza proxy nulla cambia (scan_backend=local). Feature dormiente finche' non si esegue l'installer.
+
+================================================
