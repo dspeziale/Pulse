@@ -8,14 +8,12 @@ La ricerca guidata mostra i risultati come tabella DataTables server-side
 from __future__ import annotations
 
 import json
-from datetime import datetime, timedelta, timezone
-from zoneinfo import ZoneInfo
 
 from flask import (Blueprint, current_app, flash, jsonify, redirect,
                    render_template, request, url_for)
 
 from pulse_fe_common.auth import access_token, permission_required
-from pulse_fe_common.datetimes import DEFAULT_TIMEZONE
+from pulse_fe_common.datetimes import time_presets
 
 from sdk import api_get, api_post, client
 from tzsource import fetch_config_timezone, resolve_timezone
@@ -36,41 +34,6 @@ def _current_timezone() -> str:
         current_app.config["TZ_CACHE"],
         lambda: fetch_config_timezone(client(), access_token()),
     )
-
-
-def _zone(tz_name: str) -> ZoneInfo:
-    try:
-        return ZoneInfo(tz_name)
-    except Exception:  # tz sconosciuto -> ripiego sul default
-        return ZoneInfo(DEFAULT_TIMEZONE)
-
-
-def time_presets(tz_name: str, now: datetime | None = None) -> tuple[dict, int]:
-    """Preset di periodo (from/to in UTC ISO-8601) calcolati nel fuso ``tz_name``.
-
-    Ritorna ``(presets, offset_min)`` dove ``presets`` mappa la chiave del preset
-    a ``{"from", "to"}`` (stringhe UTC con suffisso 'Z') e ``offset_min`` e' lo
-    scostamento corrente del fuso rispetto a UTC in minuti (usato lato client per
-    convertire l'intervallo personalizzato in UTC). "Oggi" parte dalla mezzanotte
-    locale; le finestre mobili terminano ad ``now``.
-    """
-    tz = _zone(tz_name)
-    local = (now.astimezone(tz) if now else datetime.now(tz))
-
-    def _iso(dt: datetime) -> str:
-        return dt.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-
-    to = _iso(local)
-    midnight = local.replace(hour=0, minute=0, second=0, microsecond=0)
-    presets = {
-        "last_hour": {"from": _iso(local - timedelta(hours=1)), "to": to},
-        "today": {"from": _iso(midnight), "to": to},
-        "last_24h": {"from": _iso(local - timedelta(hours=24)), "to": to},
-        "last_7d": {"from": _iso(local - timedelta(days=7)), "to": to},
-        "last_30d": {"from": _iso(local - timedelta(days=30)), "to": to},
-    }
-    offset = local.utcoffset() or timedelta(0)
-    return presets, int(offset.total_seconds() // 60)
 
 
 # -- P-04 query builder --------------------------------------------------------

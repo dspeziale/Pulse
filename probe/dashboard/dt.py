@@ -48,6 +48,11 @@ def _ms_col() -> DTColumn:
                     class_="text-end")
 
 
+def _msg_col() -> DTColumn:
+    return DTColumn("message", lambda h: h.get("message") or "",
+                    title="Messaggio", class_="text-body-secondary")
+
+
 def _index_table() -> DTTable:
     """Heartbeat della dashboard Sonda (colonna Sistema inclusa)."""
     return DTTable(
@@ -59,6 +64,7 @@ def _index_table() -> DTTable:
                      sort="check_name", title="Check"),
             _status_col(),
             _ms_col(),
+            _msg_col(),
         ],
         order=(0, "desc"), default_length=50, searching=False,
     )
@@ -73,6 +79,7 @@ def _system_table() -> DTTable:
                      sort="check_name", title="Check"),
             _status_col(),
             _ms_col(),
+            _msg_col(),
         ],
         order=(0, "desc"), default_length=50, searching=False,
     )

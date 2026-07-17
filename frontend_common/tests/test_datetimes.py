@@ -77,3 +77,41 @@ def test_zone_db_unavailable_falls_back_to_utc(monkeypatch):
 
     monkeypatch.setattr(dtmod, "ZoneInfo", _boom)
     assert format_datetime("2026-07-16T12:00:00Z", "Europe/Rome") == "16/07/2026 12:00:00"
+
+
+# -- time_presets (preset di periodo condivisi P-04 / PP-04) -----------------
+def test_time_presets_rome_summer_offset_and_today():
+    from pulse_fe_common import time_presets
+    now = datetime(2026, 7, 16, 15, 30, 0, tzinfo=timezone.utc)  # 17:30 a Rome
+    presets, offset = time_presets("Europe/Rome", now=now)
+    assert set(presets) == {"last_hour", "today", "last_24h", "last_7d",
+                            "last_30d"}
+    # "Oggi" = mezzanotte locale: 2026-07-16 00:00+02:00 = 15/07 22:00Z
+    assert presets["today"]["from"] == "2026-07-15T22:00:00Z"
+    assert presets["today"]["to"] == "2026-07-16T15:30:00Z"
+    assert presets["last_hour"]["from"] == "2026-07-16T14:30:00Z"
+    assert offset == 120
+
+
+def test_time_presets_utc_zero_offset():
+    from pulse_fe_common import time_presets
+    now = datetime(2026, 7, 16, 15, 30, 0, tzinfo=timezone.utc)
+    presets, offset = time_presets("UTC", now=now)
+    assert offset == 0
+    assert presets["today"]["from"] == "2026-07-16T00:00:00Z"
+
+
+def test_time_presets_invalid_tz_falls_back_to_default():
+    from pulse_fe_common import time_presets
+    now = datetime(2026, 1, 16, 12, 0, 0, tzinfo=timezone.utc)  # inverno
+    presets, offset = time_presets("Pinco/Pallino", now=now)
+    assert offset == 60  # ripiego su Europe/Rome, inverno +01:00
+    assert presets["today"]["from"] == "2026-01-15T23:00:00Z"
+
+
+def test_time_presets_now_defaults_to_current():
+    from pulse_fe_common import time_presets
+    presets, _ = time_presets("Europe/Rome")  # now=None -> adesso
+    for p in presets.values():
+        assert p["from"].endswith("Z") and p["to"].endswith("Z")
+        assert p["from"] <= p["to"]

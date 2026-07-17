@@ -1801,3 +1801,78 @@ Output consegnati
 - Voce menu "Guida" (sezione Aiuto della sidebar) -> rotta GET /guida, accessibile a TUTTI gli utenti autenticati. Pagina con indice ad ancore e 13 sezioni (Panoramica, Architettura, Accesso e sicurezza, Sonde, Sistemi monitorati, Schema heartbeat, Dashboard, Query dati e Grafici, Notifiche e allarmi, Configurazione, Report/Compendio, Tabelle, FAQ/Troubleshooting). Solo server/dashboard, nessun CDN, nessuna modifica a backend/probe-agent. Coverage 100% sul codice applicativo, 314 test verdi.
 
 ================================================
+
+ITERAZIONE 48
+
+Agente: FE
+Data: 2026-07-17
+
+Input ricevuti
+- Richiesta orchestratore (solo probe/dashboard, + frontend_common se serve; NON toccare backend/probe-agent/server dashboard nelle funzionalita'; niente CDN): replicare su PP-04 "Interrogazione diretta" della dashboard SONDA il lavoro "friendly" gia' fatto su P-04 (Server). Filtri guidati (Sistema/Check/Stato), preset di periodo (default Oggi) calcolati nel fuso della Sonda, risultati come tabella DataTables server-side (adattatore /dt/heartbeats) coi filtri via ajax.data, riepilogo totale, scorciatoia "Solo problemi", query strutturata spostata in "Avanzato" collassabile. Riusare la logica preset lato server se estraibile in frontend_common.
+
+Lavoro svolto (FE)
+- REFACTOR condiviso: estratta la logica dei preset di periodo in frontend_common/pulse_fe_common/datetimes.py -> time_presets(tz_name, now=None) -> ({last_hour,today,last_24h,last_7d,last_30d: {from,to}}, offset_min) in UTC ISO-8601, "Oggi" dalla mezzanotte locale, fuso sconosciuto -> ripiego DEFAULT_TIMEZONE (riusa _zone gia' testato). Esportata da pulse_fe_common. server/dashboard/views/query.py ora IMPORTA time_presets da frontend_common (rimossa la definizione locale duplicata): comportamento del Server invariato (200 test verdi), nessuna modifica funzionale al server. Questo e' il riuso esplicitamente richiesto (punto 2).
+- FILTRI GUIDATI PP-04 (probe/dashboard/views/query.py + templates/query/builder.html + static/js/pulse-query.js):
+  - Sistema: <select> (#q-system) popolato lato server da GET /api/v1/systems (value = system_id), opzione "Tutti i sistemi".
+  - Check: input con <datalist> (#q-check + #q-check-options) -> suggerimenti dai check distinti del sistema + testo libero. Opzione "Tutti" = campo vuoto.
+  - Stato: <select> (#q-status) Tutti / ok / warn / error / down / unknown.
+- COME HO RICAVATO I CHECK: il probe-agent NON espone /systems/{id}/checks NE' l'aggregazione "terms" (compute_aggregations supporta solo count/uptime/avg/min/max). Ho quindi implementato il proxy GET /checks-by-system?system_id= (probe dashboard, login_required) che esegue una scansione limitata dei documenti recenti: POST /api/v1/query filtrato per system_id sull'ultimo periodo (finestra last_30d) con page_size=1000, deduplicando check_id/check_name -> lista di check distinti. In UI il Check resta un input con datalist: i valori distinti sono suggerimenti, ma l'operatore puo' sempre digitare un check_id (fallback a testo libero come richiesto). Senza system_id o su errore/risposta non-dict -> lista vuota (mai bloccante).
+- PERIODO con PRESET (default Oggi): #q-preset con Ultima ora / Oggi / Ultime 24 ore / Ultimi 7 giorni / Ultimi 30 giorni / Intervallo personalizzato. from/to calcolati SERVER-SIDE con time_presets nel fuso della Sonda (cfg.timezone = env PULSE_PROBE_TIMEZONE, stessa fonte di localdt) e convertiti in UTC; intervallo personalizzato (datetime-local) convertito in UTC lato client con l'offset del fuso (data-tz-offset).
+- RISULTATI: tabella DataTables SERVER-SIDE (#q-results) verso l'adattatore locale /dt/heartbeats (creato nell'ITERAZIONE 44), con funzione ajax che aggiunge i filtri correnti ad ajax.data (system_id, check_id, status, from, to). Colonne leggibili: timestamp (localdt), sistema, check, stato (badge b-*), response_ms e NUOVA colonna Messaggio (aggiunta alle DTTable heartbeats della Sonda in probe/dashboard/dt.py, index + dettaglio sistema). Riepilogo (#q-summary) col totale aggiornato ad ogni draw.
+- SCORCIATOIA "Solo problemi" (#q-only-problems): imposta Stato = "error" e ricarica (l'endpoint heartbeat filtra un solo stato: si punta all'anomalia piu' grave; warn/down restano selezionabili).
+- AVANZATO collassabile: la query strutturata preesistente (from/to ISO, textarea Filtri/Aggregazioni JSON, esempi, POST /query e blocco risultati server-side) e' conservata invariata dentro un <div class="collapse" id="advanced-query">. Nessuna funzionalita' rimossa. run_query passa anch'esso systems/presets/tz_offset_min (la sezione guidata resta funzionante dopo una query strutturata).
+- JS dedicato probe/dashboard/static/js/pulse-query.js (vendorizzato, no CDN): niente selezione Sonda (Sonda unica locale); al cambio Sistema popola i suggerimenti Check via il proxy; init DataTables con ajax verso /dt/heartbeats fisso; filtri -> reload; presets -> from/to; solo-problemi -> stato error.
+
+Qualita'
+- NIENTE CDN: builder.html e pulse-query.js referenziano solo asset locali (jquery/datatables vendorizzati + js/pulse-query.js); grep finale senza src/href http(s) esterni.
+- Coverage 100% sul codice applicativo: frontend_common 100% (datetimes.py 52/52 con time_presets, datatables.py 128/128), server/dashboard 100% (views/query.py 79/79 dopo il refactor), probe/dashboard 100% (views/query.py 55/55, dt.py 48/48, app/sdk). Esito: frontend_common 75, server/dashboard 200, probe/dashboard 53 -> 328 test passati, 0 falliti.
+- Test aggiunti: frontend_common/tests/test_datetimes.py (time_presets: Rome estate/inverno + offset, UTC offset 0, fuso non valido -> ripiego, now=None default); probe/dashboard/tests/test_query_builder.py (rendering filtri guidati + datalist Check + preset default Oggi + colonna Messaggio + pulse-query.js; conservazione Avanzato; proxy /checks-by-system: distinti/dedup, senza system_id, errore backend -> vuoto, non-dict -> vuoto, login richiesto, forward filtri/from/to/page_size; run_query rende ancora la sezione guidata; adattatore /dt/heartbeats con colonna Messaggio). Nessun test preesistente rotto.
+- Verifica REALE (app Flask reale + probe-agent simulato): GET /query rende Sistema (sys-1/CRM), Check datalist, preset "Oggi" (from = mezzanotte locale in UTC), colonne [@timestamp, system_name, check_name, status, response_ms, message], data-query-app e js/pulse-query.js; GET /checks-by-system?system_id=sys-1 -> [{db,Database},{api,API}] (deduplicati) con POST /query filtrato per system_id; GET /dt/heartbeats?status=error&system_id=sys-1 -> riga con badge stato e cella Messaggio.
+
+File creati
+- probe/dashboard/static/js/pulse-query.js
+- probe/dashboard/tests/test_query_builder.py
+
+File modificati
+- frontend_common/pulse_fe_common/datetimes.py (time_presets + PRESET_KEYS), __init__.py (export)
+- frontend_common/tests/test_datetimes.py (test time_presets)
+- server/dashboard/views/query.py (usa time_presets da frontend_common; nessun cambio funzionale)
+- probe/dashboard/views/query.py (builder+run_query con systems/presets, proxy /checks-by-system)
+- probe/dashboard/templates/query/builder.html (sezione guidata primaria + risultati DataTables + Avanzato collassabile)
+- probe/dashboard/dt.py (colonna Messaggio nelle DTTable heartbeats index + sistema)
+
+Decisioni prese
+- Logica preset estratta in frontend_common (DRY tra P-04 e PP-04) come suggerito; il server ora la importa, comportamento invariato.
+- Check ricavati via scansione documenti (POST /query, dedup check_id) perche' la Sonda non ha /systems/{id}/checks ne' aggregazione terms; controllo Check come datalist = suggerimenti distinti + fallback a testo libero (come da istruzione).
+- "Solo problemi" -> stato "error" (l'endpoint heartbeat filtra un singolo stato; niente OR error+down+warn senza toccare il backend).
+- Query strutturata JSON conservata integralmente nella sezione Avanzato collassabile.
+
+Output consegnati
+- PP-04 ora guida l'operatore come P-04: Sistema (select) -> Check (datalist suggerito + libero) -> Stato, periodi rapidi (default Oggi) + intervallo personalizzato, risultati DataTables server-side coi filtri via ajax.data e riepilogo totale, scorciatoia "Solo problemi", query strutturata avanzata collassabile. Logica preset condivisa in frontend_common. Nessun CDN, nessuna modifica a backend/probe-agent. Coverage 100%, 328 test verdi.
+
+================================================
+
+ITERAZIONE 49
+
+Agente: ORCHESTRATORE
+Data: 2026-07-17
+
+Input ricevuti
+- Segnalazione utente: nel Compendio i KPI risultano "inclinati" (disposti a scaletta/diagonale) invece che allineati.
+
+Lavoro svolto
+- Sostituita la griglia Bootstrap row/col dei KPI del Compendio con una griglia CSS deterministica (.pulse-kpi-grid: display grid, auto-fill minmax(150px,1fr)), che garantisce celle allineate in righe/colonne pulite indipendentemente dal contenuto.
+
+File creati
+- Modificati: server/dashboard/templates/systems/report.html, server/dashboard/static/css/pulse-theme.css.
+
+Problemi trovati
+- La disposizione a scaletta non derivava dal markup (griglia corretta) ma da interazione di layout; risolta in modo robusto con CSS grid.
+
+Decisioni prese
+- Uso di CSS grid per i blocchi KPI per allineamento deterministico.
+
+Output consegnati
+- KPI del Compendio allineati.
+
+================================================

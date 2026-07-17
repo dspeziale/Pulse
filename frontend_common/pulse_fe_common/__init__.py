@@ -12,11 +12,12 @@ NB: questo pacchetto NON accede mai direttamente a DB o OpenSearch: effettua
 solo chiamate REST agli endpoint definiti in docs/api/DOCUMENTO_API.md.
 """
 
-from .datetimes import DEFAULT_FORMAT, DEFAULT_TIMEZONE, format_datetime
+from .datetimes import (DEFAULT_FORMAT, DEFAULT_TIMEZONE, format_datetime,
+                        time_presets)
 
 __all__ = [
     "config", "http_client", "auth", "rbac", "datetimes", "datatables",
-    "format_datetime", "DEFAULT_TIMEZONE", "DEFAULT_FORMAT",
+    "format_datetime", "time_presets", "DEFAULT_TIMEZONE", "DEFAULT_FORMAT",
 ]
 
 __version__ = "1.0.0"

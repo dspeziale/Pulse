@@ -82,7 +82,7 @@
 </div>
 
 {# ===================== KPI ===================== #}
-<div class="row g-2 mb-3">
+<div class="pulse-kpi-grid mb-3">
   {% set _up = o.get('uptime') %}
   {% set _avg = o.get('avg_response_ms') %}
   {% set _min = o.get('min_response_ms') %}
@@ -97,7 +97,7 @@
     ('Incidenti', alarms.get('total') or 0, 'danger', 'bi-bell')
   ] %}
   {% for label, value, color, icon in tiles %}
-  <div class="col-6 col-md-4 col-xl-3">
+  <div>
     <div class="card h-100 border-start border-4 border-{{ color }}">
       <div class="card-body py-2">
         <div class="d-flex justify-content-between align-items-center">

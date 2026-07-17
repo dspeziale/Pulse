@@ -1,87 +1,185 @@
 {% extends "base.html" %}
-{% from "_macros.html" import status_badge %}
+{% from "_macros.html" import status_badge, dt_table_shell %}
 {% block title %}Query diretta — Pulse Probe{% endblock %}
+{% set hbmeta = dt_meta('heartbeats') %}
 {% block content %}
 <h1 class="h3 mb-1"><i class="bi bi-search me-2"></i>Interrogazione diretta (PP-04)</h1>
-<p class="text-body-secondary">Query strutturata Pulse sui dati locali della Sonda
-  (<code>POST /query</code>). Non è una DSL raw OpenSearch (decisione API-01).</p>
+<p class="text-body-secondary">Cerca gli heartbeat locali della Sonda con filtri guidati e periodi rapidi.
+  Per interrogazioni strutturate (filtri/aggregazioni JSON) apri la sezione <em>Avanzato</em> in fondo.</p>
 
-<form method="post" action="{{ url_for('query.run_query') }}">
-<div class="row g-3">
-  <div class="col-lg-8">
-    <div class="card">
-      <div class="card-header"><i class="bi bi-sliders me-1"></i>Parametri query</div>
-      <div class="card-body">
-        <div class="row g-3">
+{# ===================== RICERCA GUIDATA (primaria) ===================== #}
+<div class="card mb-3"
+     data-query-app
+     data-checks-url="{{ url_for('query.checks_by_system') }}"
+     data-hb-url="{{ url_for('dt.dt_heartbeats') }}"
+     data-tz-offset="{{ tz_offset_min }}">
+  <div class="card-header"><i class="bi bi-funnel me-1"></i>Filtri</div>
+  <div class="card-body">
+    <div class="row g-3 align-items-end">
+      <div class="col-md-4">
+        <label class="form-label" for="q-system">Sistema</label>
+        <select class="form-select" id="q-system">
+          <option value="">Tutti i sistemi</option>
+          {% for s in systems['items'] %}
+            <option value="{{ s.system_id }}">{{ s.system_id }}{% if s.system_name %} — {{ s.system_name }}{% endif %}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label" for="q-check">Check</label>
+        <input class="form-control" id="q-check" list="q-check-options"
+               placeholder="Tutti i check" autocomplete="off">
+        <datalist id="q-check-options"></datalist>
+        <div class="form-text">Suggerimenti dai check recenti del sistema; puoi anche digitarne uno.</div>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label" for="q-status">Stato</label>
+        <select class="form-select" id="q-status">
+          <option value="">Tutti gli stati</option>
+          {% for s in ['ok','warn','error','down','unknown'] %}
+            <option value="{{ s }}">{{ s }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label" for="q-preset">Periodo</label>
+        <select class="form-select" id="q-preset">
+          <option value="last_hour">Ultima ora</option>
+          <option value="today" selected>Oggi</option>
+          <option value="last_24h">Ultime 24 ore</option>
+          <option value="last_7d">Ultimi 7 giorni</option>
+          <option value="last_30d">Ultimi 30 giorni</option>
+          <option value="custom">Intervallo personalizzato…</option>
+        </select>
+      </div>
+      <div class="col-md-4 d-flex gap-2">
+        <button type="button" class="btn btn-primary flex-fill" id="q-apply">
+          <i class="bi bi-arrow-clockwise me-1"></i>Aggiorna
+        </button>
+        <button type="button" class="btn btn-outline-danger" id="q-only-problems"
+                title="Mostra subito gli heartbeat in errore">
+          <i class="bi bi-exclamation-octagon me-1"></i>Solo problemi
+        </button>
+      </div>
+      <div class="col-12 d-none" id="q-custom">
+        <div class="row g-2">
           <div class="col-md-6">
-            <label class="form-label" for="from">Da (ISO-8601)</label>
-            <input class="form-control" id="from" name="from" placeholder="2026-07-15T00:00:00Z">
+            <label class="form-label small text-body-secondary mb-1" for="q-from">Da</label>
+            <input type="datetime-local" class="form-control" id="q-from">
           </div>
           <div class="col-md-6">
-            <label class="form-label" for="to">A (ISO-8601)</label>
-            <input class="form-control" id="to" name="to" placeholder="2026-07-15T23:59:59Z">
+            <label class="form-label small text-body-secondary mb-1" for="q-to">A</label>
+            <input type="datetime-local" class="form-control" id="q-to">
           </div>
-          <div class="col-12">
-            <label class="form-label" for="filters">Filtri (JSON array)</label>
-            <textarea class="form-control font-monospace" id="filters" name="filters" rows="4" placeholder='[{"field":"system_id","op":"eq","value":"sys-1"}]'></textarea>
-            <div class="form-text">Operatori: eq, neq, gt, gte, lt, lte, in, not_in, contains, matches.</div>
-          </div>
-          <div class="col-12">
-            <label class="form-label" for="aggregations">Aggregazioni (JSON array)</label>
-            <textarea class="form-control font-monospace" id="aggregations" name="aggregations" rows="3" placeholder='[{"type":"avg","field":"response_ms","interval":"1h"}]'></textarea>
-          </div>
+          <div class="col-12"><div class="form-text">L'intervallo e' interpretato nel fuso della Sonda e convertito in UTC per la query.</div></div>
         </div>
-        <div class="mt-3"><button type="submit" class="btn btn-primary"><i class="bi bi-play-fill me-1"></i>Esegui query</button></div>
       </div>
     </div>
   </div>
-  <div class="col-lg-4">
-    <div class="card">
-      <div class="card-header"><i class="bi bi-lightbulb me-1"></i>Esempi</div>
-      <div class="card-body small">
-        <p class="mb-1 text-body-secondary">Errori lenti:</p>
-        <pre class="pulse-code mb-3">[
+</div>
+
+{# Preset e colonne per pulse-query.js (nessun dato inline nel markup) #}
+<script id="q-presets" type="application/json">{{ presets|tojson }}</script>
+<script id="q-columns" type="application/json">{{ hbmeta.columnsJs|tojson }}</script>
+
+{# ===================== RISULTATI ===================== #}
+<div class="d-flex align-items-center gap-2 mb-2">
+  <span class="fw-semibold"><i class="bi bi-table me-1"></i>Risultati</span>
+  <span class="text-body-secondary small" id="q-summary">Imposta i filtri e premi Aggiorna.</span>
+</div>
+{{ dt_table_shell('q-results', hbmeta, empty='Nessun heartbeat per i filtri selezionati.') }}
+
+{# ===================== AVANZATO (query strutturata) ===================== #}
+<div class="card mt-3">
+  <div class="card-header">
+    <button class="btn btn-link p-0 text-decoration-none" type="button"
+            data-bs-toggle="collapse" data-bs-target="#advanced-query"
+            aria-expanded="false" aria-controls="advanced-query">
+      <i class="bi bi-sliders me-1"></i>Avanzato — query strutturata (filtri/aggregazioni JSON)
+    </button>
+  </div>
+  <div class="collapse" id="advanced-query">
+    <div class="card-body">
+      <p class="text-body-secondary small">Query strutturata Pulse sui dati locali della Sonda
+        (<code>POST /query</code>). Non è una DSL raw OpenSearch (decisione API-01).</p>
+      <form method="post" action="{{ url_for('query.run_query') }}">
+      <div class="row g-3">
+        <div class="col-lg-8">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label" for="from">Da (ISO-8601)</label>
+              <input class="form-control" id="from" name="from" placeholder="2026-07-15T00:00:00Z">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="to">A (ISO-8601)</label>
+              <input class="form-control" id="to" name="to" placeholder="2026-07-15T23:59:59Z">
+            </div>
+            <div class="col-12">
+              <label class="form-label" for="filters">Filtri (JSON array)</label>
+              <textarea class="form-control font-monospace" id="filters" name="filters" rows="4" placeholder='[{"field":"system_id","op":"eq","value":"sys-1"}]'></textarea>
+              <div class="form-text">Operatori: eq, neq, gt, gte, lt, lte, in, not_in, contains, matches.</div>
+            </div>
+            <div class="col-12">
+              <label class="form-label" for="aggregations">Aggregazioni (JSON array)</label>
+              <textarea class="form-control font-monospace" id="aggregations" name="aggregations" rows="3" placeholder='[{"type":"avg","field":"response_ms","interval":"1h"}]'></textarea>
+            </div>
+          </div>
+          <div class="mt-3"><button type="submit" class="btn btn-primary"><i class="bi bi-play-fill me-1"></i>Esegui query</button></div>
+        </div>
+        <div class="col-lg-4">
+          <div class="card">
+            <div class="card-header"><i class="bi bi-lightbulb me-1"></i>Esempi</div>
+            <div class="card-body small">
+              <p class="mb-1 text-body-secondary">Errori lenti:</p>
+              <pre class="pulse-code mb-3">[
   {"field":"status","op":"eq","value":"error"},
   {"field":"response_ms","op":"gt","value":500}
 ]</pre>
-        <p class="mb-1 text-body-secondary">Media + uptime:</p>
-        <pre class="pulse-code mb-0">[
+              <p class="mb-1 text-body-secondary">Media + uptime:</p>
+              <pre class="pulse-code mb-0">[
   {"type":"avg","field":"response_ms","interval":"1h"},
   {"type":"uptime"}
 ]</pre>
+            </div>
+          </div>
+        </div>
       </div>
+      </form>
+
+      {% if result %}
+      <div class="card mt-3">
+        <div class="card-header"><i class="bi bi-table me-1"></i>Risultati query strutturata ({{ result.total }})</div>
+        {% if result.aggregations %}
+        <div class="card-body">
+          <h2 class="h6 text-body-secondary">Aggregazioni</h2>
+          <pre class="pulse-code">{{ result.aggregations|tojson(indent=2) }}</pre>
+        </div>
+        {% endif %}
+        <div class="table-responsive">
+          <table class="table table-hover align-middle mb-0">
+            <thead><tr><th>Timestamp</th><th>Sistema</th><th>Check</th><th>Stato</th><th class="text-end">ms</th></tr></thead>
+            <tbody>
+            {% for h in result['items'] %}
+            <tr>
+              <td class="text-body-secondary">{{ h['@timestamp']|localdt }}</td>
+              <td>{{ h.system_name }}</td>
+              <td>{{ h.check_name }}</td>
+              <td>{{ status_badge(h.status) }}</td>
+              <td class="text-end">{{ h.response_ms }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="5" class="text-center text-body-secondary py-4">Nessun risultato.</td></tr>
+            {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      {% endif %}
     </div>
   </div>
 </div>
-</form>
+{% endblock %}
 
-{% if result %}
-<div class="card mt-3">
-  <div class="card-header"><i class="bi bi-table me-1"></i>Risultati ({{ result.total }})</div>
-  {% if result.aggregations %}
-  <div class="card-body">
-    <h2 class="h6 text-body-secondary">Aggregazioni</h2>
-    <pre class="pulse-code">{{ result.aggregations|tojson(indent=2) }}</pre>
-  </div>
-  {% endif %}
-  <div class="table-responsive">
-    <table class="table table-hover align-middle mb-0">
-      <thead><tr><th>Timestamp</th><th>Sistema</th><th>Check</th><th>Stato</th><th class="text-end">ms</th></tr></thead>
-      <tbody>
-      {% for h in result['items'] %}
-      <tr>
-        <td class="text-body-secondary">{{ h['@timestamp']|localdt }}</td>
-        <td>{{ h.system_name }}</td>
-        <td>{{ h.check_name }}</td>
-        <td>{{ status_badge(h.status) }}</td>
-        <td class="text-end">{{ h.response_ms }}</td>
-      </tr>
-      {% else %}
-      <tr><td colspan="5" class="text-center text-body-secondary py-4">Nessun risultato.</td></tr>
-      {% endfor %}
-      </tbody>
-    </table>
-  </div>
-</div>
-{% endif %}
+{% block body_extra %}
+<script src="{{ url_for('static', filename='js/pulse-query.js') }}"></script>
 {% endblock %}

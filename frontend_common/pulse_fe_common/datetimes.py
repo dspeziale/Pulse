@@ -14,7 +14,7 @@ Regole:
 """
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 #: Fuso orario di default (IANA) quando non configurato/non valido.
@@ -78,3 +78,37 @@ def format_datetime(
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=timezone.utc)
     return dt.astimezone(_zone(tz_name)).strftime(fmt)
+
+
+#: Chiavi dei preset di periodo (ordine di presentazione nella UI).
+PRESET_KEYS = ("last_hour", "today", "last_24h", "last_7d", "last_30d")
+
+
+def time_presets(tz_name: str, now: datetime | None = None) -> tuple[dict, int]:
+    """Preset di periodo (from/to in UTC ISO-8601) calcolati nel fuso ``tz_name``.
+
+    Condiviso dalle due dashboard (P-04 Server e PP-04 Sonda). Ritorna
+    ``(presets, offset_min)`` dove ``presets`` mappa la chiave del preset a
+    ``{"from", "to"}`` (stringhe UTC con suffisso 'Z') e ``offset_min`` e' lo
+    scostamento corrente del fuso rispetto a UTC in minuti (usato lato client per
+    convertire l'intervallo personalizzato in UTC). "Oggi" (``today``) parte dalla
+    mezzanotte locale; le finestre mobili terminano ad ``now`` (default: adesso).
+    Fuso sconosciuto -> ripiego su ``DEFAULT_TIMEZONE`` (vedi ``_zone``).
+    """
+    tz = _zone(tz_name)
+    local = now.astimezone(tz) if now else datetime.now(tz)
+
+    def _iso(dt: datetime) -> str:
+        return dt.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    to = _iso(local)
+    midnight = local.replace(hour=0, minute=0, second=0, microsecond=0)
+    presets = {
+        "last_hour": {"from": _iso(local - timedelta(hours=1)), "to": to},
+        "today": {"from": _iso(midnight), "to": to},
+        "last_24h": {"from": _iso(local - timedelta(hours=24)), "to": to},
+        "last_7d": {"from": _iso(local - timedelta(days=7)), "to": to},
+        "last_30d": {"from": _iso(local - timedelta(days=30)), "to": to},
+    }
+    offset = local.utcoffset() or timedelta(0)
+    return presets, int(offset.total_seconds() // 60)

@@ -145,6 +145,14 @@ canvas { display: block; width: 100%; max-width: 100%; }
 }
 /* Numeri grandi nelle card di riepilogo (KPI). */
 .pulse-kpi-value { font-size: 2rem; font-weight: 700; line-height: 1.1; }
+/* Griglia KPI allineata (evita disposizioni "a scaletta"): celle uguali,
+   responsive, sempre allineate in righe/colonne pulite. */
+.pulse-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 0.5rem;
+  align-items: stretch;
+}
 
 /* Tile/righe cliccabili (drill-down dashboard): feedback al passaggio del mouse. */
 .pulse-tile-link { cursor: pointer; transition: box-shadow 0.12s ease, transform 0.12s ease; }
