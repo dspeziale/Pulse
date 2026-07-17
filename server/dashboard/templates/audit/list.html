@@ -1,6 +1,7 @@
 {% extends "base.html" %}
-{% from "_macros.html" import status_badge, pagination %}
+{% from "_macros.html" import dt_table_shell, dt_init %}
 {% block title %}Audit log — Pulse{% endblock %}
+{% set meta = dt_meta('audit') %}
 {% block content %}
 <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
   <h1 class="h3 mb-0"><i class="bi bi-journal-text me-2"></i>Audit log</h1>
@@ -8,53 +9,31 @@
 
 <div class="card mb-3">
   <div class="card-body">
-    <form method="get" class="row g-2 align-items-end">
-      <div class="col-sm-4">
-        <label class="form-label small text-body-secondary mb-1">Azione</label>
-        <input name="action" class="form-control" placeholder="es. user.create" value="{{ request.args.get('action','') }}">
+    <div class="row g-2 align-items-end">
+      <div class="col-sm-5">
+        <label class="form-label small text-body-secondary mb-1" for="f-action">Azione</label>
+        <input id="f-action" data-dt-filter="tbl-audit" class="form-control" placeholder="es. user.create">
       </div>
       <div class="col-sm-3">
-        <label class="form-label small text-body-secondary mb-1">Esito</label>
-        <select name="outcome" class="form-select">
+        <label class="form-label small text-body-secondary mb-1" for="f-outcome">Esito</label>
+        <select id="f-outcome" data-dt-filter="tbl-audit" class="form-select">
           <option value="">Tutti</option>
           {% for o in ['success','failure'] %}
-            <option value="{{ o }}" {% if request.args.get('outcome')==o %}selected{% endif %}>{{ o }}</option>
+            <option value="{{ o }}">{{ o }}</option>
           {% endfor %}
         </select>
       </div>
       <div class="col-sm-2 d-grid">
-        <button class="btn btn-outline-secondary"><i class="bi bi-funnel me-1"></i>Filtra</button>
+        <button data-dt-apply="tbl-audit" class="btn btn-outline-secondary"><i class="bi bi-funnel me-1"></i>Filtra</button>
       </div>
-    </form>
+    </div>
   </div>
 </div>
 
-<div class="card">
-  <div class="table-responsive">
-    <table class="table table-hover align-middle mb-0">
-      <thead><tr><th>Data</th><th>Attore</th><th>Azione</th><th>Entità</th><th>Esito</th></tr></thead>
-      <tbody>
-      {% for e in data['items'] %}
-      <tr>
-        <td><a class="text-decoration-none" href="{{ url_for('audit.detail', entry_id=e.id) }}">{{ e.timestamp|localdt }}</a></td>
-        <td class="text-body-secondary">{{ e.actor_type }}:{{ e.actor_id }}</td>
-        <td><code>{{ e.action }}</code></td>
-        <td>{{ e.entity_type }}</td>
-        <td>{{ status_badge(e.outcome) }}</td>
-      </tr>
-      {% else %}
-      <tr><td colspan="5" class="text-center text-body-secondary py-5">Nessuna voce di audit per i filtri selezionati.</td></tr>
-      {% endfor %}
-      </tbody>
-    </table>
-  </div>
-  {% if data['items'] %}
-  <div class="card-footer">
-    {% set _tot = data.get('total', 0)|int %}
-    {% if _tot > page_size %}
-      {{ pagination(page, page_size, _tot, 'audit.list_audit', filters) }}
-    {% else %}<span class="text-body-secondary small">Totale: {{ _tot }}</span>{% endif %}
-  </div>
-  {% endif %}
-</div>
+{{ dt_table_shell('tbl-audit', meta, empty='Nessuna voce di audit per i filtri selezionati.') }}
+{% endblock %}
+
+{% block body_extra %}
+{{ dt_init('tbl-audit', meta, url_for('dt.dt_resource', resource='audit'),
+   'function(d){ d.action = document.getElementById("f-action").value; d.outcome = document.getElementById("f-outcome").value; }') }}
 {% endblock %}

@@ -85,7 +85,8 @@ Formato corpo errore:
 ### GET /api/v1/users
 - **Descrizione**: elenca utenti (paginato/filtrabile).
 - **Auth**: JWT. **Permesso**: `users.read`.
-- **Query**: `page:int, page_size:int, q:string, status:string, role:string`
+- **Query**: `page:int, page_size:int, q:string, status:string, role:string, sort:string`
+  - `sort` (esteso su richiesta utente: DataTables): `campo` (asc) o `-campo` (desc). Colonne ordinabili: `username, full_name, email, created_at, last_login_at, status`. Campo non ammesso -> ordinamento di default (nessun errore).
 - **Response 200**: `{ "items": [User], "total": int, "page": int, "page_size": int }`
   - `User`: `{ "id": string, "username": string, "email": string, "full_name": string, "status": "active|disabled|locked", "roles": [string], "created_at": string, "updated_at": string, "last_login_at": string|null }`
 - **Errori**: 401, 403.
@@ -120,7 +121,8 @@ Formato corpo errore:
 ## 1.3 Area: Ruoli
 
 ### GET /api/v1/roles
-- **Permesso**: `roles.read`. **Query**: `page, page_size, q`.
+- **Permesso**: `roles.read`. **Query**: `page, page_size, q, sort`.
+  - `sort` (esteso su richiesta utente: DataTables): colonne ordinabili `name, created_at`; formato `campo`/`-campo`; campo non ammesso -> default.
 - **Response 200**: `{ "items": [Role], "total": int }`
   - `Role`: `{ "id": string, "name": string, "description": string, "is_builtin": bool, "permissions": [string], "created_at": string }`
 - **Errori**: 401, 403.
@@ -161,7 +163,8 @@ Formato corpo errore:
 ## 1.5 Area: Probe
 
 ### GET /api/v1/probes
-- **Permesso**: `probes.read`. **Query**: `page, page_size, q, status`.
+- **Permesso**: `probes.read`. **Query**: `page, page_size, q, status, sort`.
+  - `sort` (esteso su richiesta utente: DataTables): colonne ordinabili `name, status, last_seen_at, created_at, location, contact_name, enabled`; formato `campo`/`-campo`; campo non ammesso -> default.
 - **Response 200**: `{ "items": [Probe], "total": int }`
   - `Probe`: `{ "id": string, "name": string, "description": string, "query_endpoint": string, "tags": [string], "location": string|null, "contact_name": string|null, "contact_email": string|null, "contact_phone": string|null, "enabled": bool, "status": "online|offline|pending", "last_seen_at": string|null, "version": string|null, "systems_count": int, "created_at": string }`
   - `location`, `contact_name`, `contact_email`, `contact_phone` (esteso su richiesta utente): dati anagrafici opzionali della Sonda (sede/posizione, referente e contatti).
@@ -199,8 +202,9 @@ Formato corpo errore:
 ## 1.6 Area: Sistemi monitorati
 
 ### GET /api/v1/systems
-- **Permesso**: `systems.read`. **Query**: `page, page_size, q, probe_id, enabled, kind`.
+- **Permesso**: `systems.read`. **Query**: `page, page_size, q, probe_id, enabled, kind, sort`.
   - `kind` (esteso su richiesta utente): filtra per tipo di controllo, valori ammessi `http` | `tcp` (utile per separare Applicazioni=http e Connettivita'=tcp nella UI); combinabile con gli altri filtri. Un valore diverso da `http`/`tcp` restituisce 422.
+  - `sort` (esteso su richiesta utente: DataTables): colonne ordinabili `system_id, system_name, kind, created_at, enabled`; formato `campo`/`-campo`; campo non ammesso -> default.
 - **Response 200**: `{ "items": [System], "total": int }`
   - `System`: `{ "id": string, "system_id": string, "system_name": string, "kind": "http"|"tcp", "heartbeat_url": string|null, "tcp_host": string|null, "tcp_port": int|null, "probe_id": string, "poll_interval_seconds": int, "timeout_seconds": int, "enabled": bool, "thresholds": { "response_ms_warn": int|null, "response_ms_error": int|null }, "maintenance_windows": [ { "start": string, "end": string, "note": string } ], "created_at": string }`
   - `kind` (esteso su richiesta utente): `"http"` = controllo heartbeat HTTP/HTTPS su `heartbeat_url`; `"tcp"` = controllo di connettivita' TCP su `tcp_host:tcp_port`. Per `kind="http"` valorizzato `heartbeat_url` (e `tcp_*` null); per `kind="tcp"` valorizzati `tcp_host`/`tcp_port` (e `heartbeat_url` puo' essere null).
@@ -322,7 +326,8 @@ Formato corpo errore:
 ## 1.10 Area: Notifiche / Canali
 
 ### GET /api/v1/notification-channels
-- **Permesso**: `notifications.read`. **Query**: `type, enabled, page, page_size`.
+- **Permesso**: `notifications.read`. **Query**: `type, enabled, page, page_size, sort`.
+  - `sort` (esteso su richiesta utente: DataTables): colonne ordinabili `name, type, created_at, enabled`; formato `campo`/`-campo`; campo non ammesso -> default.
 - **Response 200**: `{ "items": [Channel], "total": int }`
   - `Channel`: `{ "id": string, "name": string, "type": "email|telegram|whatsapp", "enabled": bool, "inbound_enabled": bool, "config": {...campi non sensibili, segreti mascherati...}, "created_at": string }`
 - **Errori**: 401, 403.
@@ -349,7 +354,8 @@ Formato corpo errore:
 
 ### GET /api/v1/notifications/history
 - **Descrizione**: storico invii. **Permesso**: `notifications.read`.
-- **Query**: `channel_id, workflow_id, status, from, to, page, page_size`.
+- **Query**: `channel_id, workflow_id, status, from, to, page, page_size, sort`.
+  - `sort` (esteso su richiesta utente: DataTables): colonne ordinabili `created_at, status, channel_id`; formato `campo`/`-campo`; campo non ammesso -> default (`created_at` desc).
 - **Response 200**: `{ "items": [ { "id": string, "channel_id": string, "workflow_id": string|null, "recipient": string, "status": "sent|failed|retrying", "error": string|null, "created_at": string } ], "total": int }`
 - **Errori**: 401, 403.
 
@@ -358,7 +364,8 @@ Formato corpo errore:
 ## 1.11 Area: Workflow notifiche
 
 ### GET /api/v1/notification-workflows
-- **Permesso**: `workflows.read`. **Query**: `enabled, q, page, page_size`.
+- **Permesso**: `workflows.read`. **Query**: `enabled, q, page, page_size, sort`.
+  - `sort` (esteso su richiesta utente: DataTables): colonne ordinabili `name, created_at, enabled`; formato `campo`/`-campo`; campo non ammesso -> default.
 - **Response 200**: `{ "items": [Workflow], "total": int }`
   - `Workflow`: `{ "id": string, "name": string, "description": string, "enabled": bool, "trigger": string, "scope": { "probe_ids": [string], "system_ids": [string], "check_ids": [string] }, "conditions": [ { "field": string, "op": string, "value": any, "group": string } ], "suppression": { "cooldown_seconds": int, "dedup_window_seconds": int, "active_hours"?: {...}, "respect_maintenance": bool }, "actions": [ { "step_order": int, "channel_id": string, "recipients": [string], "template": string, "delay_seconds": int, "escalation_condition": {...}, "repeat"?: {...} } ], "created_at": string }`
 - **Errori**: 401, 403.
@@ -391,7 +398,8 @@ Formato corpo errore:
 
 ### GET /api/v1/alarms
 - **Descrizione**: elenco allarmi (attivi/storici). **Permesso**: `workflows.read`.
-- **Query**: `status (active|acknowledged|resolved), system_id, probe_id, from, to, page, page_size`.
+- **Query**: `status (active|acknowledged|resolved), system_id, probe_id, from, to, page, page_size, sort`.
+  - `sort` (esteso su richiesta utente: DataTables): colonne ordinabili `opened_at, status`; formato `campo`/`-campo`; campo non ammesso -> default (`opened_at` desc).
 - **Response 200**: `{ "items": [ { "id": string, "workflow_id": string, "probe_id": string, "system_id": string, "check_id": string|null, "status": string, "opened_at": string, "acknowledged_at": string|null, "acknowledged_by": string|null, "resolved_at": string|null } ], "total": int }`
 - **Errori**: 401, 403.
 
@@ -443,7 +451,8 @@ Formato corpo errore:
 
 ### GET /api/v1/audit
 - **Descrizione**: elenco voci audit (immutabile, sola lettura). **Permesso**: `audit.read`.
-- **Query**: `actor, action, entity_type, entity_id, outcome, from, to, page, page_size`.
+- **Query**: `actor, action, entity_type, entity_id, outcome, from, to, page, page_size, sort`.
+  - `sort` (esteso su richiesta utente: DataTables): colonne ordinabili `timestamp, action, actor_type, outcome, entity_type`; formato `campo`/`-campo`; campo non ammesso -> default (`timestamp` desc).
 - **Response 200**: `{ "items": [ { "id": string, "timestamp": string, "actor_type": "user|probe|system", "actor_id": string, "action": string, "entity_type": string, "entity_id": string|null, "outcome": "success|failure", "ip": string|null, "details": {} } ], "total": int }`
 - **Errori**: 401, 403.
 
@@ -456,7 +465,8 @@ Formato corpo errore:
 
 ### GET /api/v1/logs
 - **Descrizione**: log di sistema di Server e Probe. **Permesso**: `syslog.read`.
-- **Query**: `component (server|probe), probe_id, level, from, to, q, page, page_size`.
+- **Query**: `component (server|probe), probe_id, level, from, to, q, page, page_size, sort`.
+  - `sort` (esteso su richiesta utente: DataTables): colonne ordinabili `timestamp, level, component` (alias `source`); formato `campo`/`-campo`; campo non ammesso -> default (`timestamp` desc).
 - **Response 200**: `{ "items": [ { "id": string, "timestamp": string, "component": string, "probe_id": string|null, "level": "debug|info|warning|error|critical", "logger": string, "message": string, "context": {} } ], "total": int }`
 - **Errori**: 401, 403.
 

@@ -1,6 +1,7 @@
 {% extends "base.html" %}
-{% from "_macros.html" import bool_badge, pagination %}
+{% from "_macros.html" import dt_table_shell, dt_init %}
 {% block title %}Ruoli — Pulse{% endblock %}
+{% set meta = dt_meta('roles') %}
 {% block content %}
 <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
   <h1 class="h3 mb-0"><i class="bi bi-person-badge me-2"></i>Ruoli</h1>
@@ -9,51 +10,9 @@
   {% endif %}
 </div>
 
-<div class="card mb-3">
-  <div class="card-body">
-    <form method="get" class="row g-2 align-items-end">
-      <div class="col-sm-10">
-        <label class="form-label small text-body-secondary mb-1">Ricerca</label>
-        <input name="q" class="form-control" placeholder="Nome ruolo" value="{{ request.args.get('q','') }}">
-      </div>
-      <div class="col-sm-2 d-grid">
-        <button class="btn btn-outline-secondary"><i class="bi bi-funnel me-1"></i>Filtra</button>
-      </div>
-    </form>
-  </div>
-</div>
+{{ dt_table_shell('tbl-roles', meta, empty='Nessun ruolo definito.') }}
+{% endblock %}
 
-<div class="card">
-  <div class="table-responsive">
-    <table class="table table-hover align-middle mb-0">
-      <thead><tr><th>Nome</th><th>Descrizione</th><th>Predefinito</th><th class="text-end">N. permessi</th><th class="text-end">Azioni</th></tr></thead>
-      <tbody>
-      {% for r in data['items'] %}
-      <tr>
-        <td><a class="fw-semibold text-decoration-none" href="{{ url_for('roles.detail', role_id=r.id) }}">{{ r.name }}</a></td>
-        <td class="text-body-secondary">{{ r.description }}</td>
-        <td>{{ bool_badge(r.is_builtin) }}</td>
-        <td class="text-end">{{ r.permissions|length }}</td>
-        <td class="text-end">
-          <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('roles.detail', role_id=r.id) }}" title="Dettaglio"><i class="bi bi-eye"></i></a>
-          {% if can('roles.update') and not r.is_builtin %}<a class="btn btn-sm btn-outline-secondary" href="{{ url_for('roles.edit_role', role_id=r.id) }}" title="Modifica"><i class="bi bi-pencil"></i></a>{% endif %}
-        </td>
-      </tr>
-      {% else %}
-      <tr><td colspan="5" class="text-center text-body-secondary py-5">
-        <i class="bi bi-inbox fs-2 d-block mb-2"></i>Nessun ruolo definito.
-      </td></tr>
-      {% endfor %}
-      </tbody>
-    </table>
-  </div>
-  {% if data['items'] %}
-  <div class="card-footer">
-    {% set _tot = data.get('total', 0)|int %}
-    {% if _tot > page_size %}
-      {{ pagination(page, page_size, _tot, 'roles.list_roles', filters) }}
-    {% else %}<span class="text-body-secondary small">Totale: {{ _tot }}</span>{% endif %}
-  </div>
-  {% endif %}
-</div>
+{% block body_extra %}
+{{ dt_init('tbl-roles', meta, url_for('dt.dt_resource', resource='roles')) }}
 {% endblock %}

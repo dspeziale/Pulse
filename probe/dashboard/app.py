@@ -15,6 +15,7 @@ from pulse_fe_common.datetimes import DEFAULT_FORMAT, format_datetime
 from pulse_fe_common.http_client import (ApiAuthError, ApiError,
                                          ApiUnavailableError, ApiClient)
 
+import dt as dt_adapter
 from probe_auth import clear_session, is_authenticated, register_template_helpers
 from views import register_blueprints
 
@@ -45,6 +46,8 @@ def create_app(config: Optional[ProbeDashboardConfig] = None) -> Flask:
         return format_datetime(value, cfg.timezone, fmt)
 
     register_blueprints(app)
+    app.register_blueprint(dt_adapter.bp)
+    dt_adapter.register_template_globals(app)
     _register_error_handlers(app)
 
     @app.route("/")

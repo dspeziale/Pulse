@@ -38,119 +38,62 @@
 {%- endmacro %}
 
 {# --------------------------------------------------------------------------
-   Paginazione riutilizzabile (Bootstrap/AdminLTE).
+   DataTables server-side.
 
-   Uso:
-     {{ pagination(data.page, data.page_size, data.total,
-                   'audit.list_audit', filters) }}
+   ``dt_table_shell`` rende la sola tabella (thead derivato da ``meta``); va
+   inserita nel blocco ``content``. ``dt_init`` rende lo <script> di init e va
+   inserito nel blocco ``body_extra`` (dopo il caricamento di jQuery/DataTables).
 
-   - page/page_size/total: valori restituiti dal backend nella risposta di
-     lista. Coercizzati a intero in modo difensivo.
-   - endpoint: nome della rotta Flask (blueprint.funzione) per i link.
-   - args: dict dei filtri correnti (q, status, ...) da preservare nei link;
-     puo' includere page_size per mantenere una dimensione pagina custom.
+   - meta:     dizionario prodotto da ``dt_meta(resource)`` (colonne, ordine,
+     lengthMenu, pageLength, searching).
+   - ajax_url: URL dell'adattatore server-side (/dt/<resource> o heartbeat).
+   - data_fn:  (opzionale) espressione JS ``function(d){...}`` che aggiunge a
+     ``d`` i filtri correnti letti dai controlli di pagina (ajax.data).
 
-   I controlli sono mostrati SOLO se total > page_size; altrimenti la macro non
-   produce output (la lista mostra il solo conteggio totale nel footer).
+   I controlli filtro con attributo ``data-dt-filter="<dom_id>"`` (change) e i
+   pulsanti ``data-dt-apply="<dom_id>"`` (click) ricaricano la tabella.
    -------------------------------------------------------------------------- #}
-{% macro pagination(page, page_size, total, endpoint, args={}) %}
-  {%- set page = page | int(1) -%}
-  {%- set page_size = page_size | int(0) -%}
-  {%- set total = total | int(0) -%}
-  {%- if page_size > 0 and total > page_size -%}
-    {%- set pages = ((total + page_size - 1) // page_size) | int -%}
-    {%- set page = [[page, 1] | max, pages] | min -%}
-    {%- set win = 2 -%}
-    {%- set start = [1, page - win] | max -%}
-    {%- set end = [pages, page + win] | min -%}
-    <nav class="d-flex flex-wrap justify-content-between align-items-center gap-2"
-         aria-label="Paginazione">
-      <span class="text-body-secondary small">
-        Pagina {{ page }} di {{ pages }} — {{ total }} totali
-      </span>
-      <ul class="pagination pagination-sm mb-0">
-        <li class="page-item {{ 'disabled' if page <= 1 }}">
-          {%- if page > 1 -%}
-            <a class="page-link" href="{{ url_for(endpoint, page=page - 1, **args) }}"
-               aria-label="Precedente"><i class="bi bi-chevron-left"></i> Precedente</a>
-          {%- else -%}
-            <span class="page-link"><i class="bi bi-chevron-left"></i> Precedente</span>
-          {%- endif -%}
-        </li>
-        {%- if start > 1 -%}
-          <li class="page-item"><a class="page-link" href="{{ url_for(endpoint, page=1, **args) }}">1</a></li>
-          {%- if start > 2 -%}
-            <li class="page-item disabled"><span class="page-link">…</span></li>
-          {%- endif -%}
-        {%- endif -%}
-        {%- for p in range(start, end + 1) -%}
-          <li class="page-item {{ 'active' if p == page }}">
-            {%- if p == page -%}
-              <span class="page-link">{{ p }}</span>
-            {%- else -%}
-              <a class="page-link" href="{{ url_for(endpoint, page=p, **args) }}">{{ p }}</a>
-            {%- endif -%}
-          </li>
-        {%- endfor -%}
-        {%- if end < pages -%}
-          {%- if end < pages - 1 -%}
-            <li class="page-item disabled"><span class="page-link">…</span></li>
-          {%- endif -%}
-          <li class="page-item"><a class="page-link" href="{{ url_for(endpoint, page=pages, **args) }}">{{ pages }}</a></li>
-        {%- endif -%}
-        <li class="page-item {{ 'disabled' if page >= pages }}">
-          {%- if page < pages -%}
-            <a class="page-link" href="{{ url_for(endpoint, page=page + 1, **args) }}"
-               aria-label="Successivo">Successivo <i class="bi bi-chevron-right"></i></a>
-          {%- else -%}
-            <span class="page-link">Successivo <i class="bi bi-chevron-right"></i></span>
-          {%- endif -%}
-        </li>
-      </ul>
-    </nav>
-  {%- endif -%}
-{%- endmacro %}
-
-{# --------------------------------------------------------------------------
-   Selettore "quanti item per pagina" (page size).
-
-   Uso:
-     {{ page_size_selector(page_size, 'probes.detail', hb_filters) }}
-
-   - current: page_size effettivo corrente (ricostruito dalla view via paging()).
-   - endpoint: nome della rotta Flask (blueprint.funzione) del form GET.
-   - args: dict dei parametri correnti da preservare. I parametri di rotta
-     (es. probe_id) vengono assorbiti nel path da url_for; i filtri di query
-     vengono ri-emessi come <input hidden> così da sopravvivere al submit GET
-     (che scarta la query string dell'action). ``page`` e ``page_size`` sono
-     esclusi dagli hidden: il submit riparte quindi da page=1 (assente = 1) e
-     usa il page_size scelto nel <select>.
-   - options: dimensioni pagina offerte. Se ``current`` non e' tra le opzioni,
-     viene aggiunto e la lista riordinata, restando comunque selezionabile.
-
-   Nessun JS esterno/CDN: onchange="this.form.submit()".
-   -------------------------------------------------------------------------- #}
-{% macro page_size_selector(current, endpoint, args={}, options=[10, 25, 50, 100]) %}
-  {%- set current = current | int(50) -%}
-  {%- set opts = options -%}
-  {%- if current not in opts -%}
-    {%- set opts = (options + [current]) | sort -%}
-  {%- endif -%}
-  <form method="get" action="{{ url_for(endpoint, **args) }}"
-        class="d-flex align-items-center gap-2 mb-0" aria-label="Elementi per pagina">
-    {%- for k, v in args.items() -%}
-      {%- if k not in ('page', 'page_size') and v is not none and v != '' -%}
-        <input type="hidden" name="{{ k }}" value="{{ v }}">
-      {%- endif -%}
-    {%- endfor -%}
-    <label class="form-label mb-0 text-body-secondary small text-nowrap"
-           for="ps-{{ endpoint }}">Per pagina</label>
-    <select id="ps-{{ endpoint }}" name="page_size"
-            class="form-select form-select-sm" style="width:auto"
-            onchange="this.form.submit()">
-      {%- for o in opts -%}
-        <option value="{{ o }}" {{ 'selected' if o == current }}>{{ o }}</option>
+{% macro dt_table_shell(dom_id, meta, empty='Nessun dato disponibile') %}
+<div class="card">
+  <div class="table-responsive">
+    <table id="{{ dom_id }}" class="table table-hover align-middle mb-0 w-100"
+           data-dt-empty="{{ empty }}">
+      <thead><tr>
+      {%- for c in meta.columns -%}
+        <th class="{{ c.th_class }}">{{ c.title }}</th>
       {%- endfor -%}
-    </select>
-  </form>
-{%- endmacro %}
+      </tr></thead>
+    </table>
+  </div>
+</div>
+{% endmacro %}
+
+{% macro dt_init(dom_id, meta, ajax_url, data_fn='') %}
+<script>
+(function () {
+  var el = document.getElementById('{{ dom_id }}');
+  if (!el) { return; }
+  var lang = Object.assign({}, PulseDT.language);
+  if (el.dataset.dtEmpty) {
+    lang.emptyTable = el.dataset.dtEmpty;
+    lang.zeroRecords = el.dataset.dtEmpty;
+  }
+  var table = PulseDT.init('#{{ dom_id }}', {
+    ajax: { url: '{{ ajax_url }}'{% if data_fn %}, data: {{ data_fn|safe }}{% endif %} },
+    columns: {{ meta.columnsJs | tojson }},
+    order: {{ meta.order | tojson }},
+    lengthMenu: {{ meta.lengthMenu | tojson }},
+    pageLength: {{ meta.pageLength }},
+    searching: {{ meta.searching | tojson }},
+    language: lang
+  });
+  var reload = function () { table.ajax.reload(); };
+  document.querySelectorAll('[data-dt-filter="{{ dom_id }}"]').forEach(function (c) {
+    c.addEventListener('change', reload);
+  });
+  document.querySelectorAll('[data-dt-apply="{{ dom_id }}"]').forEach(function (b) {
+    b.addEventListener('click', function (e) { e.preventDefault(); reload(); });
+  });
+})();
+</script>
+{% endmacro %}

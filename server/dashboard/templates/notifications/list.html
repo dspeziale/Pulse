@@ -1,7 +1,7 @@
 {% extends "base.html" %}
-{% from "_macros.html" import bool_badge, pagination %}
+{% from "_macros.html" import dt_table_shell, dt_init %}
 {% block title %}Canali notifica — Pulse{% endblock %}
-{% set type_icons = {'email':'bi-envelope','telegram':'bi-telegram','whatsapp':'bi-whatsapp'} %}
+{% set meta = dt_meta('channels') %}
 {% block content %}
 <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
   <h1 class="h3 mb-0"><i class="bi bi-broadcast me-2"></i>Canali di notifica</h1>
@@ -12,63 +12,32 @@
 
 <div class="card mb-3">
   <div class="card-body">
-    <form method="get" class="row g-2 align-items-end">
-      <div class="col-sm-5">
-        <label class="form-label small text-body-secondary mb-1">Tipo</label>
-        <select name="type" class="form-select">
+    <div class="row g-2 align-items-end">
+      <div class="col-sm-6">
+        <label class="form-label small text-body-secondary mb-1" for="f-type">Tipo</label>
+        <select id="f-type" data-dt-filter="tbl-channels" class="form-select">
           <option value="">Tutti i tipi</option>
           {% for t in ['email','telegram','whatsapp'] %}
-            <option value="{{ t }}" {% if request.args.get('type')==t %}selected{% endif %}>{{ t }}</option>
+            <option value="{{ t }}">{{ t }}</option>
           {% endfor %}
         </select>
       </div>
-      <div class="col-sm-5">
-        <label class="form-label small text-body-secondary mb-1">Stato</label>
-        <select name="enabled" class="form-select">
+      <div class="col-sm-6">
+        <label class="form-label small text-body-secondary mb-1" for="f-enabled">Stato</label>
+        <select id="f-enabled" data-dt-filter="tbl-channels" class="form-select">
           <option value="">Tutti</option>
-          <option value="true" {% if request.args.get('enabled')=='true' %}selected{% endif %}>Abilitati</option>
-          <option value="false" {% if request.args.get('enabled')=='false' %}selected{% endif %}>Disabilitati</option>
+          <option value="true">Abilitati</option>
+          <option value="false">Disabilitati</option>
         </select>
       </div>
-      <div class="col-sm-2 d-grid">
-        <button class="btn btn-outline-secondary"><i class="bi bi-funnel me-1"></i>Filtra</button>
-      </div>
-    </form>
+    </div>
   </div>
 </div>
 
-<div class="card">
-  <div class="table-responsive">
-    <table class="table table-hover align-middle mb-0">
-      <thead><tr><th>Nome</th><th>Tipo</th><th>Abilitato</th><th>Inbound</th><th class="text-end">Azioni</th></tr></thead>
-      <tbody>
-      {% for c in data['items'] %}
-      <tr>
-        <td><a class="fw-semibold text-decoration-none" href="{{ url_for('notifications.detail', channel_id=c.id) }}">{{ c.name }}</a></td>
-        <td><i class="bi {{ type_icons.get(c.type, 'bi-broadcast') }} me-1"></i>{{ c.type }}</td>
-        <td>{{ bool_badge(c.enabled) }}</td>
-        <td>{{ bool_badge(c.inbound_enabled) }}</td>
-        <td class="text-end">
-          <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('notifications.detail', channel_id=c.id) }}" title="Dettaglio"><i class="bi bi-eye"></i></a>
-          {% if can('notifications.update') %}<a class="btn btn-sm btn-outline-secondary" href="{{ url_for('notifications.edit_channel', channel_id=c.id) }}" title="Modifica"><i class="bi bi-pencil"></i></a>{% endif %}
-        </td>
-      </tr>
-      {% else %}
-      <tr><td colspan="5" class="text-center text-body-secondary py-5">
-        <i class="bi bi-inbox fs-2 d-block mb-2"></i>Nessun canale configurato.
-        {% if can('notifications.create') %}<div class="mt-2"><a class="btn btn-sm btn-primary" href="{{ url_for('notifications.new_channel') }}"><i class="bi bi-plus-lg me-1"></i>Crea il primo canale</a></div>{% endif %}
-      </td></tr>
-      {% endfor %}
-      </tbody>
-    </table>
-  </div>
-  {% if data['items'] %}
-  <div class="card-footer">
-    {% set _tot = data.get('total', 0)|int %}
-    {% if _tot > page_size %}
-      {{ pagination(page, page_size, _tot, 'notifications.list_channels', filters) }}
-    {% else %}<span class="text-body-secondary small">Totale: {{ _tot }}</span>{% endif %}
-  </div>
-  {% endif %}
-</div>
+{{ dt_table_shell('tbl-channels', meta, empty='Nessun canale configurato.') }}
+{% endblock %}
+
+{% block body_extra %}
+{{ dt_init('tbl-channels', meta, url_for('dt.dt_resource', resource='channels'),
+   'function(d){ d.type = document.getElementById("f-type").value; d.enabled = document.getElementById("f-enabled").value; }') }}
 {% endblock %}

@@ -13,7 +13,7 @@ from ..context import SecretBoxDep
 from ..deps import CurrentUser, SessionDep, client_ip, require_permission
 from ..models import NotificationChannel, NotificationDelivery, WorkflowAction
 from ..notifications import decrypt_config, encrypt_config, get_notifier
-from ._helpers import clamp_pagination, commit_or_conflict, offset, parse_uuid
+from ._helpers import clamp_pagination, commit_or_conflict, offset, parse_uuid, sort_clause
 
 router = APIRouter(prefix="/api/v1/notification-channels", tags=["notifications"])
 history_router = APIRouter(prefix="/api/v1/notifications", tags=["notifications"])
@@ -26,6 +26,7 @@ def list_channels(
     enabled: bool | None = None,
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=200),
+    sort: str | None = None,
     _: CurrentUser = Depends(require_permission("notifications.read")),
 ) -> schemas.ChannelList:
     page, page_size = clamp_pagination(page, page_size)
@@ -38,9 +39,19 @@ def list_channels(
         stmt = stmt.where(NotificationChannel.enabled.is_(enabled))
         count_stmt = count_stmt.where(NotificationChannel.enabled.is_(enabled))
     total = int(session.execute(count_stmt).scalar_one())
+    order = sort_clause(
+        sort,
+        {
+            "name": NotificationChannel.name,
+            "type": NotificationChannel.type,
+            "created_at": NotificationChannel.created_at,
+            "enabled": NotificationChannel.enabled,
+        },
+        NotificationChannel.created_at.asc(),
+    )
     rows = (
         session.execute(
-            stmt.order_by(NotificationChannel.created_at).offset(offset(page, page_size)).limit(page_size)
+            stmt.order_by(order).offset(offset(page, page_size)).limit(page_size)
         )
         .scalars()
         .all()
@@ -218,6 +229,7 @@ def notifications_history(
     to: str | None = None,
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=200),
+    sort: str | None = None,
     _: CurrentUser = Depends(require_permission("notifications.read")),
 ) -> schemas.DeliveryList:
     page, page_size = clamp_pagination(page, page_size)
@@ -243,9 +255,18 @@ def notifications_history(
         stmt = stmt.where(NotificationDelivery.created_at <= end)
         count_stmt = count_stmt.where(NotificationDelivery.created_at <= end)
     total = int(session.execute(count_stmt).scalar_one())
+    order = sort_clause(
+        sort,
+        {
+            "created_at": NotificationDelivery.created_at,
+            "status": NotificationDelivery.status,
+            "channel_id": NotificationDelivery.channel_id,
+        },
+        NotificationDelivery.created_at.desc(),
+    )
     rows = (
         session.execute(
-            stmt.order_by(NotificationDelivery.created_at.desc())
+            stmt.order_by(order)
             .offset(offset(page, page_size))
             .limit(page_size)
         )

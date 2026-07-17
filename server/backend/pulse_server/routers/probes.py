@@ -12,7 +12,14 @@ from ..audit import write_audit
 from ..deps import CurrentUser, SessionDep, SettingsDep, client_ip, require_permission
 from ..models import EnrollmentToken, MonitoredSystem, Probe
 from ..security import generate_opaque_token, hash_token
-from ._helpers import clamp_pagination, commit_or_conflict, flush_or_conflict, offset, parse_uuid
+from ._helpers import (
+    clamp_pagination,
+    commit_or_conflict,
+    flush_or_conflict,
+    offset,
+    parse_uuid,
+    sort_clause,
+)
 
 router = APIRouter(prefix="/api/v1/probes", tags=["probes"])
 
@@ -33,6 +40,7 @@ def list_probes(
     page_size: int = Query(20, ge=1, le=200),
     q: str | None = None,
     status: str | None = None,
+    sort: str | None = None,
     _: CurrentUser = Depends(require_permission("probes.read")),
 ) -> schemas.ProbeList:
     page, page_size = clamp_pagination(page, page_size)
@@ -47,8 +55,21 @@ def list_probes(
         stmt = stmt.where(cond)
         count_stmt = count_stmt.where(cond)
     total = int(session.execute(count_stmt).scalar_one())
+    order = sort_clause(
+        sort,
+        {
+            "name": Probe.name,
+            "status": Probe.status,
+            "last_seen_at": Probe.last_seen_at,
+            "created_at": Probe.created_at,
+            "location": Probe.location,
+            "contact_name": Probe.contact_name,
+            "enabled": Probe.enabled,
+        },
+        Probe.created_at.asc(),
+    )
     rows = (
-        session.execute(stmt.order_by(Probe.created_at).offset(offset(page, page_size)).limit(page_size))
+        session.execute(stmt.order_by(order).offset(offset(page, page_size)).limit(page_size))
         .scalars()
         .all()
     )

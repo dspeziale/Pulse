@@ -3,12 +3,35 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Mapping
 from typing import Any
 
+from sqlalchemy import ColumnElement
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import InstrumentedAttribute, Session
 
 from .. import errors
+
+
+def sort_clause(
+    sort: str | None,
+    allowed: Mapping[str, InstrumentedAttribute[Any]],
+    default: ColumnElement[Any],
+) -> ColumnElement[Any]:
+    """Traduce un parametro `sort` in una clausola ORDER BY (esteso: DataTables).
+
+    Formato di `sort`: `campo` (ascendente) oppure `-campo` (discendente). Se il
+    campo (dopo l'eventuale prefisso '-') non e' nella whitelist `allowed`, o se
+    `sort` e' assente/vuoto, ritorna `default` (nessun errore: robustezza).
+    """
+    if not sort:
+        return default
+    descending = sort.startswith("-")
+    field = sort[1:] if descending else sort
+    column = allowed.get(field)
+    if column is None:
+        return default
+    return column.desc() if descending else column.asc()
 
 
 def clamp_pagination(page: int, page_size: int) -> tuple[int, int]:

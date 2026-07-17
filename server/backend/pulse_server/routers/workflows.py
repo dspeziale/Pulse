@@ -18,7 +18,14 @@ from ..models import (
     WorkflowCondition,
 )
 from ..workflow import evaluate, workflow_to_dict
-from ._helpers import clamp_pagination, commit_or_conflict, flush_or_conflict, offset, parse_uuid
+from ._helpers import (
+    clamp_pagination,
+    commit_or_conflict,
+    flush_or_conflict,
+    offset,
+    parse_uuid,
+    sort_clause,
+)
 
 router = APIRouter(prefix="/api/v1/notification-workflows", tags=["workflows"])
 alarms_router = APIRouter(prefix="/api/v1/alarms", tags=["workflows"])
@@ -92,6 +99,7 @@ def list_workflows(
     q: str | None = None,
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=200),
+    sort: str | None = None,
     _: CurrentUser = Depends(require_permission("workflows.read")),
 ) -> schemas.WorkflowList:
     page, page_size = clamp_pagination(page, page_size)
@@ -105,9 +113,18 @@ def list_workflows(
         stmt = stmt.where(NotificationWorkflow.name.ilike(like))
         count_stmt = count_stmt.where(NotificationWorkflow.name.ilike(like))
     total = int(session.execute(count_stmt).scalar_one())
+    order = sort_clause(
+        sort,
+        {
+            "name": NotificationWorkflow.name,
+            "created_at": NotificationWorkflow.created_at,
+            "enabled": NotificationWorkflow.enabled,
+        },
+        NotificationWorkflow.created_at.asc(),
+    )
     rows = (
         session.execute(
-            stmt.order_by(NotificationWorkflow.created_at)
+            stmt.order_by(order)
             .offset(offset(page, page_size))
             .limit(page_size)
         )
@@ -296,6 +313,7 @@ def list_alarms(
     to: str | None = None,
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=200),
+    sort: str | None = None,
     _: CurrentUser = Depends(require_permission("workflows.read")),
 ) -> schemas.AlarmList:
     page, page_size = clamp_pagination(page, page_size)
@@ -319,9 +337,14 @@ def list_alarms(
         stmt = stmt.where(Alarm.opened_at <= _parse_iso(to))
         count_stmt = count_stmt.where(Alarm.opened_at <= _parse_iso(to))
     total = int(session.execute(count_stmt).scalar_one())
+    order = sort_clause(
+        sort,
+        {"opened_at": Alarm.opened_at, "status": Alarm.status},
+        Alarm.opened_at.desc(),
+    )
     rows = (
         session.execute(
-            stmt.order_by(Alarm.opened_at.desc()).offset(offset(page, page_size)).limit(page_size)
+            stmt.order_by(order).offset(offset(page, page_size)).limit(page_size)
         )
         .scalars()
         .all()

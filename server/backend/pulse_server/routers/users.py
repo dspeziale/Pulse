@@ -12,7 +12,14 @@ from ..audit import write_audit
 from ..deps import CurrentUser, SessionDep, client_ip, require_permission
 from ..models import Role, User, UserRole
 from ..security import hash_password
-from ._helpers import clamp_pagination, commit_or_conflict, flush_or_conflict, offset, parse_uuid
+from ._helpers import (
+    clamp_pagination,
+    commit_or_conflict,
+    flush_or_conflict,
+    offset,
+    parse_uuid,
+    sort_clause,
+)
 
 router = APIRouter(prefix="/api/v1/users", tags=["users"])
 
@@ -53,6 +60,7 @@ def list_users(
     q: str | None = None,
     status: str | None = None,
     role: str | None = None,
+    sort: str | None = None,
     _: CurrentUser = Depends(require_permission("users.read")),
 ) -> schemas.UserList:
     page, page_size = clamp_pagination(page, page_size)
@@ -74,8 +82,20 @@ def list_users(
         stmt = stmt.where(cond)
         count_stmt = count_stmt.where(cond)
     total = int(session.execute(count_stmt).scalar_one())
+    order = sort_clause(
+        sort,
+        {
+            "username": User.username,
+            "full_name": User.full_name,
+            "email": User.email,
+            "created_at": User.created_at,
+            "last_login_at": User.last_login_at,
+            "status": User.status,
+        },
+        User.created_at.asc(),
+    )
     rows = (
-        session.execute(stmt.order_by(User.created_at).offset(offset(page, page_size)).limit(page_size))
+        session.execute(stmt.order_by(order).offset(offset(page, page_size)).limit(page_size))
         .scalars()
         .all()
     )

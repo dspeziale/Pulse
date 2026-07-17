@@ -138,16 +138,17 @@ def test_dashboard_index(client, login, fake):
 
 def test_dashboard_localizes_heartbeat_timestamp(client, login, fake):
     # Il fuso della Sonda arriva da env (default Europe/Rome nel cfg di test):
-    # 12:00 UTC estate -> 14:00 locali.
+    # 12:00 UTC estate -> 14:00 locali. La tabella heartbeat e' ora DataTables
+    # server-side: la data localizzata compare nel JSON dell'adattatore /dt.
     login()
-    fake.set("GET", "/status", {"opensearch_healthy": True, "version": "1.0"})
-    fake.set("GET", "/systems", {"items": []})
     fake.set("GET", "/query/heartbeats",
              {"items": [{"@timestamp": "2026-07-16T12:00:00Z", "system_name": "s",
-                         "check_name": "c", "status": "ok", "response_ms": 5}]})
-    r = client.get("/dashboard")
+                         "check_name": "c", "status": "ok", "response_ms": 5}],
+              "total": 1})
+    r = client.get("/dt/heartbeats?draw=1&start=0&length=50")
     assert r.status_code == 200
-    assert b"16/07/2026 14:00:00" in r.data
+    body = r.get_json()
+    assert body["data"][0]["@timestamp"] == "16/07/2026 14:00:00"
 
 
 def test_dashboard_timezone_from_env(monkeypatch):
@@ -160,17 +161,17 @@ def test_dashboard_timezone_from_env(monkeypatch):
     application = app_module.create_app(ProbeDashboardConfig.from_env())
     application.config["TESTING"] = True
     fake = FakeApiClient()
-    fake.set("GET", "/status", {"opensearch_healthy": True, "version": "1.0"})
-    fake.set("GET", "/systems", {"items": []})
     fake.set("GET", "/query/heartbeats",
              {"items": [{"@timestamp": "2026-07-16T12:00:00Z", "system_name": "s",
-                         "check_name": "c", "status": "ok", "response_ms": 5}]})
+                         "check_name": "c", "status": "ok", "response_ms": 5}],
+              "total": 1})
     application.config["API_CLIENT"] = fake
     c = application.test_client()
     with c.session_transaction() as s:
         s["probe_user"] = "probe"
-    r = c.get("/dashboard")
-    assert b"16/07/2026 12:00:00" in r.data
+    r = c.get("/dt/heartbeats?draw=1&start=0&length=50")
+    body = r.get_json()
+    assert body["data"][0]["@timestamp"] == "16/07/2026 12:00:00"
 
 
 def test_dashboard_index_with_query_params(client, login, fake):

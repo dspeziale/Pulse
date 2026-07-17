@@ -1582,3 +1582,86 @@ Output consegnati
 - Dashboard cliccabile + LED chiaro. Verificato live (link a /probes/{id}?status=error, label "in errore"/"non raggiungibili") e test: server/dashboard 162 passati.
 
 ================================================
+
+ITERAZIONE 43
+
+Agente: BE
+Data: 2026-07-17
+
+Input ricevuti
+- Richiesta orchestratore: abilitare DataTables server-side aggiungendo l'ordinamento per colonna (parametro `sort`) agli endpoint di lista. Modificare SOLO server/backend. Contratto uniforme: `sort=campo` (asc) / `-campo` (desc); campo fuori whitelist -> IGNORA e usa il default (nessun 4xx); total invariato.
+
+Lavoro svolto (SERVER — server/backend)
+- routers/_helpers.py: nuovo helper tipizzato sort_clause(sort, allowed, default) -> ColumnElement: gestisce il prefisso '-', ritorna default se sort assente/vuoto o campo non in whitelist (Mapping[str, InstrumentedAttribute] -> colonna .asc()/.desc()). Riutilizzato da tutti gli endpoint.
+- Aggiunto `sort: str | None = None` e wiring dell'order_by (SOSTITUITO quando sort valido, default preservato) a: GET /users (username, full_name, email, created_at, last_login_at, status), GET /roles (name, created_at), GET /probes (name, status, last_seen_at, created_at, location, contact_name, enabled), GET /systems (system_id, system_name, kind, created_at, enabled), GET /notification-channels (name, type, created_at, enabled), GET /notifications/history (created_at, status, channel_id), GET /notification-workflows (name, created_at, enabled), GET /alarms (opened_at, status), GET /audit (timestamp, action, actor_type, outcome, entity_type), GET /logs (timestamp, level, component/alias source).
+- Default attuali preservati: created_at asc (users/roles/probes/systems/channels/workflows), created_at desc (deliveries), opened_at desc (alarms), timestamp desc (audit/logs). Il conteggio total non cambia.
+- Note: Alarm non ha colonna `severity` (non presente nel modello) -> non inclusa; per i log `source` e' mappato su `component` (colonna reale).
+- docs/api/DOCUMENTO_API.md: aggiunto il parametro `sort` e l'elenco delle colonne ordinabili per ciascun endpoint, nota "(esteso su richiesta utente: DataTables)".
+
+Qualita'
+- mypy --strict: pulito su pulse_server (31 file, "no issues found").
+- Test aggiunti (tests/test_sort.py): users sort asc/desc + q; users campo non valido -> default (ordine di creazione); probes sort asc/desc; probes campo non valido -> 200 default; audit sort timestamp asc/desc (monotonia), campo non valido == default (stessi id), sort=action ordinato. Coprono tutti i rami di sort_clause.
+- Coverage: server/backend 100% (2983 stmt, 606 branch; _helpers.py 40/4 100%). Esito: 270 test passati, 0 falliti.
+
+File toccati
+- server/backend/pulse_server/routers/_helpers.py
+- server/backend/pulse_server/routers/users.py
+- server/backend/pulse_server/routers/roles.py
+- server/backend/pulse_server/routers/probes.py
+- server/backend/pulse_server/routers/systems.py
+- server/backend/pulse_server/routers/notifications.py
+- server/backend/pulse_server/routers/workflows.py
+- server/backend/pulse_server/routers/observability.py
+- server/backend/tests/test_sort.py
+- docs/api/DOCUMENTO_API.md (GET liste)
+
+Output consegnati
+- Ordinamento server-side uniforme su 10 endpoint di lista, robusto (campo non ammesso -> default, nessun errore), documentato per colonna. Nessuna modifica a probe/frontend.
+
+================================================
+
+ITERAZIONE 44
+
+Agente: FE
+Data: 2026-07-17
+
+Input ricevuti
+- Richiesta orchestratore (solo frontend_common + server/dashboard + probe/dashboard; NIENTE CDN, vendorizzare tutto in locale; nessuna modifica a backend/probe-agent): portare TUTTE le tabelle (liste + heartbeat) a DataTables.js in modalita' SERVER-SIDE. Adattatore Flask generico /dt/<resource> che mappa i parametri DataTables su page/page_size/q/sort + filtri e risponde nel formato DataTables con celle GIA' formattate lato server (badge b-*, azioni RBAC, date via localdt). Sfrutta il parametro `sort` gia' aggiunto dal BE (ITERAZIONE 43).
+
+Lavoro svolto (FE)
+- VENDOR (nessun CDN): scaricati e vendorizzati sotto static/vendor/ di ENTRAMBE le dashboard (allineate): jQuery 3.7.1 (jquery/jquery.min.js), DataTables core 2.1.8 (datatables/js/dataTables.min.js) + integrazione Bootstrap 5 (datatables/js/dataTables.bootstrap5.min.js, datatables/css/dataTables.bootstrap5.min.css). Compatibili con Bootstrap 5.3.3 gia' presente. Referenziati via url_for('static', ...) in base.html (CSS in <head>, JS in fondo al <body> nell'ordine jQuery -> DataTables -> integrazione BS5 -> pulse-datatables.js). Nessun file di lingua da CDN.
+- Adattatore condiviso pulse_fe_common/datatables.py (puro, no Flask): parse_request (draw/start/length/search[value]/order[0][column]/[dir]/columns[i][data]), resolve_sort (colonna per nome logico con ripiego su indice; solo se la colonna e' nella whitelist DTColumn.sort), build_params (page = start//length+1, page_size = length, q = search, sort = (-)campo, + filtri correnti non vuoti), serve (ciclo completo -> {draw, recordsTotal, recordsFiltered, data}). Helper markup coerenti con _macros.html: status_badge/badge/bool_badge. Modello DTColumn (data/render/sort/title/class_/th_class + to_js) e DTTable (meta() -> thead + columnsJs + order + lengthMenu + pageLength + searching).
+- Adattatore SERVER (server/dashboard/dt.py, blueprint dt): GET /dt/<resource> protetto dal permesso di lettura giusto (401 se non autenticato, 403 se manca il permesso, 404 se risorsa ignota) per users, roles, probes, systems, workflows, channels, deliveries (storico invii), audit, logs, alarms; GET /dt/heartbeats/<probe_id> (permesso heartbeats.read) per il dettaglio Sonda. Chiama gli endpoint backend esistenti col token di sessione (api_get) e rende le celle con lo stesso markup dei template (link dettaglio, badge b-*/livelli text-bg-*, icone canale, form Ack allarme con RBAC, date via il filtro localdt). Colonne ordinabili allineate 1:1 alle whitelist backend dell'ITERAZIONE 43. table_meta() esposto ai template come global Jinja dt_meta(resource).
+- Adattatore PROBE (probe/dashboard/dt.py, blueprint dt): GET /dt/heartbeats (dashboard Sonda, tutti i sistemi) e GET /dt/heartbeats/system/<system_id> (dettaglio sistema, senza colonna Sistema). Chiamano /query/heartbeats col token agent; heartbeat ordinabili su @timestamp/system_name/check_name/status/response_ms (il probe-agent ordina per campo arbitrario, default -@timestamp).
+- JS condiviso pulse-datatables.js (vendorizzato in entrambe): definisce PulseDT.language (stringhe IT: Cerca/Mostra _MENU_/Vista da _START_ a _END_/Nessun dato/paginazione Primo-Precedente-Successivo-Ultimo) e PulseDT.init(selector, opts) coi default serverSide:true, processing:true, ordering:true, lengthMenu [10,25,50,100], pageLength 25. Macro _macros.html dt_table_shell (thead derivato da meta, nel blocco content) + dt_init (script di init nel blocco body_extra, dopo il caricamento di jQuery/DataTables); i filtri di pagina passano via ajax.data e ricaricano la tabella (data-dt-filter -> change, data-dt-apply -> click).
+- CONVERSIONE TABELLE. Liste (server): users, roles, probes, systems (tab Applicazioni/Connettivita' conservati: il kind attivo passa come filtro ad ajax.data), workflows, channels (notification-channels), deliveries (storico invii), audit, logs, alarms. Heartbeat: probes/detail (server, /dt/heartbeats/<id>), dashboard Sonda index e dettaglio sistema Sonda (probe). Rimossa la vecchia paginazione a macro e il selettore page-size da tutte le pagine convertite; rimosse le macro pagination/page_size_selector (non piu' usate) da entrambi i _macros.html. I grafici "tempo di risposta" restano alimentati server-side dalla view (invariati).
+- FILTRI via ajax.data (restano applicati e ricalcolano): users status; probes status; systems kind (dalla tab attiva) + probe_id + enabled; workflows enabled; channels type + enabled; deliveries status + channel_id; audit action + outcome; logs component + level; alarms status + system_id; heartbeat Sonda: status/system_id/check_id/from/to (dal drill-down URL, es. /probes/{id}?status=error) e finestra from/to nel dettaglio sistema Probe. La casella di ricerca DataTables e' mappata su `q` dove il backend lo supporta (users/roles/probes/systems/logs); disattivata (searching:false) dove `q` non esiste (audit/alarms/channels/deliveries/heartbeat) per non mostrare un controllo inefficace.
+- lengthMenu [10,25,50,100] ovunque; default 50 per gli heartbeat, 25 per le liste. Lingua IT locale (nessun file lingua da CDN). Testo "Nessun dato" per-tabella via data-dt-empty.
+
+Qualita'
+- NIENTE CDN: verificato con grep finale che in template/asset autorati non esistano src/href http(s) esterni; gli unici http(s) nei template autorati sono placeholder/valori di esempio dei form (WhatsApp api_base, URL heartbeat/host di esempio), non caricamenti di asset. Le stringhe interne datatables.net/tn/ sono dentro la libreria vendorizzata (non autorata).
+- Coverage 100% sul codice applicativo: frontend_common 100% (datatables.py 128/0), server/dashboard 100% (app.py/dt.py/sdk.py/tzsource.py + tutte le views), probe/dashboard 100% (app.py/dt.py/sdk.py/views). Esito: frontend_common 71, server/dashboard 164, probe/dashboard 43 -> 278 test passati, 0 falliti.
+- Test aggiunti: frontend_common/tests/test_datatables.py (parse/resolve_sort/build_params/serve + markup + DTColumn/DTTable, tutti i rami); server/dashboard/tests/test_datatables.py (formato DataTables per le 10 risorse; mappature start/length->page/page_size, search->q, order->sort; inoltro filtri incl. kind systems; RBAC 401/403 + 404 risorsa ignota; rendering celle con rami RBAC/tcp-http/icone/badge/segnaposto/date; adattatore heartbeat; pagine di lista con init DataTables + asset locali e assenza CDN); probe/dashboard/tests/test_datatables.py (heartbeat index/system, sort, filtri, localdt, pagine con asset locali). Rimossi i test della vecchia paginazione (test_pagination.py, test_heartbeat_pagination.py) e il test systems_pagination_preserves_kind; aggiornati i due test timezone della Probe per verificare la data localizzata nel JSON dell'adattatore /dt/heartbeats.
+- Verifica REALE (app Flask reale via test client + backend/probe-agent simulato): GET /dt/users mappa start=50&length=25 -> page=3&page_size=25, search=alice -> q=alice, order desc su username -> sort=-username; /dt/systems inoltra kind/probe_id/enabled; /dt/heartbeats/<id> risponde con @timestamp localizzato (16/07/2026 14:00:00 in Europe/Rome) e sort=-@timestamp; le pagine includono PulseDT.init, l'URL /dt/<resource> e gli asset vendorizzati locali (jquery/datatables) senza riferimenti a cdn.datatables.net/code.jquery.com.
+
+File creati
+- frontend_common/pulse_fe_common/datatables.py, frontend_common/tests/test_datatables.py
+- server/dashboard/dt.py, server/dashboard/static/js/pulse-datatables.js, server/dashboard/tests/test_datatables.py
+- probe/dashboard/dt.py, probe/dashboard/static/js/pulse-datatables.js, probe/dashboard/tests/test_datatables.py
+- static/vendor/jquery/jquery.min.js + static/vendor/datatables/{js,css}/... in ENTRAMBE le dashboard
+
+File modificati
+- frontend_common/pulse_fe_common/__init__.py
+- server/dashboard/app.py (registra blueprint dt + global dt_meta), templates/base.html, templates/_macros.html (macro dt_table_shell/dt_init; rimosse pagination/page_size_selector), templates/{users,roles,probes,systems,workflows,notifications/list,notifications/history,audit,logs,alarms}/list.html, templates/probes/detail.html
+- probe/dashboard/app.py, templates/base.html, templates/_macros.html, templates/dashboard/index.html, templates/dashboard/system.html
+- server/dashboard/tests/test_views_crud.py (rimosso test paginazione obsoleto), probe/dashboard/tests/test_probe_dashboard.py (timezone via /dt)
+
+Decisioni prese
+- Righe DataTables come oggetti keyed per DTColumn.data (thead + columnsJs derivati da un'unica sorgente per evitare disallineamenti header/colonne/render). Ordinamento risolto per columns[i][data] con ripiego per indice; applicato solo alle colonne in whitelist (le altre non ordinabili lato JS).
+- Casella di ricerca DataTables attiva solo dove il backend espone `q` (altrove searching:false), coerente con le API reali.
+- Le view di lista mantengono la loro fetch iniziale (coerenza di gestione errori e test esistenti); i dati di riga arrivano comunque via ajax /dt. I grafici heartbeat restano alimentati server-side.
+
+Output consegnati
+- Tutte le tabelle di lista e heartbeat delle due dashboard sono DataTables server-side, con jQuery/DataTables vendorizzati (jQuery 3.7.1, DataTables 2.1.8 + integrazione Bootstrap 5), adattatore /dt/<resource> (+ heartbeat) che preserva badge/azioni/date/RBAC, filtri via ajax.data, ricerca->q e ordinamento->sort, lingua IT locale, nessun CDN. Coverage 100%, 278 test verdi.
+
+================================================

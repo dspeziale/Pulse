@@ -512,19 +512,6 @@ def test_systems_invalid_kind_falls_back_http(client, login, fake):
     assert fake.params[("GET", "/systems")]["kind"] == "http"
 
 
-def test_systems_pagination_preserves_kind(client, login, fake):
-    """I link di paginazione conservano il kind attivo."""
-    login(["systems.read"])
-    fake.set("GET", "/systems", {"items": [{"id": "1", "system_id": "s1",
-                                            "system_name": "S", "kind": "tcp"}],
-                                 "total": 50})
-    fake.set("GET", "/probes", {"items": []})
-    html = client.get("/systems?kind=tcp&page_size=10").get_data(as_text=True)
-    # Deve esistere almeno un link di pagina con kind=tcp preservato.
-    assert "kind=tcp" in html
-    assert "page=2" in html
-
-
 def test_systems_new_form_preselects_kind_from_tab(client, login, fake):
     """Il pulsante Nuovo passa ?kind=<attivo> e la form preseleziona il tipo."""
     login(["systems.create"])

@@ -1,6 +1,7 @@
 {% extends "base.html" %}
-{% from "_macros.html" import status_badge, pagination %}
+{% from "_macros.html" import dt_table_shell, dt_init %}
 {% block title %}Allarmi — Pulse{% endblock %}
+{% set meta = dt_meta('alarms') %}
 {% block content %}
 <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
   <h1 class="h3 mb-0"><i class="bi bi-exclamation-triangle me-2"></i>Allarmi</h1>
@@ -8,64 +9,31 @@
 
 <div class="card mb-3">
   <div class="card-body">
-    <form method="get" class="row g-2 align-items-end">
+    <div class="row g-2 align-items-end">
       <div class="col-sm-4">
-        <label class="form-label small text-body-secondary mb-1">Stato</label>
-        <select name="status" class="form-select">
+        <label class="form-label small text-body-secondary mb-1" for="f-status">Stato</label>
+        <select id="f-status" data-dt-filter="tbl-alarms" class="form-select">
           <option value="">Tutti</option>
           {% for s in ['active','acknowledged','resolved'] %}
-            <option value="{{ s }}" {% if request.args.get('status')==s %}selected{% endif %}>{{ s }}</option>
+            <option value="{{ s }}">{{ s }}</option>
           {% endfor %}
         </select>
       </div>
-      <div class="col-sm-3">
-        <label class="form-label small text-body-secondary mb-1">System ID</label>
-        <input name="system_id" class="form-control" value="{{ request.args.get('system_id','') }}" placeholder="es. crm-prod">
+      <div class="col-sm-4">
+        <label class="form-label small text-body-secondary mb-1" for="f-system">System ID</label>
+        <input id="f-system" data-dt-filter="tbl-alarms" class="form-control" placeholder="es. crm-prod">
       </div>
       <div class="col-sm-2 d-grid">
-        <button class="btn btn-outline-secondary"><i class="bi bi-funnel me-1"></i>Filtra</button>
+        <button data-dt-apply="tbl-alarms" class="btn btn-outline-secondary"><i class="bi bi-funnel me-1"></i>Filtra</button>
       </div>
-    </form>
+    </div>
   </div>
 </div>
 
-<div class="card">
-  <div class="table-responsive">
-    <table class="table table-hover align-middle mb-0">
-      <thead><tr><th>Sistema</th><th>Sonda</th><th>Stato</th><th>Aperto</th><th class="text-end">Azioni</th></tr></thead>
-      <tbody>
-      {% for a in data['items'] %}
-      <tr>
-        <td>{{ a.system_id }}</td>
-        <td>{{ a.probe_id }}</td>
-        <td>{{ status_badge(a.status) }}</td>
-        <td class="text-body-secondary">{{ a.opened_at|localdt }}</td>
-        <td class="text-end">
-          {% if can('commands.execute') and a.status == 'active' %}
-          <form method="post" action="{{ url_for('alarms.ack_alarm', alarm_id=a.id) }}" class="d-inline-flex gap-1">
-            <input name="note" class="form-control form-control-sm" style="width:12rem" placeholder="Nota (opzionale)">
-            <button class="btn btn-sm btn-outline-primary" title="Riconosci allarme"><i class="bi bi-check2-square me-1"></i>Ack</button>
-          </form>
-          {% else %}
-          <span class="text-body-secondary small">—</span>
-          {% endif %}
-        </td>
-      </tr>
-      {% else %}
-      <tr><td colspan="5" class="text-center text-body-secondary py-5">
-        <i class="bi bi-check-circle fs-2 d-block mb-2"></i>Nessun allarme per i filtri selezionati.
-      </td></tr>
-      {% endfor %}
-      </tbody>
-    </table>
-  </div>
-  {% if data['items'] %}
-  <div class="card-footer">
-    {% set _tot = data.get('total', 0)|int %}
-    {% if _tot > page_size %}
-      {{ pagination(page, page_size, _tot, 'alarms.list_alarms', filters) }}
-    {% else %}<span class="text-body-secondary small">Totale: {{ _tot }}</span>{% endif %}
-  </div>
-  {% endif %}
-</div>
+{{ dt_table_shell('tbl-alarms', meta, empty='Nessun allarme per i filtri selezionati.') }}
+{% endblock %}
+
+{% block body_extra %}
+{{ dt_init('tbl-alarms', meta, url_for('dt.dt_resource', resource='alarms'),
+   'function(d){ d.status = document.getElementById("f-status").value; d.system_id = document.getElementById("f-system").value; }') }}
 {% endblock %}

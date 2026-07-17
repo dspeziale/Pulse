@@ -9,7 +9,14 @@ from .. import errors, schemas, serializers
 from ..audit import write_audit
 from ..deps import CurrentUser, SessionDep, client_ip, require_permission
 from ..models import Permission, Role, RolePermission, UserRole
-from ._helpers import clamp_pagination, commit_or_conflict, flush_or_conflict, offset, parse_uuid
+from ._helpers import (
+    clamp_pagination,
+    commit_or_conflict,
+    flush_or_conflict,
+    offset,
+    parse_uuid,
+    sort_clause,
+)
 
 router = APIRouter(prefix="/api/v1/roles", tags=["roles"])
 perm_router = APIRouter(prefix="/api/v1/permissions", tags=["permissions"])
@@ -35,6 +42,7 @@ def list_roles(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=200),
     q: str | None = None,
+    sort: str | None = None,
     _: CurrentUser = Depends(require_permission("roles.read")),
 ) -> schemas.RoleList:
     page, page_size = clamp_pagination(page, page_size)
@@ -45,8 +53,13 @@ def list_roles(
         stmt = stmt.where(Role.name.ilike(like))
         count_stmt = count_stmt.where(Role.name.ilike(like))
     total = int(session.execute(count_stmt).scalar_one())
+    order = sort_clause(
+        sort,
+        {"name": Role.name, "created_at": Role.created_at},
+        Role.created_at.asc(),
+    )
     rows = (
-        session.execute(stmt.order_by(Role.created_at).offset(offset(page, page_size)).limit(page_size))
+        session.execute(stmt.order_by(order).offset(offset(page, page_size)).limit(page_size))
         .scalars()
         .all()
     )

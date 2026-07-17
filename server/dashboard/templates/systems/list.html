@@ -1,8 +1,9 @@
 {% extends "base.html" %}
-{% from "_macros.html" import status_badge, bool_badge, pagination %}
+{% from "_macros.html" import dt_table_shell, dt_init %}
 {% block title %}Sistemi monitorati — Pulse{% endblock %}
-{% block content %}
+{% set meta = dt_meta('systems') %}
 {% set active_kind = kind if kind in ('http', 'tcp') else 'http' %}
+{% block content %}
 <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
   <h1 class="h3 mb-0"><i class="bi bi-hdd-stack me-2"></i>Sistemi monitorati</h1>
   {% if can('systems.create') %}
@@ -10,7 +11,7 @@
   {% endif %}
 </div>
 
-{# TAB per tipo di sistema: il filtro effettivo lo applica il backend (?kind=). #}
+{# TAB per tipo di sistema: il ``kind`` attivo e' passato come filtro ad ajax.data. #}
 <ul class="nav nav-tabs mb-3" role="tablist">
   <li class="nav-item" role="presentation">
     <a class="nav-link{{ ' active' if active_kind == 'http' }}" href="{{ url_for('systems.list_systems', kind='http') }}"
@@ -28,74 +29,33 @@
 
 <div class="card mb-3">
   <div class="card-body">
-    <form method="get" class="row g-2 align-items-end">
-      <input type="hidden" name="kind" value="{{ active_kind }}">
-      <div class="col-sm-5">
-        <label class="form-label small text-body-secondary mb-1">Ricerca</label>
-        <input name="q" class="form-control" placeholder="ID o nome sistema" value="{{ request.args.get('q','') }}">
-      </div>
-      <div class="col-sm-4">
-        <label class="form-label small text-body-secondary mb-1">Sonda</label>
-        <select name="probe_id" class="form-select">
+    <div class="row g-2 align-items-end">
+      <div class="col-sm-6">
+        <label class="form-label small text-body-secondary mb-1" for="f-probe">Sonda</label>
+        <select id="f-probe" data-dt-filter="tbl-systems" class="form-select">
           <option value="">Tutte le Sonde</option>
           {% for p in probes['items'] %}
-            <option value="{{ p.id }}" {% if request.args.get('probe_id')==p.id %}selected{% endif %}>{{ p.name }}</option>
+            <option value="{{ p.id }}">{{ p.name }}</option>
           {% endfor %}
         </select>
       </div>
-      <div class="col-sm-2">
-        <label class="form-label small text-body-secondary mb-1">Stato</label>
-        <select name="enabled" class="form-select">
+      <div class="col-sm-4">
+        <label class="form-label small text-body-secondary mb-1" for="f-enabled">Stato</label>
+        <select id="f-enabled" data-dt-filter="tbl-systems" class="form-select">
           <option value="">Tutti</option>
-          <option value="true" {% if request.args.get('enabled')=='true' %}selected{% endif %}>Abilitati</option>
-          <option value="false" {% if request.args.get('enabled')=='false' %}selected{% endif %}>Disabilitati</option>
+          <option value="true">Abilitati</option>
+          <option value="false">Disabilitati</option>
         </select>
       </div>
-      <div class="col-sm-1 d-grid">
-        <button class="btn btn-outline-secondary" title="Filtra"><i class="bi bi-funnel"></i></button>
-      </div>
-    </form>
+    </div>
   </div>
 </div>
 
-<div class="card">
-  <div class="table-responsive">
-    <table class="table table-hover align-middle mb-0">
-      <thead>
-        <tr><th>System ID</th><th>Nome</th><th>Tipo</th><th>Endpoint / Target</th><th>Sonda</th><th>Abilitato</th><th class="text-end">Azioni</th></tr>
-      </thead>
-      <tbody>
-      {% for s in data['items'] %}
-      <tr>
-        <td><a class="fw-semibold text-decoration-none" href="{{ url_for('systems.detail', system_id=s.id) }}">{{ s.system_id }}</a></td>
-        <td>{{ s.system_name }}</td>
-        {% set skind = s.kind or 'http' %}
-        <td><span class="badge {{ 'b-unknown' if skind == 'tcp' else 'b-ok' }}">{{ 'TCP' if skind == 'tcp' else 'HTTP' }}</span></td>
-        <td class="text-body-secondary text-truncate" style="max-width:22rem">{% if skind == 'tcp' %}{{ s.tcp_host }}:{{ s.tcp_port }}{% else %}{{ s.heartbeat_url }}{% endif %}</td>
-        <td>{{ s.probe_id }}</td>
-        <td>{{ bool_badge(s.enabled) }}</td>
-        <td class="text-end">
-          <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('systems.detail', system_id=s.id) }}" title="Dettaglio"><i class="bi bi-eye"></i></a>
-          {% if can('systems.update') %}<a class="btn btn-sm btn-outline-secondary" href="{{ url_for('systems.edit_system', system_id=s.id) }}" title="Modifica"><i class="bi bi-pencil"></i></a>{% endif %}
-        </td>
-      </tr>
-      {% else %}
-      <tr><td colspan="7" class="text-center text-body-secondary py-5">
-        <i class="bi bi-inbox fs-2 d-block mb-2"></i>
-        {% if active_kind == 'tcp' %}Nessun sistema di connettività (TCP).{% else %}Nessuna applicazione (HTTP) monitorata.{% endif %}
-        {% if can('systems.create') %}<div class="mt-2"><a class="btn btn-sm btn-primary" href="{{ url_for('systems.new_system', kind=active_kind) }}"><i class="bi bi-plus-lg me-1"></i>Aggiungi il primo sistema</a></div>{% endif %}
-      </td></tr>
-      {% endfor %}
-      </tbody>
-    </table>
-  </div>
-  {% if data['items'] %}
-  <div class="card-footer">
-    {% set _tot = data.get('total', 0)|int %}
-    {% if _tot > page_size %}
-      {{ pagination(page, page_size, _tot, 'systems.list_systems', filters) }}
-    {% else %}<span class="text-body-secondary small">Totale: {{ _tot }}</span>{% endif %}
-  </div>
-  {% endif %}
-</div>
+{{ dt_table_shell('tbl-systems', meta,
+   empty=('Nessun sistema di connettività (TCP).' if active_kind == 'tcp' else 'Nessuna applicazione (HTTP) monitorata.')) }}
+{% endblock %}
+
+{% block body_extra %}
+{{ dt_init('tbl-systems', meta, url_for('dt.dt_resource', resource='systems'),
+   'function(d){ d.kind = "' ~ active_kind ~ '"; d.probe_id = document.getElementById("f-probe").value; d.enabled = document.getElementById("f-enabled").value; }') }}
 {% endblock %}

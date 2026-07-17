@@ -1,7 +1,7 @@
 {% extends "base.html" %}
-{% from "_macros.html" import pagination %}
+{% from "_macros.html" import dt_table_shell, dt_init %}
 {% block title %}Utenti — Pulse{% endblock %}
-{% set acct = {'active':'b-ok','disabled':'b-off','locked':'b-warn'} %}
+{% set meta = dt_meta('users') %}
 {% block content %}
 <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
   <h1 class="h3 mb-0"><i class="bi bi-people me-2"></i>Utenti</h1>
@@ -12,60 +12,24 @@
 
 <div class="card mb-3">
   <div class="card-body">
-    <form method="get" class="row g-2 align-items-end">
-      <div class="col-sm-5">
-        <label class="form-label small text-body-secondary mb-1">Ricerca</label>
-        <input name="q" class="form-control" placeholder="Username, nome o email" value="{{ request.args.get('q','') }}">
-      </div>
-      <div class="col-sm-3">
-        <label class="form-label small text-body-secondary mb-1">Stato</label>
-        <select name="status" class="form-select">
+    <div class="row g-2 align-items-end">
+      <div class="col-sm-4">
+        <label class="form-label small text-body-secondary mb-1" for="f-status">Stato</label>
+        <select id="f-status" data-dt-filter="tbl-users" class="form-select">
           <option value="">Tutti</option>
           {% for st in ['active','disabled','locked'] %}
-            <option value="{{ st }}" {% if request.args.get('status')==st %}selected{% endif %}>{{ st }}</option>
+            <option value="{{ st }}">{{ st }}</option>
           {% endfor %}
         </select>
       </div>
-      <div class="col-sm-2 d-grid">
-        <button class="btn btn-outline-secondary"><i class="bi bi-funnel me-1"></i>Filtra</button>
-      </div>
-    </form>
+    </div>
   </div>
 </div>
 
-<div class="card">
-  <div class="table-responsive">
-    <table class="table table-hover align-middle mb-0">
-      <thead><tr><th>Username</th><th>Nome</th><th>Email</th><th>Stato</th><th>Ruoli</th><th class="text-end">Azioni</th></tr></thead>
-      <tbody>
-      {% for u in data['items'] %}
-      <tr>
-        <td><a class="fw-semibold text-decoration-none" href="{{ url_for('users.detail', user_id=u.id) }}">{{ u.username }}</a></td>
-        <td>{{ u.full_name }}</td>
-        <td>{{ u.email }}</td>
-        <td><span class="badge {{ acct.get(u.status, 'b-unknown') }}">{{ u.status }}</span></td>
-        <td class="text-body-secondary">{{ u.roles|join(', ') }}</td>
-        <td class="text-end">
-          <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('users.detail', user_id=u.id) }}" title="Dettaglio"><i class="bi bi-eye"></i></a>
-          {% if can('users.update') %}<a class="btn btn-sm btn-outline-secondary" href="{{ url_for('users.edit_user', user_id=u.id) }}" title="Modifica"><i class="bi bi-pencil"></i></a>{% endif %}
-        </td>
-      </tr>
-      {% else %}
-      <tr><td colspan="6" class="text-center text-body-secondary py-5">
-        <i class="bi bi-inbox fs-2 d-block mb-2"></i>Nessun utente trovato.
-        {% if can('users.create') %}<div class="mt-2"><a class="btn btn-sm btn-primary" href="{{ url_for('users.new_user') }}"><i class="bi bi-plus-lg me-1"></i>Crea utente</a></div>{% endif %}
-      </td></tr>
-      {% endfor %}
-      </tbody>
-    </table>
-  </div>
-  {% if data['items'] %}
-  <div class="card-footer">
-    {% set _tot = data.get('total', 0)|int %}
-    {% if _tot > page_size %}
-      {{ pagination(page, page_size, _tot, 'users.list_users', filters) }}
-    {% else %}<span class="text-body-secondary small">Totale: {{ _tot }}</span>{% endif %}
-  </div>
-  {% endif %}
-</div>
+{{ dt_table_shell('tbl-users', meta, empty='Nessun utente trovato.') }}
+{% endblock %}
+
+{% block body_extra %}
+{{ dt_init('tbl-users', meta, url_for('dt.dt_resource', resource='users'),
+   'function(d){ d.status = document.getElementById("f-status").value; }') }}
 {% endblock %}

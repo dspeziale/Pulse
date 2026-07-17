@@ -6,6 +6,7 @@ Contiene:
 - auth: gestione sessione/JWT, decoratori login/permessi, error handlers.
 - rbac: utilità di controllo permessi lato UI.
 - datetimes: formattazione delle date-ora nel fuso orario configurato.
+- datatables: adattatore server-side per DataTables.js (parsing + risposta).
 
 NB: questo pacchetto NON accede mai direttamente a DB o OpenSearch: effettua
 solo chiamate REST agli endpoint definiti in docs/api/DOCUMENTO_API.md.
@@ -14,7 +15,7 @@ solo chiamate REST agli endpoint definiti in docs/api/DOCUMENTO_API.md.
 from .datetimes import DEFAULT_FORMAT, DEFAULT_TIMEZONE, format_datetime
 
 __all__ = [
-    "config", "http_client", "auth", "rbac", "datetimes",
+    "config", "http_client", "auth", "rbac", "datetimes", "datatables",
     "format_datetime", "DEFAULT_TIMEZONE", "DEFAULT_FORMAT",
 ]
 

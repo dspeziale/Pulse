@@ -1,5 +1,6 @@
 {% extends "base.html" %}
-{% from "_macros.html" import status_badge, bool_badge, pagination, page_size_selector %}
+{% from "_macros.html" import status_badge, bool_badge, dt_table_shell, dt_init %}
+{% set hb_meta = dt_meta('heartbeats') %}
 {% block title %}Dashboard — Pulse Probe{% endblock %}
 {% block head_extra %}<script src="{{ url_for('static', filename='pulse-charts.js') }}"></script>{% endblock %}
 {% block content %}
@@ -58,38 +59,8 @@
   <div class="card-body"><canvas id="rt" height="90"></canvas></div>
 </div>
 
-<div class="card">
-  <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
-    <span><i class="bi bi-clock-history me-1"></i>Heartbeat recenti</span>
-    {{ page_size_selector(page_size, 'dashboard.index', hb_filters) }}
-  </div>
-  <div class="table-responsive">
-    <table class="table table-hover align-middle mb-0">
-      <thead><tr><th>Timestamp</th><th>Sistema</th><th>Check</th><th>Stato</th><th class="text-end">ms</th></tr></thead>
-      <tbody>
-      {% for h in heartbeats['items'] %}
-      <tr>
-        <td class="text-body-secondary">{{ h['@timestamp']|localdt }}</td>
-        <td>{{ h.system_name }}</td>
-        <td>{{ h.check_name }}</td>
-        <td>{{ status_badge(h.status) }}</td>
-        <td class="text-end">{{ h.response_ms }}</td>
-      </tr>
-      {% else %}
-      <tr><td colspan="5" class="text-center text-body-secondary py-4">Nessun heartbeat recente.</td></tr>
-      {% endfor %}
-      </tbody>
-    </table>
-  </div>
-  {% if heartbeats['items'] %}
-  <div class="card-footer">
-    {% set _tot = heartbeats.get('total', 0)|int %}
-    {% if _tot > page_size %}
-      {{ pagination(page, page_size, _tot, 'dashboard.index', hb_filters) }}
-    {% else %}<span class="text-body-secondary small">Totale: {{ _tot }}</span>{% endif %}
-  </div>
-  {% endif %}
-</div>
+<div class="mb-2"><span class="fw-semibold"><i class="bi bi-clock-history me-1"></i>Heartbeat recenti</span></div>
+{{ dt_table_shell('tbl-hb', hb_meta, empty='Nessun heartbeat recente.') }}
 
 <script>
 const hb = {{ heartbeats['items']|tojson }};
@@ -100,4 +71,8 @@ new Chart(document.getElementById('rt'), {
   options:{ title:'Tempo di risposta heartbeat', yLabel:'Tempo', yUnit:'ms', xTime:true }
 });
 </script>
+{% endblock %}
+
+{% block body_extra %}
+{{ dt_init('tbl-hb', hb_meta, url_for('dt.dt_heartbeats')) }}
 {% endblock %}

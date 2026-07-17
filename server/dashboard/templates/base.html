@@ -24,6 +24,7 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='vendor/bootstrap/css/bootstrap.min.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='vendor/bootstrap-icons/bootstrap-icons.min.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='vendor/adminlte/css/adminlte.min.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='vendor/datatables/css/dataTables.bootstrap5.min.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/pulse-theme.css') }}">
   {% block head_extra %}{% endblock %}
 </head>
@@ -186,6 +187,11 @@
   <script src="{{ url_for('static', filename='vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
   <script src="{{ url_for('static', filename='vendor/adminlte/js/adminlte.min.js') }}"></script>
   <script src="{{ url_for('static', filename='js/pulse-theme.js') }}"></script>
+  {# DataTables vendorizzato (jQuery + core + integrazione Bootstrap 5) — nessun CDN #}
+  <script src="{{ url_for('static', filename='vendor/jquery/jquery.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='vendor/datatables/js/dataTables.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='vendor/datatables/js/dataTables.bootstrap5.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/pulse-datatables.js') }}"></script>
   {% block body_extra %}{% endblock %}
 </body>
 </html>

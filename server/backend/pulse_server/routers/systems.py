@@ -16,7 +16,14 @@ from .. import errors, schemas, serializers
 from ..audit import write_audit
 from ..deps import CurrentUser, SessionDep, client_ip, require_any_permission, require_permission
 from ..models import DiscoveredCheck, MaintenanceWindow, MonitoredSystem, Probe
-from ._helpers import clamp_pagination, commit_or_conflict, flush_or_conflict, offset, parse_uuid
+from ._helpers import (
+    clamp_pagination,
+    commit_or_conflict,
+    flush_or_conflict,
+    offset,
+    parse_uuid,
+    sort_clause,
+)
 
 # Numero massimo di documenti canonici restituiti dal test heartbeat.
 _MAX_TEST_DOCUMENTS = 20
@@ -78,6 +85,7 @@ def list_systems(
     probe_id: str | None = None,
     enabled: bool | None = None,
     kind: str | None = None,
+    sort: str | None = None,
     _: CurrentUser = Depends(require_permission("systems.read")),
 ) -> schemas.SystemList:
     page, page_size = clamp_pagination(page, page_size)
@@ -101,9 +109,20 @@ def list_systems(
         stmt = stmt.where(cond)
         count_stmt = count_stmt.where(cond)
     total = int(session.execute(count_stmt).scalar_one())
+    order = sort_clause(
+        sort,
+        {
+            "system_id": MonitoredSystem.system_id,
+            "system_name": MonitoredSystem.system_name,
+            "kind": MonitoredSystem.kind,
+            "created_at": MonitoredSystem.created_at,
+            "enabled": MonitoredSystem.enabled,
+        },
+        MonitoredSystem.created_at.asc(),
+    )
     rows = (
         session.execute(
-            stmt.order_by(MonitoredSystem.created_at).offset(offset(page, page_size)).limit(page_size)
+            stmt.order_by(order).offset(offset(page, page_size)).limit(page_size)
         )
         .scalars()
         .all()

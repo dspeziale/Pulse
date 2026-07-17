@@ -1,7 +1,7 @@
 {% extends "base.html" %}
-{% from "_macros.html" import pagination %}
+{% from "_macros.html" import dt_table_shell, dt_init %}
 {% block title %}Log di sistema — Pulse{% endblock %}
-{% set lvl = {'debug':'text-bg-secondary','info':'text-bg-info','warning':'text-bg-warning','error':'text-bg-danger','critical':'text-bg-dark'} %}
+{% set meta = dt_meta('logs') %}
 {% block content %}
 <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
   <h1 class="h3 mb-0"><i class="bi bi-terminal me-2"></i>Log di sistema</h1>
@@ -9,62 +9,33 @@
 
 <div class="card mb-3">
   <div class="card-body">
-    <form method="get" class="row g-2 align-items-end">
-      <div class="col-sm-3">
-        <label class="form-label small text-body-secondary mb-1">Componente</label>
-        <select name="component" class="form-select">
+    <div class="row g-2 align-items-end">
+      <div class="col-sm-4">
+        <label class="form-label small text-body-secondary mb-1" for="f-component">Componente</label>
+        <select id="f-component" data-dt-filter="tbl-logs" class="form-select">
           <option value="">Tutti</option>
           {% for c in ['server','probe'] %}
-            <option value="{{ c }}" {% if request.args.get('component')==c %}selected{% endif %}>{{ c }}</option>
-          {% endfor %}
-        </select>
-      </div>
-      <div class="col-sm-3">
-        <label class="form-label small text-body-secondary mb-1">Livello</label>
-        <select name="level" class="form-select">
-          <option value="">Tutti i livelli</option>
-          {% for l in ['debug','info','warning','error','critical'] %}
-            <option value="{{ l }}" {% if request.args.get('level')==l %}selected{% endif %}>{{ l }}</option>
+            <option value="{{ c }}">{{ c }}</option>
           {% endfor %}
         </select>
       </div>
       <div class="col-sm-4">
-        <label class="form-label small text-body-secondary mb-1">Testo</label>
-        <input name="q" class="form-control" placeholder="Cerca nel messaggio" value="{{ request.args.get('q','') }}">
+        <label class="form-label small text-body-secondary mb-1" for="f-level">Livello</label>
+        <select id="f-level" data-dt-filter="tbl-logs" class="form-select">
+          <option value="">Tutti i livelli</option>
+          {% for l in ['debug','info','warning','error','critical'] %}
+            <option value="{{ l }}">{{ l }}</option>
+          {% endfor %}
+        </select>
       </div>
-      <div class="col-sm-2 d-grid">
-        <button class="btn btn-outline-secondary"><i class="bi bi-funnel me-1"></i>Filtra</button>
-      </div>
-    </form>
+    </div>
   </div>
 </div>
 
-<div class="card">
-  <div class="table-responsive">
-    <table class="table table-hover align-middle mb-0">
-      <thead><tr><th>Data</th><th>Componente</th><th>Livello</th><th>Logger</th><th>Messaggio</th></tr></thead>
-      <tbody>
-      {% for e in data['items'] %}
-      <tr>
-        <td class="text-body-secondary text-nowrap">{{ e.timestamp|localdt }}</td>
-        <td>{{ e.component }}</td>
-        <td><span class="badge {{ lvl.get(e.level, 'text-bg-secondary') }}">{{ e.level }}</span></td>
-        <td class="text-body-secondary">{{ e.logger }}</td>
-        <td>{{ e.message }}</td>
-      </tr>
-      {% else %}
-      <tr><td colspan="5" class="text-center text-body-secondary py-5">Nessun log per i filtri selezionati.</td></tr>
-      {% endfor %}
-      </tbody>
-    </table>
-  </div>
-  {% if data['items'] %}
-  <div class="card-footer">
-    {% set _tot = data.get('total', 0)|int %}
-    {% if _tot > page_size %}
-      {{ pagination(page, page_size, _tot, 'logs.list_logs', filters) }}
-    {% else %}<span class="text-body-secondary small">Totale: {{ _tot }}</span>{% endif %}
-  </div>
-  {% endif %}
-</div>
+{{ dt_table_shell('tbl-logs', meta, empty='Nessun log per i filtri selezionati.') }}
+{% endblock %}
+
+{% block body_extra %}
+{{ dt_init('tbl-logs', meta, url_for('dt.dt_resource', resource='logs'),
+   'function(d){ d.component = document.getElementById("f-component").value; d.level = document.getElementById("f-level").value; }') }}
 {% endblock %}

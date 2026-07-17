@@ -1,6 +1,7 @@
 {% extends "base.html" %}
-{% from "_macros.html" import bool_badge, pagination %}
+{% from "_macros.html" import dt_table_shell, dt_init %}
 {% block title %}Workflow — Pulse{% endblock %}
+{% set meta = dt_meta('workflows') %}
 {% block content %}
 <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
   <h1 class="h3 mb-0"><i class="bi bi-diagram-3 me-2"></i>Workflow di notifica</h1>
@@ -11,57 +12,23 @@
 
 <div class="card mb-3">
   <div class="card-body">
-    <form method="get" class="row g-2 align-items-end">
-      <div class="col-sm-8">
-        <label class="form-label small text-body-secondary mb-1">Ricerca</label>
-        <input name="q" class="form-control" placeholder="Nome workflow" value="{{ request.args.get('q','') }}">
-      </div>
-      <div class="col-sm-2">
-        <label class="form-label small text-body-secondary mb-1">Stato</label>
-        <select name="enabled" class="form-select">
+    <div class="row g-2 align-items-end">
+      <div class="col-sm-4">
+        <label class="form-label small text-body-secondary mb-1" for="f-enabled">Stato</label>
+        <select id="f-enabled" data-dt-filter="tbl-workflows" class="form-select">
           <option value="">Tutti</option>
-          <option value="true" {% if request.args.get('enabled')=='true' %}selected{% endif %}>Abilitati</option>
-          <option value="false" {% if request.args.get('enabled')=='false' %}selected{% endif %}>Disabilitati</option>
+          <option value="true">Abilitati</option>
+          <option value="false">Disabilitati</option>
         </select>
       </div>
-      <div class="col-sm-2 d-grid">
-        <button class="btn btn-outline-secondary"><i class="bi bi-funnel me-1"></i>Filtra</button>
-      </div>
-    </form>
+    </div>
   </div>
 </div>
 
-<div class="card">
-  <div class="table-responsive">
-    <table class="table table-hover align-middle mb-0">
-      <thead><tr><th>Nome</th><th>Trigger</th><th>Abilitato</th><th class="text-end">Azioni</th></tr></thead>
-      <tbody>
-      {% for w in data['items'] %}
-      <tr>
-        <td><a class="fw-semibold text-decoration-none" href="{{ url_for('workflows.detail', workflow_id=w.id) }}">{{ w.name }}</a></td>
-        <td><code>{{ w.trigger }}</code></td>
-        <td>{{ bool_badge(w.enabled) }}</td>
-        <td class="text-end">
-          <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('workflows.detail', workflow_id=w.id) }}" title="Dettaglio"><i class="bi bi-eye"></i></a>
-          {% if can('workflows.update') %}<a class="btn btn-sm btn-outline-secondary" href="{{ url_for('workflows.edit_workflow', workflow_id=w.id) }}" title="Modifica"><i class="bi bi-pencil"></i></a>{% endif %}
-        </td>
-      </tr>
-      {% else %}
-      <tr><td colspan="4" class="text-center text-body-secondary py-5">
-        <i class="bi bi-inbox fs-2 d-block mb-2"></i>Nessun workflow definito.
-        {% if can('workflows.create') %}<div class="mt-2"><a class="btn btn-sm btn-primary" href="{{ url_for('workflows.new_workflow') }}"><i class="bi bi-plus-lg me-1"></i>Crea il primo workflow</a></div>{% endif %}
-      </td></tr>
-      {% endfor %}
-      </tbody>
-    </table>
-  </div>
-  {% if data['items'] %}
-  <div class="card-footer">
-    {% set _tot = data.get('total', 0)|int %}
-    {% if _tot > page_size %}
-      {{ pagination(page, page_size, _tot, 'workflows.list_workflows', filters) }}
-    {% else %}<span class="text-body-secondary small">Totale: {{ _tot }}</span>{% endif %}
-  </div>
-  {% endif %}
-</div>
+{{ dt_table_shell('tbl-workflows', meta, empty='Nessun workflow definito.') }}
+{% endblock %}
+
+{% block body_extra %}
+{{ dt_init('tbl-workflows', meta, url_for('dt.dt_resource', resource='workflows'),
+   'function(d){ d.enabled = document.getElementById("f-enabled").value; }') }}
 {% endblock %}

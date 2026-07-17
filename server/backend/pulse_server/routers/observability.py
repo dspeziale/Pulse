@@ -12,7 +12,7 @@ from .. import errors, schemas, serializers
 from ..audit import write_audit
 from ..deps import CurrentUser, SessionDep, client_ip, require_permission
 from ..models import AuditLog, Configuration, SystemLog
-from ._helpers import clamp_pagination, offset, parse_uuid
+from ._helpers import clamp_pagination, offset, parse_uuid, sort_clause
 
 audit_router = APIRouter(prefix="/api/v1/audit", tags=["audit"])
 logs_router = APIRouter(prefix="/api/v1/logs", tags=["logs"])
@@ -41,6 +41,7 @@ def list_audit(
     to: str | None = None,
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=200),
+    sort: str | None = None,
     _: CurrentUser = Depends(require_permission("audit.read")),
 ) -> schemas.AuditList:
     page, page_size = clamp_pagination(page, page_size)
@@ -65,9 +66,20 @@ def list_audit(
         stmt = stmt.where(cond)
         count_stmt = count_stmt.where(cond)
     total = int(session.execute(count_stmt).scalar_one())
+    order = sort_clause(
+        sort,
+        {
+            "timestamp": AuditLog.timestamp,
+            "action": AuditLog.action,
+            "actor_type": AuditLog.actor_type,
+            "outcome": AuditLog.outcome,
+            "entity_type": AuditLog.entity_type,
+        },
+        AuditLog.timestamp.desc(),
+    )
     rows = (
         session.execute(
-            stmt.order_by(AuditLog.timestamp.desc()).offset(offset(page, page_size)).limit(page_size)
+            stmt.order_by(order).offset(offset(page, page_size)).limit(page_size)
         )
         .scalars()
         .all()
@@ -101,6 +113,7 @@ def list_logs(
     q: str | None = None,
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=200),
+    sort: str | None = None,
     _: CurrentUser = Depends(require_permission("syslog.read")),
 ) -> schemas.LogList:
     page, page_size = clamp_pagination(page, page_size)
@@ -123,9 +136,19 @@ def list_logs(
         stmt = stmt.where(cond)
         count_stmt = count_stmt.where(cond)
     total = int(session.execute(count_stmt).scalar_one())
+    order = sort_clause(
+        sort,
+        {
+            "timestamp": SystemLog.timestamp,
+            "level": SystemLog.level,
+            "component": SystemLog.component,
+            "source": SystemLog.component,
+        },
+        SystemLog.timestamp.desc(),
+    )
     rows = (
         session.execute(
-            stmt.order_by(SystemLog.timestamp.desc()).offset(offset(page, page_size)).limit(page_size)
+            stmt.order_by(order).offset(offset(page, page_size)).limit(page_size)
         )
         .scalars()
         .all()
