@@ -20,7 +20,10 @@ canonico heartbeat (`docs/analisi/01_specifica_funzionale.md` §4).
 | GET | `/query/heartbeats` | token Server | query filtrata su OpenSearch locale |
 | POST | `/query` | token Server | query strutturata avanzata (filtri + aggregazioni) |
 | GET | `/systems` | token Server | sistemi attualmente monitorati (config effettiva) |
-| GET | `/status` | token Server | stato interno (poller, OpenSearch, coda eventi) |
+| GET | `/status` | token Server | stato interno (poller, OpenSearch, coda eventi, `nmap_available`) |
+| POST | `/scan` | token Server | avvia una scansione NMAP (ritorna `scan_id`, `status:running`) |
+| GET | `/scans` | token Server | elenco scansioni (paginato) |
+| GET | `/scan/{scan_id}` | token Server | dettaglio scansione (host/porte/script) |
 | GET | `/health` | nessuna | liveness |
 | GET | `/health/ready` | nessuna | readiness (OpenSearch/poller) |
 
