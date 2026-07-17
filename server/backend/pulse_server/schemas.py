@@ -509,6 +509,65 @@ class QueryResponse(_Model):
     total: int
 
 
+# ==================== Scansioni NMAP (proxy verso Probe) ===================
+# (aggiunta su richiesta utente: NMAP). Le opzioni sono validate in modo
+# strutturale qui (tipi/Literal/bound) ma la validazione profonda dei target/
+# opzioni nmap resta sulla Probe (whitelist/regex, argv mai su shell).
+
+
+class ScanRequest(_Model):
+    """Opzioni di una scansione NMAP inoltrate alla Probe (pass-through tipizzato)."""
+
+    target: str
+    timing: Literal["T0", "T1", "T2", "T3", "T4", "T5"] = "T3"
+    technique: Literal["connect", "syn", "udp", "ping"] = "connect"
+    ports: str | None = None
+    top_ports: int | None = Field(default=None, ge=1, le=65535)
+    service_version: bool = False
+    version_intensity: int | None = Field(default=None, ge=0, le=9)
+    os_detection: bool = False
+    no_ping: bool = False
+    scripts: list[str] = Field(default_factory=list)
+    script_args: str | None = None
+    min_rate: int | None = Field(default=None, ge=1)
+    max_rate: int | None = Field(default=None, ge=1)
+    max_retries: int | None = Field(default=None, ge=0, le=20)
+    extra: str | None = None
+
+
+class ScanStartOut(_Model):
+    scan_id: str
+    status: str
+    started_at: str
+    target: str
+
+
+class ScanListItem(_Model):
+    scan_id: str
+    target: str
+    status: str
+    started_at: str
+    finished_at: str | None = None
+    summary: dict[str, Any] | None = None
+
+
+class ScanList(_Model):
+    items: list[ScanListItem]
+    total: int
+
+
+class ScanDetail(_Model):
+    scan_id: str
+    target: str
+    options: dict[str, Any] = Field(default_factory=dict)
+    status: str
+    started_at: str
+    finished_at: str | None = None
+    error: str | None = None
+    summary: dict[str, Any] | None = None
+    hosts: list[dict[str, Any]] = Field(default_factory=list)
+
+
 class DashboardProbeSummary(_Model):
     probe_id: str
     status: str

@@ -49,6 +49,7 @@ _TAGS_METADATA = [
     {"name": "systems", "description": "Sistemi monitorati."},
     {"name": "checks", "description": "Check scoperti."},
     {"name": "heartbeats-dashboard", "description": "Drill-down heartbeat e dashboard."},
+    {"name": "scans", "description": "Scansioni NMAP via Server (proxy verso Probe)."},
     {"name": "probe-comm", "description": "Endpoint dedicati Server<->Probe (mTLS+token)."},
     {"name": "notifications", "description": "Canali notifica e storico invii."},
     {"name": "workflows", "description": "Workflow notifiche e allarmi."},

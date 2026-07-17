@@ -2058,3 +2058,50 @@ Output consegnati
 - Gateway Nominatim operativo su GET /api/v1/nominatim/{endpoint} (allowlist search/reverse/lookup/status/details), auth duale JWT/X-API-Key, base URL fissa anti-SSRF, throttle ~1 req/s + cache TTL, variabili di config/compose/.env documentate, sezione API 1.19. mypy --strict pulito, coverage 100%, 288 test verdi. La Guida FE la fara' il frontend.
 
 ================================================
+
+
+ITERAZIONE 54
+
+Agente: BE
+Data: 2026-07-17
+
+Input ricevuti
+- Richiesta orchestratore: aggiungere il PROXY del Server verso gli endpoint di scansione NMAP della Probe (implementati nella Probe, iter. 52), con RBAC e audit. Modificare SOLO server/backend. Riusare il pattern di get_heartbeats (ProbeClient + _probe_base_url(probe) + settings.probe_query_token). Permessi scans.run/scans.read (seed DBA iter. 51).
+
+Lavoro svolto
+- SCHEMI (pulse_server/schemas.py): ScanRequest (opzioni pass-through tipizzate: target, timing Literal T0..T5, technique Literal connect/syn/udp/ping, ports, top_ports, service_version, version_intensity, os_detection, no_ping, scripts[], script_args, min_rate, max_rate, max_retries, extra — bound numerici replicati; la validazione profonda nmap resta sulla Probe), ScanStartOut, ScanListItem, ScanList, ScanDetail (hosts liberi list[dict]).
+- CLIENT (pulse_server/proxy.py): aggiunti a ProbeQueryClient i metodi post_scan (POST /api/v1/scan), get_scans (GET /api/v1/scans), get_scan (GET /api/v1/scan/{id}), tutti col probe_query_token. Aggiunto parametro allow_404 a _request: get_scan propaga il 404 della Probe come 404 (not_found) invece di 503.
+- ROTTE (pulse_server/routers/dashboard.py, tag "scans", riuso _require_probe/_probe_base_url):
+  * POST /api/v1/probes/{probe_id}/scan -> require_permission("scans.run"); inoltra il body alla Probe; scrive write_audit action="scans.run" (actor utente, entity_type "probe", entity_id probe_id, details {target, technique, timing} — NON logga l'intero extra), session.commit(); ritorna {scan_id,status,started_at,target}. Probe irraggiungibile -> 503.
+  * GET /api/v1/probes/{probe_id}/scans?page&page_size -> require_permission("scans.read"); proxy a GET /scans; {items,total}.
+  * GET /api/v1/probes/{probe_id}/scan/{scan_id} -> require_permission("scans.read"); proxy a GET /scan/{id}; 404 se la Probe risponde 404.
+- main.py: aggiunto tag OpenAPI "scans".
+
+Qualita'
+- mypy --strict: Success, no issues (33 source files).
+- Coverage 100% su server/backend (TOTAL 3187 stmts / 636 branch, 0 miss): proxy.py 46/10 100%, routers/dashboard.py 92/14 100%, schemas.py 621/20 100%.
+- Test: 301 passed, 0 failed. Nuovo tests/test_scans_proxy.py (13 test, ProbeClient MOCKATO, nessuna Probe reale): POST scan con scans.run -> 200 + audit scans.run scritto (entity probe, details riassunto); senza permesso (utente solo scans.read) -> 403 e nessun inoltro; senza token -> 401; probe irraggiungibile -> 503; probe inesistente -> 404; GET scans -> proxy corretto (items/total + params page/page_size); GET scan detail -> proxy (hosts); scan inesistente -> 404; GET senza token -> 401. Unit test su ProbeQueryClient reale (httpx mockato) per post_scan/get_scans/get_scan 200 e get_scan 404.
+
+Problemi trovati
+- Nessuno.
+
+Decisioni prese
+- Schema tipizzato pass-through (coerente con QueryRequest): il Server espone un contratto tipizzato/OpenAPI ma delega alla Probe la validazione profonda nmap (i validatori nmap vivono in probe/agent, fuori dal backend). body.model_dump(exclude_none=True) -> Probe.
+- allow_404 su _request per distinguere 404 (scan inesistente) da 503 (probe irraggiungibile).
+- Rotte nella dashboard.py esistente (riuso helper _require_probe/_probe_base_url) invece di un nuovo modulo, come da indicazione "riusa il pattern di get_heartbeats"; tag OpenAPI dedicato "scans".
+- Audit solo su avvio riuscito (dopo l'inoltro alla Probe): se la Probe e' irraggiungibile la 503 precede l'audit.
+
+File creati
+- server/backend/tests/test_scans_proxy.py
+
+File modificati
+- server/backend/pulse_server/schemas.py (ScanRequest/ScanStartOut/ScanListItem/ScanList/ScanDetail)
+- server/backend/pulse_server/proxy.py (post_scan/get_scans/get_scan + allow_404)
+- server/backend/pulse_server/routers/dashboard.py (3 rotte scan + audit)
+- server/backend/pulse_server/main.py (tag "scans")
+- docs/api/DOCUMENTO_API.md (§1.8 sezione Scansioni NMAP + riga tracciabilita')
+
+Output consegnati
+- Proxy Server->Probe per NMAP: POST /probes/{id}/scan (scans.run, con audit), GET /probes/{id}/scans (scans.read), GET /probes/{id}/scan/{scan_id} (scans.read). RBAC applicato, audit scans.run scritto, errori mappati (401/403/404/503). mypy --strict pulito, coverage 100%, 301 test verdi.
+
+================================================

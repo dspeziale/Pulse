@@ -9,8 +9,9 @@ from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy import func, select
 
 from .. import errors, schemas, serializers
+from ..audit import write_audit
 from ..context import ProbeClientDep
-from ..deps import CurrentUser, SessionDep, SettingsDep, require_permission
+from ..deps import CurrentUser, SessionDep, SettingsDep, client_ip, require_permission
 from ..models import Alarm, MonitoredSystem, Probe, ProbeRollup
 
 router = APIRouter(prefix="/api/v1", tags=["heartbeats-dashboard"])
@@ -183,3 +184,75 @@ def dashboard_probe(
         systems=systems,
         generated_at=dt.datetime.now(dt.timezone.utc).isoformat(),
     )
+
+
+# ==================== Scansioni NMAP (proxy verso Probe) ===================
+# (aggiunta su richiesta utente: NMAP). Riusa il pattern di get_heartbeats:
+# ProbeClient + _probe_base_url(probe) + settings.probe_query_token.
+
+
+@router.post("/probes/{probe_id}/scan", response_model=schemas.ScanStartOut, tags=["scans"])
+def start_scan(
+    probe_id: str,
+    body: schemas.ScanRequest,
+    request: Request,
+    session: SessionDep,
+    settings: SettingsDep,
+    client: ProbeClientDep,
+    user: CurrentUser = Depends(require_permission("scans.run")),
+) -> schemas.ScanStartOut:
+    """Avvia una scansione NMAP sulla Probe (proxy) e traccia un audit."""
+    probe = _require_probe(session, probe_id)
+    payload = body.model_dump(exclude_none=True)
+    data = client.post_scan(_probe_base_url(probe), settings.probe_query_token, payload)
+    # Audit: non logga l'intero `extra`, solo un riassunto degli estremi.
+    write_audit(
+        session,
+        actor_type="user",
+        actor_id=str(user.id),
+        action="scans.run",
+        outcome="success",
+        entity_type="probe",
+        entity_id=probe_id,
+        ip=client_ip(request),
+        details={"target": body.target, "technique": body.technique, "timing": body.timing},
+    )
+    session.commit()
+    return schemas.ScanStartOut.model_validate(data)
+
+
+@router.get("/probes/{probe_id}/scans", response_model=schemas.ScanList, tags=["scans"])
+def list_scans(
+    probe_id: str,
+    session: SessionDep,
+    settings: SettingsDep,
+    client: ProbeClientDep,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=200),
+    _: CurrentUser = Depends(require_permission("scans.read")),
+) -> schemas.ScanList:
+    """Elenca le scansioni note alla Probe (proxy)."""
+    probe = _require_probe(session, probe_id)
+    data = client.get_scans(
+        _probe_base_url(probe),
+        settings.probe_query_token,
+        {"page": page, "page_size": page_size},
+    )
+    return schemas.ScanList(items=data.get("items", []), total=int(data.get("total", 0)))
+
+
+@router.get(
+    "/probes/{probe_id}/scan/{scan_id}", response_model=schemas.ScanDetail, tags=["scans"]
+)
+def get_scan(
+    probe_id: str,
+    scan_id: str,
+    session: SessionDep,
+    settings: SettingsDep,
+    client: ProbeClientDep,
+    _: CurrentUser = Depends(require_permission("scans.read")),
+) -> schemas.ScanDetail:
+    """Dettaglio di una scansione NMAP sulla Probe (proxy); 404 se inesistente."""
+    probe = _require_probe(session, probe_id)
+    data = client.get_scan(_probe_base_url(probe), settings.probe_query_token, scan_id)
+    return schemas.ScanDetail.model_validate(data)

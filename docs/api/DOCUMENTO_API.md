@@ -279,6 +279,26 @@ Formato corpo errore:
 - **Response 200**: `{ "probe": Probe, "systems": [ { "system_id": string, "system_name": string, "status": string, "avg_response_ms": number, "uptime_pct": number, "checks": [ { "check_id": string, "status": string } ] } ], "generated_at": string }`
 - **Errori**: 404, 503 (probe offline → può restituire ultimo rollup), 401, 403.
 
+### Scansioni NMAP (proxy verso Probe) — (aggiunta su richiesta utente: NMAP)
+> Il Server inoltra alla API di scansione della Probe (auth verso la Probe: `probe_query_token`, stesso canale di `/query/heartbeats`). La validazione profonda di target/opzioni (whitelist/regex, argv mai su shell) resta sulla Probe.
+
+#### POST /api/v1/probes/{id}/scan
+- **Descrizione**: avvia una scansione NMAP sulla Probe. **Permesso**: `scans.run`. **Audit**: scrive una voce `scans.run` (actor = utente, `entity_type=probe`, `entity_id=probe_id`, `details={target, technique, timing}`).
+- **Request** (opzioni pass-through): `{ "target": string, "timing"?: "T0..T5", "technique"?: "connect|syn|udp|ping", "ports"?: string, "top_ports"?: int, "service_version"?: bool, "version_intensity"?: int, "os_detection"?: bool, "no_ping"?: bool, "scripts"?: [string], "script_args"?: string, "min_rate"?: int, "max_rate"?: int, "max_retries"?: int, "extra"?: string }`
+- **Response 200**: `{ "scan_id": string, "status": "running", "started_at": string, "target": string }`
+- **Errori**: 404 (probe inesistente), 503 (probe irraggiungibile/endpoint non configurato), 422 (opzioni non valide sulla Probe), 401, 403.
+
+#### GET /api/v1/probes/{id}/scans
+- **Descrizione**: elenca le scansioni note alla Probe (proxy). **Permesso**: `scans.read`.
+- **Query**: `page` (≥1), `page_size` (1..200).
+- **Response 200**: `{ "items": [ { "scan_id": string, "target": string, "status": string, "started_at": string, "finished_at": string|null, "summary": {...}|null } ], "total": int }`
+- **Errori**: 404 (probe), 503, 401, 403.
+
+#### GET /api/v1/probes/{id}/scan/{scan_id}
+- **Descrizione**: dettaglio di una scansione (proxy). **Permesso**: `scans.read`.
+- **Response 200**: `{ "scan_id": string, "target": string, "options": {...}, "status": string, "started_at": string, "finished_at": string|null, "error": string|null, "summary": {...}|null, "hosts": [ {...} ] }`
+- **Errori**: 404 (probe **o** scan_id inesistente sulla Probe), 503, 401, 403.
+
 ---
 
 ## 1.9 Area: Comunicazione Server↔Probe (endpoint dedicati)
@@ -515,6 +535,7 @@ Formato corpo errore:
 | Sistemi | /systems* | systems.*, checks.read |
 | Check | /checks | checks.read |
 | Heartbeat/Query | /probes/{id}/heartbeats, /probes/{id}/query, /dashboard/* | heartbeats.read, heartbeats.query, dashboard.read |
+| Scansioni NMAP | /probes/{id}/scan, /probes/{id}/scans, /probes/{id}/scan/{scan_id} | scans.run, scans.read |
 | Probe↔Server | /probe/register, /probe/config, /probe/heartbeat, /probe/events, /probe/rollup, (Probe) /query/* | mTLS+probe_token |
 | Notifiche | /notification-channels*, /notifications/history | notifications.* |
 | Workflow | /notification-workflows*, /alarms* | workflows.*, commands.execute |
