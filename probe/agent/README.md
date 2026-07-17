@@ -141,7 +141,15 @@ Contratto opzioni (body `POST /scan`, stesso usato dal FE):
   Concorrenza massima: `PULSE_PROBE_SCAN_MAX_CONCURRENCY` (default 2).
 
 Esempio di argv generato (`technique=syn`, `top_ports=100`, `-sV`):
-`["nmap","-sS","-T3","--top-ports","100","-sV","-oX","-","10.0.0.5"]`.
+`["nmap","--privileged","-sS","-T3","--top-ports","100","-sV","-oX","-","10.0.0.5"]`.
+
+Le scansioni **RAW** (`technique` `syn`/`udp` oppure `os_detection=true`) aggiungono
+`--privileged`: nmap eseguito da utente non-root non auto-rileva le capabilities e
+rifiuterebbe (`requires root privileges. QUITTING!`); `--privileged` gli dice di
+assumere i privilegi, che **sono** realmente presenti (cap_add + setcap), quindi i
+raw socket funzionano. Non viene aggiunto per `connect`/`ping` senza OS detection
+(non serve). Se le capabilities mancassero (compose senza `cap_add`), la scansione
+raw fallirebbe comunque a runtime con un errore chiaro.
 
 ### NMAP in container (Windows/Docker Desktop)
 

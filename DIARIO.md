@@ -2259,3 +2259,34 @@ Output consegnati
 - Sidebar compatta a treeview collassabile su entrambe le dashboard: 6 gruppi (server) e 2 (Sonda) con icona + freccia, sotto-item indentati, gruppo della pagina corrente auto-aperto ed evidenziato, gating dei permessi invariato. Nessun CDN, nessuna modifica a backend/probe. Coverage 100%, 374 test verdi.
 
 ================================================
+
+ITERAZIONE 59
+
+Agente: BE
+Data: 2026-07-17
+
+Input ricevuti
+- Bug confermato a runtime: nmap con file-capabilities (getcap = cap_net_admin,cap_net_raw=eip) e container con NET_RAW/NET_ADMIN nel bounding set, ma nmap eseguito da utente NON-root NON auto-rileva le capabilities e rifiuta -sS/-sU/-O con "requires root privileges. QUITTING!". Prova: `nmap --privileged -sS -Pn -p 80 127.0.0.1` FUNZIONA (usa le caps presenti). Fix solo in probe/agent.
+
+Lavoro svolto (PROBE — probe/agent)
+- nmap_scan.build_nmap_argv: aggiunto il flag `--privileged` subito dopo "nmap" quando la scansione richiede raw socket, cioe' technique in {"syn","udp"} OPPURE os_detection=True. NON aggiunto per connect/ping senza OS detection. Mantenuti invariati -oX - forzato, validazione/sicurezza e ordine (target in coda). `--privileged` dice a nmap di assumere i privilegi: le capabilities SONO presenti (cap_add + setcap), quindi i raw socket funzionano da utente non-root.
+- Test (tests/test_nmap_scan.py): aggiornata l'asserzione della full argv (ora argv[:4] == ["nmap","--privileged","-sS","-T4"]); aggiunti test dedicati: --privileged presente per syn/udp e per connect+os_detection; --privileged ASSENTE per connect/ping senza os.
+- README.md: aggiornato l'esempio argv (["nmap","--privileged","-sS",...]) e aggiunta nota sul motivo di --privileged per le scansioni raw (con caps presenti funzionano da non-root; senza caps fallirebbero comunque a runtime con errore chiaro).
+
+Esempio argv (syn, top_ports=100, -sV)
+- ["nmap","--privileged","-sS","-T3","--top-ports","100","-sV","-oX","-","10.0.0.5"]
+- connect senza os_detection: ["nmap","-sT","-T3","-oX","-","10.0.0.5"] (nessun --privileged)
+
+Qualita'
+- mypy --strict: pulito (14 file, "no issues found").
+- Coverage probe/agent: 100% (928 stmt, 200 branch). Esito: 141 test passati, 0 falliti.
+
+File toccati
+- probe/agent/pulse_probe/nmap_scan.py
+- probe/agent/tests/test_nmap_scan.py
+- probe/agent/README.md
+
+Output consegnati
+- Le scansioni RAW (SYN/UDP/OS) ora usano --privileged e funzionano da utente non-root con le capabilities presenti; connect/ping restano invariate. Nessuna modifica a server/frontend/deploy.
+
+================================================

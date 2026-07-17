@@ -173,7 +173,17 @@ def build_nmap_argv(req: ScanRequest, *, binary: str = "nmap") -> list[str]:
     piu' token. L'output e' SEMPRE forzato a XML su stdout (`-oX -`) e i target
     sono posti in coda dopo essere stati validati.
     """
-    argv: list[str] = [binary, TECHNIQUE_FLAGS[req.technique], f"-{req.timing}"]
+    argv: list[str] = [binary]
+
+    # Scansioni RAW (SYN/UDP/OS detection): nmap, eseguito da utente NON-root, non
+    # auto-rileva le capabilities del file/container e rifiuterebbe con
+    # "requires root privileges. QUITTING!". `--privileged` gli dice di assumere i
+    # privilegi: le capabilities SONO presenti (cap_add + setcap), quindi i raw
+    # socket funzionano davvero. Per connect/ping (senza OS detection) non serve.
+    if req.technique in ("syn", "udp") or req.os_detection:
+        argv.append("--privileged")
+
+    argv += [TECHNIQUE_FLAGS[req.technique], f"-{req.timing}"]
 
     if req.ports:
         argv += ["-p", req.ports]

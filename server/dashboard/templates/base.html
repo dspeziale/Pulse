@@ -127,11 +127,13 @@
         {% set a_guida = ep.startswith('guida.') %}
         <ul class="nav sidebar-menu flex-column" data-lte-toggle="treeview" role="menu">
 
-          {# ---- MONITORAGGIO ---- #}
-          {% if can('dashboard.read') or can('probes.read') or can('systems.read') or can('heartbeats.query') or can('heartbeats.read') or can('workflows.read') %}
-          {{ group_open('bi-speedometer2', 'Monitoraggio',
-             a_dashboard or a_probes or a_systems or a_query or a_charts or a_alarms) }}
+          {# ---- DASHBOARD: sempre PRIMA voce, di primo livello (fuori dai gruppi) ---- #}
           {% if can('dashboard.read') %}{{ navlink(url_for('dashboard.index'), 'bi-speedometer2', 'Dashboard', a_dashboard) }}{% endif %}
+
+          {# ---- MONITORAGGIO ---- #}
+          {% if can('probes.read') or can('systems.read') or can('heartbeats.query') or can('heartbeats.read') or can('workflows.read') %}
+          {{ group_open('bi-speedometer2', 'Monitoraggio',
+             a_probes or a_systems or a_query or a_charts or a_alarms) }}
           {% if can('probes.read') %}{{ navlink(url_for('probes.list_probes'), 'bi-hdd-network', 'Sonde', a_probes) }}{% endif %}
           {% if can('systems.read') %}{{ navlink(url_for('systems.list_systems'), 'bi-hdd-stack', 'Sistemi monitorati', a_systems) }}{% endif %}
           {% if can('heartbeats.query') %}{{ navlink(url_for('query.builder'), 'bi-search', 'Query dati', a_query) }}{% endif %}

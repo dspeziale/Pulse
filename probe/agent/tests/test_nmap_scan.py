@@ -115,7 +115,8 @@ def test_build_argv_full() -> None:
         extra="-A --reason",
     )
     argv = nmap_scan.build_nmap_argv(req)
-    assert argv[:3] == ["nmap", "-sS", "-T4"]
+    # syn scan -> --privileged subito dopo "nmap", poi tecnica/timing
+    assert argv[:4] == ["nmap", "--privileged", "-sS", "-T4"]
     assert "-p" in argv and "22,80" in argv
     assert "-sV" in argv and "--version-intensity" in argv and "5" in argv
     assert "-O" in argv and "-Pn" in argv
@@ -143,6 +144,25 @@ def test_build_argv_top_ports_and_sv_without_intensity() -> None:
 def test_build_argv_technique_mapping(technique: str, flag: str) -> None:
     argv = nmap_scan.build_nmap_argv(ScanRequest(target="10.0.0.5", technique=technique))  # type: ignore[arg-type]
     assert flag in argv
+
+
+def test_build_argv_privileged_for_raw_scans() -> None:
+    # SYN e UDP richiedono raw socket -> --privileged
+    for technique in ("syn", "udp"):
+        argv = nmap_scan.build_nmap_argv(ScanRequest(target="10.0.0.5", technique=technique))  # type: ignore[arg-type]
+        assert "--privileged" in argv
+    # OS detection (anche con connect) richiede raw socket -> --privileged
+    argv_os = nmap_scan.build_nmap_argv(
+        ScanRequest(target="10.0.0.5", technique="connect", os_detection=True)
+    )
+    assert "--privileged" in argv_os
+
+
+def test_build_argv_no_privileged_for_connect_and_ping() -> None:
+    # connect/ping SENZA os detection non necessitano di raw socket
+    for technique in ("connect", "ping"):
+        argv = nmap_scan.build_nmap_argv(ScanRequest(target="10.0.0.5", technique=technique))  # type: ignore[arg-type]
+        assert "--privileged" not in argv
 
 
 # --------------------------------------------------------------------------- #
