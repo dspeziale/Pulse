@@ -87,7 +87,10 @@ INSERT INTO permissions (code, area, description) VALUES
     ('syslog.read',               'syslog',        'Consultare i log di sistema.'),
     -- Configurazione
     ('config.read',               'config',        'Consultare la configurazione.'),
-    ('config.update',             'config',        'Modificare la configurazione.')
+    ('config.update',             'config',        'Modificare la configurazione.'),
+    -- Scansioni di rete (NMAP dalla Probe)
+    ('scans.run',                 'scans',         'Avviare scansioni di rete (NMAP) dalla Probe.'),
+    ('scans.read',                'scans',         'Consultare le scansioni di rete e i risultati.')
 ON CONFLICT (code) DO NOTHING;
 
 -- -----------------------------------------------------------------------------
@@ -142,7 +145,9 @@ INSERT INTO role_permissions (role_id, permission_code) VALUES
     ('00000000-0000-0000-0000-000000000003', 'workflows.read'),
     ('00000000-0000-0000-0000-000000000003', 'workflows.create'),
     ('00000000-0000-0000-0000-000000000003', 'workflows.update'),
-    ('00000000-0000-0000-0000-000000000003', 'commands.execute')
+    ('00000000-0000-0000-0000-000000000003', 'commands.execute'),
+    ('00000000-0000-0000-0000-000000000003', 'scans.run'),
+    ('00000000-0000-0000-0000-000000000003', 'scans.read')
 ON CONFLICT DO NOTHING;
 
 -- Viewer.
@@ -153,7 +158,8 @@ INSERT INTO role_permissions (role_id, permission_code) VALUES
     ('00000000-0000-0000-0000-000000000004', 'systems.read'),
     ('00000000-0000-0000-0000-000000000004', 'checks.read'),
     ('00000000-0000-0000-0000-000000000004', 'dashboard.read'),
-    ('00000000-0000-0000-0000-000000000004', 'heartbeats.read')
+    ('00000000-0000-0000-0000-000000000004', 'heartbeats.read'),
+    ('00000000-0000-0000-0000-000000000004', 'scans.read')
 ON CONFLICT DO NOTHING;
 
 -- Auditor.
@@ -162,7 +168,8 @@ INSERT INTO role_permissions (role_id, permission_code) VALUES
     ('00000000-0000-0000-0000-000000000005', 'profile.update'),
     ('00000000-0000-0000-0000-000000000005', 'dashboard.read'),
     ('00000000-0000-0000-0000-000000000005', 'audit.read'),
-    ('00000000-0000-0000-0000-000000000005', 'syslog.read')
+    ('00000000-0000-0000-0000-000000000005', 'syslog.read'),
+    ('00000000-0000-0000-0000-000000000005', 'scans.read')
 ON CONFLICT DO NOTHING;
 
 -- -----------------------------------------------------------------------------

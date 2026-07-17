@@ -305,7 +305,8 @@ temporale grezza**: e' un riepilogo periodico con retention breve (DB-07).
   attivata di default per non complicare il modello con volumi medio-bassi.
 
 ### 5.3 Seed permessi/ruoli RBAC (06_rbac.md)
-- `deploy/seed.sql` popola: 40 permessi (catalogo enumerato — vedi I-1), 5 ruoli
+- `deploy/seed.sql` popola: 42 permessi (catalogo enumerato — vedi I-1; include
+  `scans.run`/`scans.read` per le scansioni NMAP), 5 ruoli
   predefiniti (`is_builtin=true`), matrice ruoli×permessi (SuperAdmin=tutti,
   Admin=tutti tranne gestione struttura ruoli, Operator/Viewer/Auditor come da
   §4 di `06_rbac.md`), utente `admin` SuperAdmin.
@@ -343,7 +344,7 @@ all'API. **Nessuna entita' o campo e' stato inventato.**
 
 | # | Incongruenza | Riscontro | Decisione conservativa |
 |---|---|---|---|
-| **I-1** | Numero permessi RBAC | `06_rbac.md` dichiara "37 permessi" e `DOCUMENTO_DATABASE.md` idem, ma il catalogo **enumerato** in `06_rbac.md` §2 e la matrice §4 contengono **40 codici distinti**. | Seed di **tutti i 40 codici enumerati** (superset esplicitamente definito dall'Analista, necessario a matrice e API). Il "37" e' un conteggio errato nel testo, non una lista ridotta. Da segnalare all'Analista per allineare il totale. |
+| **I-1** | Numero permessi RBAC | In origine `06_rbac.md` dichiarava "37 permessi" ma il catalogo enumerato (§2) e la matrice (§4) contenevano 40 codici distinti. Corretto in fase di collaudo: totale allineato a **40**; con l'aggiunta di `scans.run`/`scans.read` (scansioni NMAP) il totale attuale e' **42**. | RISOLTA. Seed di **tutti i codici enumerati** (42) coerenti tra `06_rbac.md`, matrice, seed e API. Il "37" era un conteggio errato nel testo, ora allineato. |
 | **I-2** | `probes.tags` tipo | Modello: "ARRAY<STRING> / JSON" (ambiguo). | Scelto `jsonb` array con `CHECK jsonb_typeof='array'`, coerente con l'array JSON `tags:[string]` restituito dall'API `Probe`. |
 | **I-3** | Cancellazione canale vs storico invii | API `DELETE /notification-channels/{id}` → 409 solo "se usato da **workflow**"; ma `notification_deliveries.channel_id` e' `NOT NULL` (modello §3.16) e le delivery sono storiche. | `channel_id NOT NULL ON DELETE RESTRICT`: preserva l'integrita' dello storico. Conseguenza: un canale con delivery storiche non e' cancellabile finche' le delivery non sono purgate per retention. Il 409 "workflow" resta implementato da `workflow_actions.channel_id RESTRICT`. Alternativa (non scelta) sarebbe rendere `channel_id` nullable, ma contraddirebbe il modello. |
 | **I-4** | Parole riservate come nomi colonna | `trigger`, `timestamp`, `window`, `repeat`. | Mantenuti i nomi del modello/API (coerenza RNF-050) quotandoli nel DDL. Nessuna rinomina per non divergere dai contratti API. |
@@ -384,10 +385,10 @@ Iterazione 2:
   applicative** (`fn_set_updated_at`, `fn_audit_log_immutable`,
   `fn_protect_builtin_roles`, `fn_purge_retention`; oltre alle funzioni
   dell'estensione `pgcrypto`), **9 trigger** distinti, 78 indici.
-- `seed.sql` applicato pulito: 40 permessi, 5 ruoli, matrice (SuperAdmin 40 /
-  Admin 36 / Operator 19 / Viewer 7 / Auditor 5), 1 utente admin, 10 config.
+- `seed.sql` applicato pulito: 42 permessi, 5 ruoli, matrice (SuperAdmin 42 /
+  Admin 38 / Operator 21 / Viewer 8 / Auditor 6), 1 utente admin, 11 config.
 - **Idempotenza** verificata: re-run di schema e seed senza errori (0 righe
   inserite al secondo passaggio).
 - **Trigger** verificati: UPDATE/DELETE su `audit_log` rifiutati; DELETE e
   rinomina di ruolo builtin rifiutati.
-- **Vista** `v_user_effective_permissions`: 40 permessi per l'utente admin.
+- **Vista** `v_user_effective_permissions`: 42 permessi per l'utente admin.

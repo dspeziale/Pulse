@@ -121,7 +121,13 @@ Formato codice permesso: `area.azione`.
 | `config.read` | Consultare la configurazione. |
 | `config.update` | Modificare la configurazione. |
 
-Totale: **40 permessi** (di cui 2 di profilo impliciti). Il conteggio coincide con i codici enumerati in questa sezione, con le righe della matrice (§4) e con il seed del DB Server.
+### Scansioni di rete (NMAP dalla Probe)
+| Codice | Descrizione |
+|---|---|
+| `scans.run` | Avviare scansioni di rete (NMAP) dalla Probe. |
+| `scans.read` | Consultare le scansioni di rete e i risultati. |
+
+Totale: **42 permessi** (di cui 2 di profilo impliciti). Il conteggio coincide con i codici enumerati in questa sezione, con le righe della matrice (§4) e con il seed del DB Server.
 
 ---
 
@@ -183,6 +189,8 @@ Legenda: ✔ = concesso, vuoto = non concesso.
 | syslog.read | ✔ | ✔ | | | ✔ |
 | config.read | ✔ | ✔ | | | |
 | config.update | ✔ | ✔ | | | |
+| scans.run | ✔ | ✔ | ✔ | | |
+| scans.read | ✔ | ✔ | ✔ | ✔ | ✔ |
 
 ---
 

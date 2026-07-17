@@ -1925,3 +1925,40 @@ Output consegnati
 - Ovunque nel server dashboard la Sonda e' referenziata come testo ora appare il NOME (dashboard riepilogo/tabella, dettaglio e compendio sistema, colonne DataTables Sistemi e Allarmi), con ripiego sul codice se il nome non e' risolvibile; gli URL mantengono il probe_id. Nessuna modifica a backend/probe-agent, nessun CDN. Coverage 100%, 340 test verdi.
 
 ================================================
+
+ITERAZIONE 51
+
+Agente: DBA
+Data: 2026-07-17
+
+Input ricevuti
+- Nuova funzionalita: scansioni di rete NMAP dalla Probe. Servono due permessi RBAC (scans.run, scans.read) e le assegnazioni ai ruoli predefiniti.
+- Vincolo: modificare SOLO deploy/seed.sql, deploy/migrations, docs/database (+ docs/analisi/06_rbac.md catalogo permessi). Nessun codice applicativo.
+
+Lavoro svolto
+- deploy/seed.sql: aggiunti i 2 permessi al catalogo (area scans) e le assegnazioni role_permissions. SuperAdmin (blocco SELECT di tutti i code) e Admin (SELECT tutti tranne roles.*) li ricevono automaticamente; aggiunte righe esplicite per Operator (scans.run+scans.read), Viewer (scans.read) e Auditor (scans.read). Tutto ON CONFLICT DO NOTHING.
+- Creata migrazione deploy/migrations/005_scan_permissions.sql per DB esistenti: INSERT dei 2 permessi + assegnazioni role_permissions ESPLICITE per tutti i ruoli (SuperAdmin/Admin/Operator per scans.run; +Viewer/Auditor per scans.read), in BEGIN/COMMIT, idempotente.
+- Aggiornato docs/analisi/06_rbac.md: nuova sezione catalogo "Scansioni di rete", 2 righe in matrice ruoli x permessi, totale portato da 40 a 42.
+- Aggiornati docs/database: SCHEMA_FISICO.md (5.3 seed, esito validazione con nuovi conteggi per ruolo, I-1 marcata RISOLTA con totale 42) e DOCUMENTO_DATABASE.md (catalogo 42 permessi).
+- VALIDAZIONE sul DB vivo (pulse-postgres):
+  * migrazione 005 applicata: INSERT 0 2 (permessi) + INSERT 0 8 (assegnazioni), COMMIT, exit 0; RI-esecuzione idempotente (INSERT 0 0 / 0 0, exit 0).
+  * permessi scans.run/scans.read presenti; assegnazioni: scans.run -> SuperAdmin/Admin/Operator, scans.read -> SuperAdmin/Admin/Operator/Viewer/Auditor.
+  * utente admin (SuperAdmin) via v_user_effective_permissions: ha sia scans.run sia scans.read.
+  * totale permessi in DB = 42.
+  * container fresco Postgres 16 con schema.sql+seed.sql: 42 permessi; conteggi per ruolo SuperAdmin 42 / Admin 38 / Operator 21 / Viewer 8 / Auditor 6; assegnazioni scans coerenti (convergenza clean-install/migrazione).
+
+File creati
+- deploy/migrations/005_scan_permissions.sql (nuovo)
+- Modificati: deploy/seed.sql, docs/analisi/06_rbac.md, docs/database/SCHEMA_FISICO.md, docs/database/DOCUMENTO_DATABASE.md
+
+Problemi trovati
+- Nessuno. Idempotenza verificata su seed (blocchi ON CONFLICT) e migrazione.
+
+Decisioni prese
+- Assegnazioni ruolo: scans.run ai ruoli operativi (SuperAdmin/Admin/Operator); scans.read anche a Viewer e Auditor (sola consultazione), coerente con la logica della matrice esistente.
+- Nella migrazione le assegnazioni sono ESPLICITE per tutti i ruoli (incluso SuperAdmin) per sicurezza sul DB esistente, dove i blocchi SELECT del seed non vengono rieseguiti.
+
+Output consegnati
+- Permessi scans.run/scans.read disponibili su installazioni pulite (seed) e su DB esistenti (migrazione 005), matrice/catalogo/docs aggiornati (totale 42), validazione su DB vivo superata (applicazione + idempotenza + SuperAdmin/Admin/Operator con scans.run confermati). Pronto per BE/Probe che implementeranno gli endpoint di scansione NMAP protetti da scans.run/scans.read.
+
+================================================

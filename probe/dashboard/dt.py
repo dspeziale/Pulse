@@ -43,7 +43,8 @@ def _status_col() -> DTColumn:
 
 
 def _ms_col() -> DTColumn:
-    return DTColumn("response_ms", lambda h: h.get("response_ms"),
+    return DTColumn("response_ms",
+                    lambda h: "—" if h.get("response_ms") is None else h.get("response_ms"),
                     sort="response_ms", title="ms", th_class="text-end",
                     class_="text-end")
 
