@@ -174,29 +174,30 @@ def _kpi_grid(pdf: _Report, tiles: Sequence[tuple[str, str]]) -> None:
     tile_w = (usable - gap * (cols - 1)) / cols
     tile_h = 16.0
     x0 = 15
+    # y FISSA per riga: si aggiorna solo quando inizia una nuova riga, così
+    # tutti i riquadri della stessa riga sono allineati (niente "scaletta").
+    row_y = pdf.get_y()
     for i, (label, value) in enumerate(tiles):
         col = i % cols
-        if col == 0:
-            if i:
-                pdf.ln(tile_h + gap)
-            y = pdf.get_y()
+        if col == 0 and i:
+            row_y += tile_h + gap
         x = x0 + col * (tile_w + gap)
-        y = pdf.get_y()
         pdf.set_draw_color(*_BORDER)
         pdf.set_fill_color(255, 255, 255)
         pdf.set_line_width(0.2)
-        pdf.rect(x, y, tile_w, tile_h, style="D", round_corners=True,
+        pdf.rect(x, row_y, tile_w, tile_h, style="D", round_corners=True,
                  corner_radius=1.5)
-        pdf.set_xy(x, y + 2.5)
+        pdf.set_xy(x, row_y + 2.5)
         pdf.set_font(_FONT, "B", 14)
         pdf.set_text_color(*_BRAND)
         pdf.cell(tile_w, 7, value, align="C")
-        pdf.set_xy(x, y + 9.5)
+        pdf.set_xy(x, row_y + 9.5)
         pdf.set_font(_FONT, "", 8.5)
         pdf.set_text_color(*_MUTED)
         pdf.cell(tile_w, 5, label, align="C")
+    # Posiziona il cursore sotto l'ultima riga di riquadri.
     pdf.set_text_color(*_INK)
-    pdf.ln(tile_h + 2)
+    pdf.set_xy(x0, row_y + tile_h + 4)
 
 
 def _row_fits(pdf: _Report, row_h: float) -> bool:

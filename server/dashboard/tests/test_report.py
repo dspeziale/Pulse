@@ -203,6 +203,39 @@ def test_pdf_filename_sanitized(client, login, fake):
     assert "compendio_sistema_" in r.headers["Content-Disposition"]
 
 
+def test_kpi_grid_tiles_aligned_per_row():
+    """Regressione: i riquadri KPI di una stessa riga condividono la y
+    (niente disposizione "a scaletta"); le righe differiscono in verticale."""
+    class _FakePDF:
+        w = 210
+
+        def __init__(self):
+            self.rects = []
+
+        def get_y(self):
+            return 100.0
+
+        def rect(self, x, y, w, h, **k):
+            self.rects.append((round(x, 1), round(y, 1)))
+
+        def set_xy(self, *a):
+            pass
+
+        def __getattr__(self, _name):  # set_font/set_*_color/cell/... no-op
+            return lambda *a, **k: None
+
+    pdf = _FakePDF()
+    tiles = [("A", "1"), ("B", "2"), ("C", "3"), ("D", "4"),
+             ("E", "5"), ("F", "6"), ("G", "7")]
+    report_pdf._kpi_grid(pdf, tiles)
+    ys = [_y for _x, _y in pdf.rects]
+    xs = [_x for _x, _y in pdf.rects]
+    assert len(set(ys[0:4])) == 1          # prima riga allineata
+    assert len(set(ys[4:7])) == 1          # seconda riga allineata
+    assert ys[0] != ys[4]                  # righe su y diverse
+    assert xs[0:4] == sorted(xs[0:4]) and len(set(xs[0:4])) == 4  # x crescenti
+
+
 # --------------------------------------------------------------------------- #
 # Helper puri di report.py
 # --------------------------------------------------------------------------- #
